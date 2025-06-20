@@ -6,10 +6,11 @@ import TransactionHistory from "@/Modules/User/pages/UserDasboardpage/History";
 import QRScannerPage from "./Pay";
 
 const features = [
-  { label: "Top Up", icon: <Plus className="w-6 h-6" />, key: "topup" },
-  { label: "Pay", icon: <Wallet className="w-6 h-6" />, key: "pay" },
-  { label: "History", icon: <Clock className="w-6 h-6" />, key: "history" },
+  { label: "Top Up", icon: <Plus className="w-10 h-10" />, key: "topup" },
+  { label: "Pay", icon: <Wallet className="w-10 h-10" />, key: "pay" },
+  { label: "History", icon: <Clock className="w-10 h-10" />, key: "history" },
 ];
+
 
 const UserHome = () => {
   const [activeFeature, setActiveFeature] = useState("topup");
