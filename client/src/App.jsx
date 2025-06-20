@@ -1,16 +1,23 @@
-import React from 'react'
-import Header from '@/Modules/User/components/header/Navbar'
-import Landing from '@/Modules/User/pages/Landing/Landing'
-import Footer from '@/Modules/User/components/footer/Footer'
+import React from "react";
+import { Routes, Route } from "react-router-dom";
+import Home from '@/Modules/User/pages/Landing/Home';
+import Footer from '@/Modules/User/components/footer/Footer';
+import Mainpage from "@/Modules/User/pages/UserDasboardpage/Main/Mainpage";
+
+
 
 const App = () => {
   return (
-    <div>
-        <Header/>
-        <Landing/>
-        <Footer/>
-    </div>
-  )
-}
+    <>
 
-export default App
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path='/userdashboard' element={<Mainpage/>}/>
+      </Routes>
+      <Footer />
+    </>
+  );
+};
+
+export default App;
+
