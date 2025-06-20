@@ -18,9 +18,6 @@ const transactionRoute=require('./route/transactionRoute');
 const cardRoute=require('./route/cardRoute');
 const loginLogRoute=require('./route/loginLogRoute');
 const apiIntegrationRoute=require('./route/apiIntegrationRoute');
-
-
-
 const app = express();
 
 app.use('/api/roles',roleRoute);
