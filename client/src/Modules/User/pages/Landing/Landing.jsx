@@ -10,7 +10,7 @@ const Landing = () => {
         <CardHeader className="text-center mb-4">
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[#07014A]">
             Welcome to Pegasus
-          </h1>
+          </h1>cd 
           <p className="mt-2 text-[#413C85] text-sm sm:text-base lg:text-lg font-medium">
             Celebrating 125 years of CMC Vellore
           </p>
