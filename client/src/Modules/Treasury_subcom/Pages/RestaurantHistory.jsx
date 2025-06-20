@@ -1,0 +1,173 @@
+import { useState } from "react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+
+const RestaurantHistory = () => {
+  const [date, setDate] = useState(new Date());
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const restaurants = ["Olive Garden", "The Capital Grille", "Red Lobster", "Ruth's Chris"];
+  const transactionTypes = ["Purchase", "Refund"];
+
+  const transactions = [
+    { id: "TXN00087", customer: "Rahul Sharma (CUST001)", amount: -250, dateTime: "15/3/2023 03:32 pm", status: "Completed" },
+    { id: "TXN00086", customer: "Priya Patel (CUST002)", amount: -180, dateTime: "15/3/2023 01:45 pm", status: "Completed" },
+    { id: "TXN00085", customer: "Amit Kumar (CUST003)", amount: -320, dateTime: "15/3/2023 12:20 pm", status: "Completed" },
+    { id: "TXN00084", customer: "Sneha Gupta (CUST004)", amount: -150, dateTime: "15/3/2023 11:15 am", status: "Completed" },
+    { id: "TXN00083", customer: "Vikram Singh (CUST005)", amount: -200, dateTime: "15/3/2023 10:30 am", status: "Completed" },
+    { id: "TXN00082", customer: "Neha Kapoor (CUST006)", amount: -300, dateTime: "14/3/2023 04:15 pm", status: "Completed" },
+    { id: "TXN00081", customer: "Rohan Mehta (CUST007)", amount: -175, dateTime: "14/3/2023 02:30 pm", status: "Completed" },
+    { id: "TXN00080", customer: "Anita Desai (CUST008)", amount: -220, dateTime: "14/3/2023 11:00 am", status: "Completed" },
+    { id: "TXN00079", customer: "Suresh Patel (CUST009)", amount: -190, dateTime: "13/3/2023 03:45 pm", status: "Completed" },
+    { id: "TXN00078", customer: "Kavita Sharma (CUST010)", amount: -260, dateTime: "13/3/2023 01:20 pm", status: "Completed" },
+  ];
+
+  const handleExport = () => {
+    const csv = [
+      ["Transaction ID, Customer, Amount, Date & Time, Status"],
+      ...transactions.map(row => `${row.id}, "${row.customer}", ₹${row.amount}, ${row.dateTime}, ${row.status}`),
+    ].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "transaction_history.csv";
+    a.click();
+  };
+
+  return (
+    <div className="container mx-auto p-4">
+      <Card className="max-w-[70%] mx-auto">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-2xl font-bold" style={{ color: '#070149' }}>Restaurant History</CardTitle>
+          <Button onClick={handleExport} className="bg-[#070149] text-white">Export Data</Button>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-4 gap-4 mb-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Restaurant Name</label>
+              <Select>
+                <SelectTrigger className="mt-1 w-full">
+                  <SelectValue placeholder="All Restaurants" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Restaurants</SelectItem>
+                  {restaurants.map((restaurant) => (
+                    <SelectItem key={restaurant} value={restaurant}>
+                      {restaurant}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Transaction Date</label>
+              <div className="relative mt-1">
+                <Button
+                  variant="outline"
+                  className="w-full justify-between"
+                  onClick={() => setIsCalendarOpen(!isCalendarOpen)}
+                >
+                  {date.toLocaleDateString()}
+                  <span className="ml-2">📅</span>
+                </Button>
+                {isCalendarOpen && (
+                  <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={(selectedDate) => {
+                      setDate(selectedDate || date);
+                      setIsCalendarOpen(false);
+                    }}
+                    className="mt-2 rounded-md border absolute z-10 bg-white"
+                    onClickOutside={() => setIsCalendarOpen(false)}
+                  />
+                )}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Transaction Type</label>
+              <Select>
+                <SelectTrigger className="mt-1 w-full">
+                  <SelectValue placeholder="All Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  {transactionTypes.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Sort By</label>
+              <Select>
+                <SelectTrigger className="mt-1 w-full">
+                  <SelectValue placeholder="A to Z" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="a-z">A to Z</SelectItem>
+                  <SelectItem value="z-a">Z to A</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <h2 className="text-xl font-semibold mb-2" style={{ color: '#070149' }}>Transaction History</h2>
+            <table className="w-full text-sm text-left text-gray-500">
+              <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2">Transaction ID</th>
+                  <th className="px-4 py-2">Customer</th>
+                  <th className="px-4 py-2">Amount</th>
+                  <th className="px-4 py-2">Date & Time</th>
+                  <th className="px-4 py-2">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {transactions.map((transaction) => (
+                  <tr key={transaction.id} className="bg-white border-b">
+                    <td className="px-4 py-2">{transaction.id}</td>
+                    <td className="px-4 py-2">{transaction.customer}</td>
+                    <td className="px-4 py-2 text-red-600">₹{transaction.amount}</td>
+                    <td className="px-4 py-2">{transaction.dateTime}</td>
+                    <td className="px-4 py-2">
+                      <Badge className="bg-green-100 text-green-800">{transaction.status}</Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="flex justify-between items-center mt-4">
+              <span className="text-gray-600">Showing 1 to 10 of 10 transactions</span>
+              <div className="flex items-center gap-2">
+                <div className="flex gap-1">
+                  <Button variant="outline" size="sm" disabled={true}>←</Button>
+                  <Button variant="outline" size="sm">1</Button>
+                  <Button variant="outline" size="sm">2</Button>
+                  <Button variant="outline" size="sm"></Button>
+                  <Button variant="outline" size="sm"></Button>
+                  <Button variant="outline" size="sm">→</Button>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => window.history.back()}>×</Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default RestaurantHistory;

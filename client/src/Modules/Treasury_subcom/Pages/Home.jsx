@@ -6,10 +6,10 @@ function Home() {
   const navigate = useNavigate();
   const cards = [
    { title: "Register Customer", icon: UserPlus, color: "text-blue-600", path: "/register-customer" },
-    { title: "Topup", icon: CreditCard, color: "text-green-600", path: "" },
-    { title: "Customer History", icon: Users, color: "text-purple-600", path: "" },
-    { title: "Restaurant History", icon: Utensils, color: "text-red-600", path: "" },
-    { title: "User History", icon: User, color: "text-orange-600", path: "" },
+    { title: "Topup", icon: CreditCard, color: "text-green-600", path: "/topup-online-user" },
+    { title: "Customer History", icon: Users, color: "text-purple-600", path: "/customer-history" },
+    { title: "Restaurant History", icon: Utensils, color: "text-red-600", path: "/restaurant-history" },
+    { title: "User History", icon: User, color: "text-orange-600", path: "user-history" },
   ];
 
   return (
