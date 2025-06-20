@@ -7,7 +7,8 @@ import LoginForm from "@/Modules/User/pages/Loginpage/Login";
 import ForgotPasswordForm from "@/Modules/User/pages/Loginpage/ForgotPasswordForm";
 import MobileLogin from "@/Modules/User/pages/Loginpage/MobileLogin";
 import MobileOtp from "@/Modules/User/pages/Loginpage/MobileOtp"; // import
-import Header from "../../components/header/Navbar";
+import Header from "@/Modules/User/components/header/Navbar";
+import Footer from "@/Modules/User/components/footer/Footer";
 
 const Home = () => {
   const [showRegister, setShowRegister] = useState(false);
@@ -156,6 +157,7 @@ const Home = () => {
         />
       )}
     </div>
+    <Footer/>
     </>
   );
 };
