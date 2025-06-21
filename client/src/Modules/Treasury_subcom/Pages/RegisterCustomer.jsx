@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useRef, useEffect } from "react";
 import {
   Card,
@@ -14,7 +16,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { BrowserQRCodeReader } from "@zxing/browser";
+import { Html5Qrcode } from "html5-qrcode";
 import RegistrationSuccess from "./RegistrationSuccess";
 
 import {
@@ -33,36 +35,90 @@ function RegisterCustomer() {
     phoneNumber: "",
   });
   const [isRegistered, setIsRegistered] = useState(false);
-  const videoRef = useRef(null);
-  const codeReader = useRef(null);
 
-  useEffect(() => {
-    if (isScannerOpen && videoRef.current) {
-      codeReader.current = new BrowserQRCodeReader();
-      codeReader.current.decodeFromVideoDevice(
-        null,
-        videoRef.current,
-        (result, error) => {
-          if (result) {
-            console.log("Scanned:", result.getText());
-            setIsScannerOpen(false);
-          }
-          if (error && error.name !== "NotFoundException") {
-            console.error(error);
-          }
-        }
-      );
-    }
-    return () => {
-      if (codeReader.current) {
-        codeReader.current.reset();
+  const qrRef = useRef(null);
+  const html5QrCodeRef = useRef(null);
+  const [cameraError, setCameraError] = useState("");
+
+  const startScanner = async () => {
+    setCameraError("");
+    try {
+      if (html5QrCodeRef.current) {
+        await stopScanner();
       }
+
+      const html5QrCode = new Html5Qrcode("qr-reader");
+      html5QrCodeRef.current = html5QrCode;
+
+      await html5QrCode.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: { width: 300, height: 350 },
+        },
+        decodedText => handleScanSuccess(decodedText),
+        error => console.warn("QR scan error:", error)
+      );
+    } catch (err) {
+      console.error("Camera start failed:", err);
+      setCameraError("Failed to access camera. Please check permissions.");
+      html5QrCodeRef.current = null;
+    }
+  };
+
+  const stopScanner = async () => {
+    if (html5QrCodeRef.current) {
+      try {
+        await html5QrCodeRef.current.stop();
+      } catch (err) {
+        console.error("Stop failed:", err);
+      } finally {
+        html5QrCodeRef.current = null;
+      }
+    }
+  };
+
+  const handleScanSuccess = decodedText => {
+    try {
+      const data = JSON.parse(decodedText);
+      if (!data.name || !data.phone || !data.email) {
+        alert("Invalid QR data");
+        return;
+      }
+
+      setFormData({
+        customerName: data.name,
+        email: data.email,
+        phoneNumber: data.phone,
+      });
+
+      setIsScannerOpen(false);
+      stopScanner();
+    } catch (err) {
+      console.error("Failed to parse QR:", err);
+      alert("Invalid QR Code Format");
+    }
+  };
+
+useEffect(() => {
+  if (isScannerOpen) {
+    // Delay to ensure dialog content (qr-reader) is rendered
+    const timeout = setTimeout(() => {
+      startScanner();
+    }, 300); // 300ms delay
+
+    return () => {
+      clearTimeout(timeout);
+      stopScanner();
     };
-  }, [isScannerOpen]);
+  } else {
+    stopScanner();
+  }
+}, [isScannerOpen]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleRegister = (e) => {
@@ -97,9 +153,19 @@ function RegisterCustomer() {
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Scanner</DialogTitle>
+                  <DialogTitle>Scan QR Code</DialogTitle>
                 </DialogHeader>
-                <video ref={videoRef} style={{ width: "100%" }} />
+                <div className="relative w-full h-64 bg-gray-100 border border-dashed border-[#070149] rounded-lg overflow-hidden">
+                  {!html5QrCodeRef.current && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <ScanLine className="w-20 h-20 text-[#070149]" />
+                    </div>
+                  )}
+                  <div id="qr-reader" ref={qrRef} className="w-full h-full" />
+                </div>
+                {cameraError && (
+                  <p className="text-red-500 text-sm mt-2">{cameraError}</p>
+                )}
                 <Button
                   onClick={() => setIsScannerOpen(false)}
                   className="mt-4 bg-[#070149] hover:bg-[#3f3b6d] text-white"
@@ -109,13 +175,14 @@ function RegisterCustomer() {
               </DialogContent>
             </Dialog>
           </div>
+
           <form onSubmit={handleRegister} className="space-y-6">
             <div>
               <label
                 htmlFor="customerName"
                 className="block text-lg font-medium text-gray-700 mb-1 items-center gap-2"
               >
-                <User className="w-5 h-5" />
+                <User className="w-5 h-5 inline" />
                 Customer Name
               </label>
               <Input
@@ -132,9 +199,9 @@ function RegisterCustomer() {
             <div>
               <label
                 htmlFor="email"
-                className="block text-lg font-medium text-gray-700 mb-1  items-center gap-2"
+                className="block text-lg font-medium text-gray-700 mb-1 items-center gap-2"
               >
-                <Mail className="w-5 h-5" />
+                <Mail className="w-5 h-5 inline" />
                 Email
               </label>
               <Input
@@ -153,7 +220,7 @@ function RegisterCustomer() {
                 htmlFor="phoneNumber"
                 className="block text-lg font-medium text-gray-700 mb-1 items-center gap-2"
               >
-                <Phone className="w-5 h-5" />
+                <Phone className="w-5 h-5 inline" />
                 Phone Number
               </label>
               <Input
