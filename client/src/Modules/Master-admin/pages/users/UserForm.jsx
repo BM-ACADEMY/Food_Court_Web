@@ -61,25 +61,22 @@ export function UserForm({ open, onOpenChange, onSubmit, defaultValues }) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>{defaultValues ? "Edit" : "Add"} User</DialogTitle>
+          <DialogTitle className="text-[#00004D] font-bold">{defaultValues ? "Edit" : "Add"} User</DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div>
-            <Label htmlFor="name">Name</Label>
-            <Input id="name" name="name" value={formData.name} onChange={handleChange} />
+            <Label htmlFor="name" className="mb-3">Name</Label>
+            <Input id="name" name="name" placeholder="Enter name" value={formData.name} onChange={handleChange} />
           </div>
           <div>
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" name="email" type="email" value={formData.email} onChange={handleChange} />
+            <Label htmlFor="email"  className="mb-3">Email</Label>
+            <Input id="email" name="email" type="email" placeholder="Enter email" value={formData.email} onChange={handleChange} />
           </div>
           <div>
-            <Label htmlFor="phone_number">Phone Number</Label>
-            <Input id="phone_number" name="phone_number" value={formData.phone_number} onChange={handleChange} />
+            <Label htmlFor="phone_number"  className="mb-3">Phone Number</Label>
+            <Input id="phone_number" name="phone_number" placeholder="Phone number" value={formData.phone_number} onChange={handleChange} />
           </div>
-          <div>
-            <Label htmlFor="whatsapp_number">WhatsApp Number</Label>
-            <Input id="whatsapp_number" name="whatsapp_number" value={formData.whatsapp_number} onChange={handleChange} />
-          </div>
+       
 
           {/* Role Selection Buttons */}
           <div className="flex flex-col gap-2">
@@ -91,7 +88,7 @@ export function UserForm({ open, onOpenChange, onSubmit, defaultValues }) {
                   type="button"
                   variant={formData.role_id === role.value ? "default" : "outline"}
                   onClick={() => handleRoleChange(role.value)}
-                  className="transition-colors"
+                  className={formData.role_id === role.value ? "bg-[#00004D] cursor-pointer transition-colors " : "outline "}
                 >
                   {role.label}
                 </Button>
@@ -101,7 +98,7 @@ export function UserForm({ open, onOpenChange, onSubmit, defaultValues }) {
 
           {isCustomer && (
             <div>
-              <Label htmlFor="registration_type">Registration Type</Label>
+              <Label htmlFor="registration_type"  className="mb-3">Registration Type</Label>
               <Select
                 value={formData.registration_type}
                 onValueChange={(value) => setFormData((prev) => ({ ...prev, registration_type: value }))}
@@ -120,19 +117,21 @@ export function UserForm({ open, onOpenChange, onSubmit, defaultValues }) {
           {isRestaurant && (
             <>
               <div>
-                <Label htmlFor="restaurant_name">Restaurant Name</Label>
+                <Label htmlFor="restaurant_name"  className="mb-3">Restaurant Name</Label>
                 <Input
                   id="restaurant_name"
                   name="restaurant_name"
+                  placeholder="Restaurant name"
                   value={formData.restaurant_name}
                   onChange={handleChange}
                 />
               </div>
               <div>
-                <Label htmlFor="location">Location</Label>
+                <Label htmlFor="location"  className="mb-3">Location</Label>
                 <Input
                   id="location"
                   name="location"
+                  placeholder="Enter restaurant location"
                   value={formData.location}
                   onChange={handleChange}
                 />
@@ -140,7 +139,7 @@ export function UserForm({ open, onOpenChange, onSubmit, defaultValues }) {
             </>
           )}
 
-          <Button onClick={handleSubmit}>{defaultValues ? "Update" : "Submit"}</Button>
+          <Button className="bg-[#00004D] cursor-pointer" onClick={handleSubmit}>{defaultValues ? "Update" : "Submit"}</Button>
         </div>
       </DialogContent>
     </Dialog>

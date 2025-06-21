@@ -28,6 +28,19 @@ import { Label } from "@/components/ui/label";
 import { Eye, Pencil, Trash2, UserPlus, Search } from "lucide-react";
 import { useState, useEffect } from "react";
 import { UserForm } from "./UserForm";
+import { toast } from "react-toastify";
+import axios from "axios";
+import {
+    Pagination,
+    PaginationContent,
+    PaginationEllipsis,
+    PaginationItem,
+    PaginationLink,
+    PaginationNext,
+    PaginationPrevious,
+} from "@/components/ui/pagination";
+
+
 
 const initialUsers = [...Array(53)].map((_, i) => ({
     id: i + 1,
@@ -45,6 +58,14 @@ const roleMap = {
     "5": "Customer",
 };
 
+const getPageNumbers = (current, total, delta = 2) => {
+    const range = [];
+    const start = Math.max(1, current - delta);
+    const end = Math.min(total, current + delta);
+    for (let i = start; i <= end; i++) range.push(i);
+    return range;
+};
+
 const roleColumns = {
     all: ["ID", "Name", "Email", "Phone", "Role"],
     "1": ["ID", "Name", "Email", "Phone", "Role"],
@@ -53,7 +74,6 @@ const roleColumns = {
     "4": ["ID", "Name", "Email", "Phone", "Role", "Restaurant Name", "Location"],
     "5": ["ID", "Name", "Email", "Phone", "Role", "Registration Type"],
 };
-
 
 export default function UserList() {
     const [users, setUsers] = useState(initialUsers);
@@ -65,6 +85,8 @@ export default function UserList() {
     const perPage = 10;
     const [selectedUserForDelete, setSelectedUserForDelete] = useState(null);
     const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
+    // const totalPages = Math.ceil(filteredUsers.length / perPage);
+
 
 
     useEffect(() => {
@@ -96,18 +118,42 @@ export default function UserList() {
         alert(`Viewing details for:\n\nName: ${user.name}\nEmail: ${user.email}\nPhone: ${user.phone_number}\nRole: ${roleMap[user.role_id]}`);
     };
 
-    const handleSubmit = (data) => {
-        if (editUser) {
-            setUsers((prev) =>
-                prev.map((u) => (u.id === editUser.id ? { ...u, ...data } : u))
-            );
-        } else {
-            const newUser = { ...data, id: users.length + 1 };
-            setUsers((prev) => [...prev, newUser]);
+    const handleSubmit = async (formData) => {
+        console.log(formData,"data");
+        
+        try {
+            // Step 1: Create the user
+            const userRes = await axios.post(`${import.meta.env.VITE_BASE_URL}/users/create-user`, formData);
+            const newUser = userRes.data.data; 
+
+            toast.success("User created successfully");
+
+            // Step 2: Based on role, call role-specific API
+            const roleId = newUser.role_id;
+            const userId = newUser._id;
+
+            if (roleId === "1") {
+                await axios.post(`${import.meta.env.VITE_BASE_URL}/master-admins/create-master-admin`, { user_id: userId });
+            } else if (roleId === "2") {
+                await axios.post(`${import.meta.env.VITE_BASE_URL}/admins/create-admin`, { user_id: userId });
+            } else if (roleId === "3") {
+                await axios.post(`${import.meta.env.VITE_BASE_URL}/treasurySubcom/create-treasurysubcom`, { user_id: userId });
+            } else if (roleId === "4") {
+                await axios.post(`${import.meta.env.VITE_BASE_URL}/restaurants/create-restaurant`, { user_id: userId });
+            } else if (roleId === "5") {
+                await axios.post(`${import.meta.env.VITE_BASE_URL}/customers/create-customer`, { user_id: userId });
+            }
+
+            toast.success("Role-specific data saved");
+
+            setOpenModal(false);
+            // fetchUsers();
+        } catch (err) {
+            console.error("Error during submission:", err);
+            toast.error(err.response?.data?.message || "Something went wrong");
         }
-        setOpenModal(false);
-        setEditUser(null);
     };
+
 
     return (
         <div className="p-4">
@@ -115,7 +161,7 @@ export default function UserList() {
                 <div className="flex gap-4 items-end">
                     {/* Search Input with Label */}
                     <div className="flex flex-col gap-1">
-                        <Label htmlFor="search">Search by Name or Phone</Label>
+                        <Label htmlFor="search" className="mb-3 text-[#00004D] font-bold">Search by Name or Phone</Label>
                         <div className="relative w-64">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
                             <Input
@@ -130,7 +176,7 @@ export default function UserList() {
 
                     {/* Role Filter Select with Label */}
                     <div className="flex flex-col gap-1">
-                        <Label htmlFor="role">Select User Role</Label>
+                        <Label htmlFor="role" className="text-[#00004D] mb-3 font-bold">Select User Role</Label>
                         <Select onValueChange={setRoleFilter} value={roleFilter}>
                             <SelectTrigger id="role" className="w-48">
                                 <SelectValue placeholder="Filter by Role" />
@@ -151,6 +197,7 @@ export default function UserList() {
                         setEditUser(null);
                         setOpenModal(true);
                     }}
+                    className="bg-[#00004D] cursor-pointer"
                 >
                     <UserPlus className="mr-2 h-4 w-4" /> Add User
                 </Button>
@@ -160,9 +207,9 @@ export default function UserList() {
                 <TableHeader>
                     <TableRow>
                         {roleColumns[roleFilter]?.map((col) => (
-                            <TableHead key={col}>{col}</TableHead>
+                            <TableHead className="text-[#00004D] font-bold" key={col}>{col}</TableHead>
                         ))}
-                        <TableHead className="text-center">Actions</TableHead>
+                        <TableHead className="text-center text-[#00004D] font-bold ">Actions</TableHead>
                     </TableRow>
                 </TableHeader>
 
@@ -193,15 +240,16 @@ export default function UserList() {
                             })}
                             <TableCell className="text-center">
                                 <div className="flex justify-center gap-2">
-                                    <Button size="icon" variant="ghost" onClick={() => handleView(user)}>
-                                        <Eye className="w-4 h-4" />
+                                    <Button size="icon" variant="ghost" className="cursor-pointer" onClick={() => handleView(user)}>
+                                        <Eye className="w-4 h-4 text-[#00004D] " />
                                     </Button>
-                                    <Button size="icon" variant="ghost" onClick={() => handleEdit(user)}>
-                                        <Pencil className="w-4 h-4" />
+                                    <Button size="icon" variant="ghost" className="cursor-pointer" onClick={() => handleEdit(user)}>
+                                        <Pencil className="w-4 h-4 text-[#00004D] r" />
                                     </Button>
                                     <Button
                                         size="icon"
                                         variant="ghost"
+                                        className="cursor-pointer"
                                         onClick={() => {
                                             setSelectedUserForDelete(user);
                                             setOpenDeleteDialog(true);
@@ -216,24 +264,74 @@ export default function UserList() {
                 </TableBody>
             </Table>
 
+            <div className="float-end">
+                <Pagination>
+                    <PaginationContent>
+                        {/* Previous Button */}
+                        <PaginationItem>
+                            <PaginationPrevious
+                                href="#"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    if (page > 1) setPage(page - 1);
+                                }}
+                                className={page === 1 ? "pointer-events-none opacity-50" : ""}
+                            />
+                        </PaginationItem>
 
-            <div className="flex justify-between items-center mt-4">
-                <span>Total: {filteredUsers.length} records</span>
-                <div className="flex gap-2">
-                    <Button disabled={page === 1} onClick={() => setPage(page - 1)}>
-                        Prev
-                    </Button>
-                    <span>
-                        Page {page} of {totalPages}
-                    </span>
-                    <Button
-                        disabled={page === totalPages}
-                        onClick={() => setPage(page + 1)}
-                    >
-                        Next
-                    </Button>
-                </div>
+                        {/* Page Numbers */}
+                        {getPageNumbers(page, totalPages).map((p) => (
+                            <PaginationItem key={p}>
+                                <PaginationLink
+                                    href="#"
+                                    isActive={p === page}
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        setPage(p);
+                                    }}
+                                    className="text-[#00004D]"
+                                >
+                                    {p}
+                                </PaginationLink>
+                            </PaginationItem>
+                        ))}
+
+                        {/* Ellipsis if needed */}
+                        {page + 2 < totalPages && (
+                            <>
+                                <PaginationItem>
+                                    <PaginationEllipsis />
+                                </PaginationItem>
+                                <PaginationItem>
+                                    <PaginationLink
+                                        href="#"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            setPage(totalPages);
+                                        }}
+                                        className="text-[#00004D] font-bold"
+                                    >
+                                        {totalPages}
+                                    </PaginationLink>
+                                </PaginationItem>
+                            </>
+                        )}
+
+                        {/* Next Button */}
+                        <PaginationItem>
+                            <PaginationNext
+                                href="#"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    if (page < totalPages) setPage(page + 1);
+                                }}
+                                className={page === totalPages ? "pointer-events-none opacity-50" : "text-[#00004D]"}
+                            />
+                        </PaginationItem>
+                    </PaginationContent>
+                </Pagination>
             </div>
+
             <Dialog open={openDeleteDialog} onOpenChange={setOpenDeleteDialog}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>

@@ -1,6 +1,7 @@
 const express = require('express');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
+const cors =require('cors');
 
 // Load environment variables from .env file
 dotenv.config();
@@ -22,11 +23,21 @@ const userBalanceRoute=require('./route/userBalanceRoute');
 
 
 const app = express();
+app.use(cors({ origin: '*' }));
+
+// Optional: manually allow CORS headers for more control
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+  next();
+});
+
 
 app.use('/api/roles',roleRoute);
 app.use('/api/users',userRoute);
 app.use('/api/customers',customerRoute);
-app.use('/api/restaurant',restaurantRoute);
+app.use('/api/restaurants',restaurantRoute);
 app.use('/api/restaurantSub',restaurantSubRoute);
 app.use('/api/treasurySubcom',treasurySubcomRoute);
 app.use('/api/admins',adminRoute);
