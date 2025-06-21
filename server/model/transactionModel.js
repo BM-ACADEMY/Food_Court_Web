@@ -19,11 +19,11 @@ const transactionSchema = new mongoose.Schema(
     transaction_type: {
       type: String,
       required: true,
-      enum: ["Transfer", "TopUp", "Refund", "Withdrawal"], // Add your exact types here
+      enum: ["Transfer", "TopUp", "Refund"], 
     },
     payment_method: {
       type: String,
-      enum: ["Cash", "Online", "Wallet", "Card"], // Optional, adjust as per your enum
+      enum: ["Cash", "Gpay", "Mess bill"],
     },
     status: {
       type: String,

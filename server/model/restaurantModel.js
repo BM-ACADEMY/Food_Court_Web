@@ -31,6 +31,16 @@ const restaurantSchema = new mongoose.Schema(
       trim: true,
       index: true,
     },
+      status: {
+      type: String,
+      enum: ["Active", "Inactive", "Blocked", "Lost"],
+      default: "Active",
+      required: true,
+    },
+    treasury_to_customer_refund: {
+      type: mongoose.Schema.Types.Decimal128,
+      default: 1000.0,
+    },
   },
   {
     timestamps: {
@@ -41,6 +51,9 @@ const restaurantSchema = new mongoose.Schema(
 );
 
 // Compound index: (user_id, qr_code)
-restaurantSchema.index({ user_id: 1, qr_code: 1 }, { name: "idx_restaurants_user_qr" });
+restaurantSchema.index(
+  { user_id: 1, qr_code: 1 },
+  { name: "idx_restaurants_user_qr" }
+);
 
 module.exports = mongoose.model("Restaurant", restaurantSchema);

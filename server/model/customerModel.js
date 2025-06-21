@@ -11,7 +11,7 @@ const customerSchema = new mongoose.Schema(
     },
     registration_type: {
       type: String,
-      enum: ["TypeA", "TypeB", "TypeC"], // ← Replace with your actual enum values
+      enum: ["online", "offline"], 
       required: true,
     },
     registration_fee_paid: {
@@ -24,6 +24,12 @@ const customerSchema = new mongoose.Schema(
       unique: true,
       trim: true,
       index: true,
+    },
+      status: {
+      type: String,
+      enum: ["Active", "Inactive", "Blocked", "Lost"],
+      default: "Active",
+      required: true,
     },
   },
   {
