@@ -18,7 +18,6 @@ import {
 } from "@/components/ui/dialog";
 import { Html5Qrcode } from "html5-qrcode";
 import RegistrationSuccess from "./RegistrationSuccess";
-
 import {
   ScanLine,
   User,
@@ -35,14 +34,15 @@ function RegisterCustomer() {
     phoneNumber: "",
   });
   const [isRegistered, setIsRegistered] = useState(false);
+  const [cameraError, setCameraError] = useState("");
 
   const qrRef = useRef(null);
   const html5QrCodeRef = useRef(null);
-  const [cameraError, setCameraError] = useState("");
 
   const startScanner = async () => {
     setCameraError("");
     try {
+      // Stop any existing scanner instance
       if (html5QrCodeRef.current) {
         await stopScanner();
       }
@@ -52,16 +52,15 @@ function RegisterCustomer() {
 
       await html5QrCode.start(
         { facingMode: "environment" },
-        {
-          fps: 10,
-          qrbox: { width: 300, height: 350 },
-        },
-        decodedText => handleScanSuccess(decodedText),
-        error => console.warn("QR scan error:", error)
+        { fps: 10, qrbox: { width: 300, height: 350 } },
+        (decodedText) => handleScanSuccess(decodedText),
+        (error) => console.warn("QR scan error:", error)
       );
     } catch (err) {
       console.error("Camera start failed:", err);
-      setCameraError("Failed to access camera. Please check permissions.");
+      setCameraError(
+        "Failed to access camera. Please enable camera permissions and try again."
+      );
       html5QrCodeRef.current = null;
     }
   };
@@ -70,6 +69,7 @@ function RegisterCustomer() {
     if (html5QrCodeRef.current) {
       try {
         await html5QrCodeRef.current.stop();
+        html5QrCodeRef.current.clear();
       } catch (err) {
         console.error("Stop failed:", err);
       } finally {
@@ -78,47 +78,49 @@ function RegisterCustomer() {
     }
   };
 
-  const handleScanSuccess = decodedText => {
+  const handleScanSuccess = (decodedText) => {
     try {
       const data = JSON.parse(decodedText);
-      if (!data.name || !data.phone || !data.email) {
-        alert("Invalid QR data");
+      // Validate required fields
+      if (!data.name || !data.email || !data.phone) {
+        alert("Invalid QR code: Missing name, email, or phone.");
         return;
       }
 
+      // Map QR data to form fields
       setFormData({
         customerName: data.name,
         email: data.email,
         phoneNumber: data.phone,
       });
 
+      // Close scanner dialog
       setIsScannerOpen(false);
-      stopScanner();
     } catch (err) {
-      console.error("Failed to parse QR:", err);
-      alert("Invalid QR Code Format");
+      console.error("Failed to parse QR code:", err);
+      alert("Invalid QR code format. Please try a valid QR code.");
     }
   };
 
-useEffect(() => {
-  if (isScannerOpen) {
-    // Delay to ensure dialog content (qr-reader) is rendered
-    const timeout = setTimeout(() => {
-      startScanner();
-    }, 300); // 300ms delay
+  useEffect(() => {
+    if (isScannerOpen) {
+      // Delay to ensure dialog content is rendered
+      const timeout = setTimeout(() => {
+        startScanner();
+      }, 300);
 
-    return () => {
-      clearTimeout(timeout);
+      return () => {
+        clearTimeout(timeout);
+        stopScanner();
+      };
+    } else {
       stopScanner();
-    };
-  } else {
-    stopScanner();
-  }
-}, [isScannerOpen]);
+    }
+  }, [isScannerOpen]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleRegister = (e) => {
@@ -180,9 +182,9 @@ useEffect(() => {
             <div>
               <label
                 htmlFor="customerName"
-                className="block text-lg font-medium text-gray-700 mb-1 items-center gap-2"
+                className=" text-lg font-medium text-gray-700 mb-1 flex items-center gap-2"
               >
-                <User className="w-5 h-5 inline" />
+                <User className="w-5 h-5" />
                 Customer Name
               </label>
               <Input
@@ -199,9 +201,9 @@ useEffect(() => {
             <div>
               <label
                 htmlFor="email"
-                className="block text-lg font-medium text-gray-700 mb-1 items-center gap-2"
+                className=" text-lg font-medium text-gray-700 mb-1 flex items-center gap-2"
               >
-                <Mail className="w-5 h-5 inline" />
+                <Mail className="w-5 h-5" />
                 Email
               </label>
               <Input
@@ -218,9 +220,9 @@ useEffect(() => {
             <div>
               <label
                 htmlFor="phoneNumber"
-                className="block text-lg font-medium text-gray-700 mb-1 items-center gap-2"
+                className=" text-lg font-medium text-gray-700 mb-1 flex items-center gap-2"
               >
-                <Phone className="w-5 h-5 inline" />
+                <Phone className="w-5 h-5" />
                 Phone Number
               </label>
               <Input

@@ -8,7 +8,6 @@ import {
 } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -45,18 +44,18 @@ const RestaurantHistory = () => {
   };
 
   return (
-    <div className="container mx-auto p-4">
-      <Card className="max-w-[70%] mx-auto">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-2xl font-bold" style={{ color: '#070149' }}>Restaurant History</CardTitle>
-          <Button onClick={handleExport} className="bg-[#070149] text-white">Export Data</Button>
+    <div className="container mx-auto p-4 sm:p-6">
+      <Card className="w-full max-w-5xl mx-auto">
+        <CardHeader className="flex flex-col sm:flex-row items-center justify-between space-y-2 sm:space-y-0 pb-2">
+          <CardTitle className="text-xl sm:text-2xl font-bold" style={{ color: '#070149' }}>Restaurant History</CardTitle>
+          <Button onClick={handleExport} className="bg-[#070149] text-white text-sm sm:text-base">Export Data</Button>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-4 gap-4 mb-4">
+        <CardContent className="p-4 sm:p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-gray-700">Restaurant Name</label>
               <Select>
-                <SelectTrigger className="mt-1 w-full">
+                <SelectTrigger className="mt-1 w-full text-sm sm:text-base">
                   <SelectValue placeholder="All Restaurants" />
                 </SelectTrigger>
                 <SelectContent>
@@ -74,7 +73,7 @@ const RestaurantHistory = () => {
               <div className="relative mt-1">
                 <Button
                   variant="outline"
-                  className="w-full justify-between"
+                  className="w-full justify-between text-sm sm:text-base"
                   onClick={() => setIsCalendarOpen(!isCalendarOpen)}
                 >
                   {date.toLocaleDateString()}
@@ -88,7 +87,7 @@ const RestaurantHistory = () => {
                       setDate(selectedDate || date);
                       setIsCalendarOpen(false);
                     }}
-                    className="mt-2 rounded-md border absolute z-10 bg-white"
+                    className="mt-2 rounded-md border absolute z-10 bg-white w-max"
                     onClickOutside={() => setIsCalendarOpen(false)}
                   />
                 )}
@@ -97,7 +96,7 @@ const RestaurantHistory = () => {
             <div>
               <label className="block text-sm font-medium text-gray-700">Transaction Type</label>
               <Select>
-                <SelectTrigger className="mt-1 w-full">
+                <SelectTrigger className="mt-1 w-full text-sm sm:text-base">
                   <SelectValue placeholder="All Types" />
                 </SelectTrigger>
                 <SelectContent>
@@ -113,7 +112,7 @@ const RestaurantHistory = () => {
             <div>
               <label className="block text-sm font-medium text-gray-700">Sort By</label>
               <Select>
-                <SelectTrigger className="mt-1 w-full">
+                <SelectTrigger className="mt-1 w-full text-sm sm:text-base">
                   <SelectValue placeholder="A to Z" />
                 </SelectTrigger>
                 <SelectContent>
@@ -124,33 +123,33 @@ const RestaurantHistory = () => {
             </div>
           </div>
           <div className="overflow-x-auto">
-            <h2 className="text-xl font-semibold mb-2" style={{ color: '#070149' }}>Transaction History</h2>
-            <table className="w-full text-sm text-left text-gray-500">
+            <h2 className="text-lg sm:text-xl font-semibold mb-2" style={{ color: '#070149' }}>Transaction History</h2>
+            <table className="w-full text-xs sm:text-sm text-left text-gray-500 min-w-[600px]">
               <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                 <tr>
-                  <th className="px-4 py-2">Transaction ID</th>
-                  <th className="px-4 py-2">Customer</th>
-                  <th className="px-4 py-2">Amount</th>
-                  <th className="px-4 py-2">Date & Time</th>
-                  <th className="px-4 py-2">Status</th>
+                  <th className="px-2 sm:px-4 py-2">Transaction ID</th>
+                  <th className="px-2 sm:px-4 py-2">Customer</th>
+                  <th className="px-2 sm:px-4 py-2">Amount</th>
+                  <th className="px-2 sm:px-4 py-2">Date & Time</th>
+                  <th className="px-2 sm:px-4 py-2">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {transactions.map((transaction) => (
                   <tr key={transaction.id} className="bg-white border-b">
-                    <td className="px-4 py-2">{transaction.id}</td>
-                    <td className="px-4 py-2">{transaction.customer}</td>
-                    <td className="px-4 py-2 text-red-600">₹{transaction.amount}</td>
-                    <td className="px-4 py-2">{transaction.dateTime}</td>
-                    <td className="px-4 py-2">
-                      <Badge className="bg-green-100 text-green-800">{transaction.status}</Badge>
+                    <td className="px-2 sm:px-4 py-2">{transaction.id}</td>
+                    <td className="px-2 sm:px-4 py-2">{transaction.customer}</td>
+                    <td className="px-2 sm:px-4 py-2 text-red-600">₹{transaction.amount}</td>
+                    <td className="px-2 sm:px-4 py-2">{transaction.dateTime}</td>
+                    <td className="px-2 sm:px-4 py-2">
+                      <Badge className="bg-green-100 text-green-800 text-xs"> {transaction.status}</Badge>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <div className="flex justify-between items-center mt-4">
-              <span className="text-gray-600">Showing 1 to 10 of 10 transactions</span>
+            <div className="flex flex-col sm:flex-row justify-between items-center mt-4 gap-2">
+              <span className="text-gray-600 text-xs sm:text-sm">Showing 1 to 10 of 10 transactions</span>
               <div className="flex items-center gap-2">
                 <div className="flex gap-1">
                   <Button variant="outline" size="sm" disabled={true}>←</Button>
