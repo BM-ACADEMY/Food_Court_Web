@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Header from '@/Modules/Treasury_subcom/components/header/Navbar';
@@ -9,12 +10,19 @@ import CustomerHistory from './Modules/Treasury_subcom/Pages/CustomerHistory';
 import RestaurantHistory from './Modules/Treasury_subcom/Pages/RestaurantHistory';
 import UserHistory from './Modules/Treasury_subcom/Pages/UserHistory';
 
+// src/App.tsx
+// import CustomerRoutes from "@/routes/CustomerRoutes";
+// import AdminRoutes from "@/routes/AdminRoutes";
+// import RestaurantRoutes from "@/routes/RestaurantRoutes";
+// import TreasuryRoutes from "@/routes/TreasuryRoutes";
 
-const App = () => {
+function App() {
+  const user = { role: "masteradmin" }; // Replace with actual auth logic
+
+
   return (
     <Router>
       <Header />
-
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/register-customer" element={<RegisterCustomer />} />
@@ -22,12 +30,7 @@ const App = () => {
         <Route path="/customer-history" element={<CustomerHistory/>} />
         <Route path="/restaurant-history" element={<RestaurantHistory/>} />
         <Route path="/user-history" element={<UserHistory/>} />
-
-
-
       </Routes>
-
-
       <Footer />
     </Router>
   );

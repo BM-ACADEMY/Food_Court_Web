@@ -30,14 +30,6 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    whatsapp_number: {
-      type: String,
-      trim: true,
-    },
-    balance: {
-      type: mongoose.Schema.Types.Decimal128,
-      default: 0.0,
-    },
     is_flagged: {
       type: Boolean,
       default: false,
@@ -45,9 +37,9 @@ const userSchema = new mongoose.Schema(
     flag_reason: {
       type: String,
     },
-    last_activity_at: {
-      type: Date,
-    },
+    // last_activity_at: {
+    //   type: Date,
+    // },
   },
   {
     timestamps:true

@@ -12,6 +12,10 @@ const masterAdminSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Decimal128,
       default: 500000.00,
     },
+    master_admin_to_admin: {
+      type: mongoose.Schema.Types.Decimal128,
+      default: 100000.00,
+    },
   },
   {
     timestamps: {

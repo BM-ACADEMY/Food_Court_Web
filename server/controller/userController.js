@@ -10,8 +10,6 @@ exports.createUser = async (req, res) => {
       email,
       phone_number,
       password,
-      whatsapp_number,
-      balance,
     } = req.body;
 
     // Hash password
@@ -23,8 +21,6 @@ exports.createUser = async (req, res) => {
       email,
       phone_number,
       password_hash,
-      whatsapp_number,
-      balance,
     });
 
     await newUser.save();

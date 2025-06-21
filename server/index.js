@@ -15,9 +15,9 @@ const adminRoute=require('./route/adminRoute');
 const masterAdminRoute=require('./route/masterAdminRoute');
 const locationRoute=require('./route/locationRoute');
 const transactionRoute=require('./route/transactionRoute');
-const cardRoute=require('./route/cardRoute');
 const loginLogRoute=require('./route/loginLogRoute');
 const apiIntegrationRoute=require('./route/apiIntegrationRoute');
+const userBalanceRoute=require('./route/userBalanceRoute');
 const app = express();
 
 app.use('/api/roles',roleRoute);
@@ -30,9 +30,9 @@ app.use('/api/admins',adminRoute);
 app.use('/api/master-admins',masterAdminRoute);
 app.use('/api/locations',locationRoute);
 app.use('/api/transactions',transactionRoute);
-app.use('/api/cards',cardRoute);
 app.use('/api/login-logs',loginLogRoute);
 app.use('/api/api-integrations',apiIntegrationRoute);
+app.use('/api/user-balance',userBalanceRoute);
 
 const PORT=process.env.PORT || 5000;
 // Connect to MongoDB and then start the server
