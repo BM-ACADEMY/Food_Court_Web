@@ -26,7 +26,7 @@ const cardOptions = [
     icon: <ClipboardList className="text-white" size={40} />,
     bgColor: "#1f7b3c",
     hoverColor: "#16612d",
-    route: "#", // Placeholder for now
+    route: "/restaurant/history",
   },
 ];
 

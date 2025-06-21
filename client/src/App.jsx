@@ -4,6 +4,7 @@ import Home from "@/Modules/User/pages/Landing/Home";
 import Mainpage from "@/Modules/User/pages/UserDasboardpage/Main/Mainpage";
 import RestaurantMain from "@/Modules/Restaurant/pages/main/RestaurantMain";
 import DeductRefund from "@/Modules/Restaurant/pages/DeductRefund";
+import TransactionDashboard from "@/Modules/Restaurant/pages/History";
 
 const App = () => {
   return (
@@ -15,6 +16,7 @@ const App = () => {
       <Route path="/restaurant" element={<RestaurantMain />}>
         <Route index element={<></>} />
         <Route path="deduct" element={<DeductRefund />} />
+        <Route path="history" element={<TransactionDashboard/>}/>
       </Route>
     </Routes>
   );

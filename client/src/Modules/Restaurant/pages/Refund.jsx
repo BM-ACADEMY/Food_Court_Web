@@ -129,29 +129,22 @@ export default function Refund() {
     }
   };
 
-  const handleDeduct = () => {
-    const deductAmount = parseFloat(amount);
-    if (isNaN(deductAmount) || deductAmount <= 0) {
+  const handleRefund = () => {
+    const refundAmount = parseFloat(amount);
+    if (isNaN(refundAmount) || refundAmount <= 0) {
       setResultMessage("Please enter a valid amount greater than 0.");
       setIsSuccess(false);
       setShowResultDialog(true);
       return;
     }
 
-    if (deductAmount > customer.balance) {
-      setResultMessage(`Insufficient balance. Current balance: ₹${customer.balance}`);
-      setIsSuccess(false);
-      setShowResultDialog(true);
-      return;
-    }
-
-    const newBalance = customer.balance - deductAmount;
+    const newBalance = customer.balance + refundAmount;
     setCustomer(prev => ({
       ...prev,
       balance: newBalance,
     }));
     setAmount("");
-    setResultMessage(`Payment successful! New balance: ₹${newBalance}`);
+    setResultMessage(`Refund successful! New balance: ₹${newBalance.toFixed(2)}`);
     setIsSuccess(true);
     setShowResultDialog(true);
   };
@@ -244,7 +237,7 @@ export default function Refund() {
 
                 <div className="space-y-1">
                   <Label htmlFor="deductAmount" className="text-sm">
-                    Deduct Points
+                    Refund Amount
                   </Label>
                   <div className="flex items-center gap-2">
                     <span className="text-base pt-1">₹</span>
@@ -261,7 +254,7 @@ export default function Refund() {
                     />
                   </div>
                   <Button
-                    onClick={handleDeduct}
+                    onClick={handleRefund}
                     disabled={!customer.id || !amount}
                     className="w-full mt-2 h-8 px-3 py-1 text-xs bg-[#1a2f87] text-white"
                   >

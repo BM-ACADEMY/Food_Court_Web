@@ -2,13 +2,12 @@ import React from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, Info } from "lucide-react";
+import qrImageUrl from "@/assets/qrcode.jpeg"; // ✅ FIXED
 
 const TopUpSection = () => {
-  const qrImageUrl = "https://api.qrserver.com/v1/create-qr-code/?data=pegasus-2025-topup&size=200x200";
-
   const handleDownload = async () => {
     try {
-      const response = await fetch(qrImageUrl, { mode: "cors" });
+      const response = await fetch(qrImageUrl);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
 
@@ -29,7 +28,6 @@ const TopUpSection = () => {
       <h2 className="text-2xl font-bold text-[#00004d] mb-6">Add Money to Your Wallet</h2>
 
       <div className="flex flex-col lg:flex-row gap-8">
-        {/* Left: QR Code Box */}
         <div className="flex-1">
           <div className="relative w-full max-w-sm border-2 border-dashed border-[#000052] rounded-xl p-4 bg-[#f5f6fb] shadow-inner">
             <p className="absolute -top-4 left-4 text-xs font-medium bg-white px-2 py-0.5 rounded shadow text-[#000052]">
@@ -49,7 +47,6 @@ const TopUpSection = () => {
           </div>
         </div>
 
-        {/* Right: Instructions */}
         <div className="flex-1 bg-white/50 backdrop-blur-lg border border-gray-200 rounded-xl p-6 shadow-sm">
           <h3 className="text-lg font-semibold text-[#00004d] mb-3">How to Top Up</h3>
 
