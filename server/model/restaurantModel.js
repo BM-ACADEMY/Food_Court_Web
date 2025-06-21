@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const { v4: uuidv4 } = require("uuid");
+const Counter = require("./counterModel"); // Import Counter
 
 const restaurantSchema = new mongoose.Schema(
   {
@@ -7,6 +8,11 @@ const restaurantSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
+      unique: true,
+      index: true,
+    },
+    restaurant_id: {
+      type: String,
       unique: true,
       index: true,
     },
@@ -45,17 +51,30 @@ const restaurantSchema = new mongoose.Schema(
   }
 );
 
-// Compound index
-restaurantSchema.index(
-  { user_id: 1, qr_code: 1 },
-  { name: "idx_restaurants_user_qr" }
-);
+// Index: user_id + qr_code
+restaurantSchema.index({ user_id: 1, qr_code: 1 }, { name: "idx_restaurants_user_qr" });
 
-// ✅ Pre-save hook to generate qr_code UUID if not already set
-restaurantSchema.pre("save", function (next) {
+// Pre-save hook to generate qr_code and restaurant_id
+restaurantSchema.pre("save", async function (next) {
+  // Generate UUID QR code if missing
   if (!this.qr_code) {
     this.qr_code = uuidv4();
   }
+
+  // Generate REST ID if missing
+  if (!this.restaurant_id) {
+    try {
+      const counter = await Counter.findByIdAndUpdate(
+        { _id: "restaurant_id" },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true }
+      );
+      this.restaurant_id = `REST${counter.seq}`;
+    } catch (err) {
+      return next(err);
+    }
+  }
+
   next();
 });
 

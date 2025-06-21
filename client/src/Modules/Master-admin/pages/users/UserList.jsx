@@ -38,12 +38,22 @@ const initialUsers = [...Array(53)].map((_, i) => ({
 }));
 
 const roleMap = {
-    "1": "Master Admin",
+    "1": "Master-Admin",
     "2": "Admin",
-    "3": "Treasury Subcom",
+    "3": "Treasury-Subcom",
     "4": "Restaurant",
     "5": "Customer",
 };
+
+const roleColumns = {
+    all: ["ID", "Name", "Email", "Phone", "Role"],
+    "1": ["ID", "Name", "Email", "Phone", "Role"],
+    "2": ["ID", "Name", "Email", "Phone", "Role"],
+    "3": ["ID", "Name", "Email", "Phone", "Role"],
+    "4": ["ID", "Name", "Email", "Phone", "Role", "Restaurant Name", "Location"],
+    "5": ["ID", "Name", "Email", "Phone", "Role", "Registration Type"],
+};
+
 
 export default function UserList() {
     const [users, setUsers] = useState(initialUsers);
@@ -149,22 +159,38 @@ export default function UserList() {
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead>ID</TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Phone</TableHead>
-                        <TableHead>Role</TableHead>
+                        {roleColumns[roleFilter]?.map((col) => (
+                            <TableHead key={col}>{col}</TableHead>
+                        ))}
                         <TableHead className="text-center">Actions</TableHead>
                     </TableRow>
                 </TableHeader>
+
                 <TableBody>
                     {paginated.map((user) => (
                         <TableRow key={user.id}>
-                            <TableCell>{user.id}</TableCell>
-                            <TableCell>{user.name}</TableCell>
-                            <TableCell>{user.email}</TableCell>
-                            <TableCell>{user.phone_number}</TableCell>
-                            <TableCell>{roleMap[user.role_id]}</TableCell>
+                            {roleColumns[roleFilter]?.map((col) => {
+                                switch (col) {
+                                    case "ID":
+                                        return <TableCell key="id">{user.id}</TableCell>;
+                                    case "Name":
+                                        return <TableCell key="name">{user.name}</TableCell>;
+                                    case "Email":
+                                        return <TableCell key="email">{user.email}</TableCell>;
+                                    case "Phone":
+                                        return <TableCell key="phone">{user.phone_number}</TableCell>;
+                                    case "Role":
+                                        return <TableCell key="role">{roleMap[user.role_id]}</TableCell>;
+                                    case "Restaurant Name":
+                                        return <TableCell key="restaurant_name">{user.restaurant_name || "-"}</TableCell>;
+                                    case "Location":
+                                        return <TableCell key="location">{user.location || "-"}</TableCell>;
+                                    case "Registration Type":
+                                        return <TableCell key="registration_type">{user.registration_type || "-"}</TableCell>;
+                                    default:
+                                        return <TableCell key={col}>-</TableCell>;
+                                }
+                            })}
                             <TableCell className="text-center">
                                 <div className="flex justify-center gap-2">
                                     <Button size="icon" variant="ghost" onClick={() => handleView(user)}>
@@ -183,13 +209,13 @@ export default function UserList() {
                                     >
                                         <Trash2 className="w-4 h-4 text-red-500" />
                                     </Button>
-
                                 </div>
                             </TableCell>
                         </TableRow>
                     ))}
                 </TableBody>
             </Table>
+
 
             <div className="flex justify-between items-center mt-4">
                 <span>Total: {filteredUsers.length} records</span>

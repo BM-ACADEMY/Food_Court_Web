@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const { v4: uuidv4 } = require("uuid");
+const Counter = require("./counterModel"); // 👈 Import Counter model
 
 const customerSchema = new mongoose.Schema(
   {
@@ -26,6 +27,11 @@ const customerSchema = new mongoose.Schema(
       trim: true,
       index: true,
     },
+    customer_id: {
+      type: String,
+      unique: true,
+      index: true,
+    },
     status: {
       type: String,
       enum: ["Active", "Inactive", "Blocked", "Lost"],
@@ -38,18 +44,29 @@ const customerSchema = new mongoose.Schema(
   }
 );
 
-// ✅ Generate UUID for `qr_code` if not set
-customerSchema.pre("save", function (next) {
+// 👇 Auto-generate `qr_code` & `customer_id`
+customerSchema.pre("save", async function (next) {
   if (!this.qr_code) {
     this.qr_code = uuidv4();
   }
+
+  if (!this.customer_id) {
+    try {
+      const counter = await Counter.findByIdAndUpdate(
+        { _id: "customer_id" },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true }
+      );
+      this.customer_id = `CUST${counter.seq}`;
+    } catch (err) {
+      return next(err);
+    }
+  }
+
   next();
 });
 
 // Compound index: (user_id, qr_code)
-customerSchema.index(
-  { user_id: 1, qr_code: 1 },
-  { name: "idx_customers_user_qr" }
-);
+customerSchema.index({ user_id: 1, qr_code: 1 }, { name: "idx_customers_user_qr" });
 
 module.exports = mongoose.model("Customer", customerSchema);
