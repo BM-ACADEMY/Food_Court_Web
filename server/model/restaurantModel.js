@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { v4: uuidv4 } = require("uuid");
 
 const restaurantSchema = new mongoose.Schema(
   {
@@ -15,14 +16,8 @@ const restaurantSchema = new mongoose.Schema(
       trim: true,
     },
     location: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    owner_name: {
-      type: String,
-      required: true,
-      trim: true,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Location",
     },
     qr_code: {
       type: String,
@@ -31,7 +26,7 @@ const restaurantSchema = new mongoose.Schema(
       trim: true,
       index: true,
     },
-      status: {
+    status: {
       type: String,
       enum: ["Active", "Inactive", "Blocked", "Lost"],
       default: "Active",
@@ -50,10 +45,18 @@ const restaurantSchema = new mongoose.Schema(
   }
 );
 
-// Compound index: (user_id, qr_code)
+// Compound index
 restaurantSchema.index(
   { user_id: 1, qr_code: 1 },
   { name: "idx_restaurants_user_qr" }
 );
+
+// ✅ Pre-save hook to generate qr_code UUID if not already set
+restaurantSchema.pre("save", function (next) {
+  if (!this.qr_code) {
+    this.qr_code = uuidv4();
+  }
+  next();
+});
 
 module.exports = mongoose.model("Restaurant", restaurantSchema);

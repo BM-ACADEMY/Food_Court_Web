@@ -16,8 +16,8 @@ export default function MasterAdminRoutes() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/transaction-history" element={<TransactionHistory />} />
-        <Route path="/customers/customerList" element={<CustomerList />} />
-        <Route path="/treasurySubcom/treasury-subcom-list" element={<TreasurySubcomList />} />
+        <Route path="/customers/customer-list" element={<CustomerList />} />
+        <Route path="/treasury-subcom/treasury-subcom-list" element={<TreasurySubcomList />} />
         <Route path="/restaurant/restaurant-list" element={<RestaurantList />} />
         <Route path="/admin/admin-list" element={<AdminList />} />
         <Route path="/points/point-exchange" element={<PointExchange />} />

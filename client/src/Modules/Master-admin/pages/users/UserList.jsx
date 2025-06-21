@@ -23,8 +23,9 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label";
 
-import { Eye, Pencil, Trash2, UserPlus } from "lucide-react";
+import { Eye, Pencil, Trash2, UserPlus, Search } from "lucide-react";
 import { useState, useEffect } from "react";
 import { UserForm } from "./UserForm";
 
@@ -101,26 +102,39 @@ export default function UserList() {
     return (
         <div className="p-4">
             <div className="flex justify-between items-center mb-4 gap-2 flex-wrap">
-                <div className="flex gap-2">
-                    <Input
-                        placeholder="Search name or phone..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="w-64"
-                    />
-                    <Select onValueChange={setRoleFilter} value={roleFilter}>
-                        <SelectTrigger className="w-48">
-                            <SelectValue placeholder="Filter by Role" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All</SelectItem>
-                            <SelectItem value="1">Master Admin</SelectItem>
-                            <SelectItem value="2">Admin</SelectItem>
-                            <SelectItem value="3">Treasury Subcom</SelectItem>
-                            <SelectItem value="4">Restaurant</SelectItem>
-                            <SelectItem value="5">Customer</SelectItem>
-                        </SelectContent>
-                    </Select>
+                <div className="flex gap-4 items-end">
+                    {/* Search Input with Label */}
+                    <div className="flex flex-col gap-1">
+                        <Label htmlFor="search">Search by Name or Phone</Label>
+                        <div className="relative w-64">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                            <Input
+                                id="search"
+                                placeholder="Search name or phone..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="pl-10"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Role Filter Select with Label */}
+                    <div className="flex flex-col gap-1">
+                        <Label htmlFor="role">Select User Role</Label>
+                        <Select onValueChange={setRoleFilter} value={roleFilter}>
+                            <SelectTrigger id="role" className="w-48">
+                                <SelectValue placeholder="Filter by Role" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All</SelectItem>
+                                <SelectItem value="1">Master Admin</SelectItem>
+                                <SelectItem value="2">Admin</SelectItem>
+                                <SelectItem value="3">Treasury Subcom</SelectItem>
+                                <SelectItem value="4">Restaurant</SelectItem>
+                                <SelectItem value="5">Customer</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
                 <Button
                     onClick={() => {

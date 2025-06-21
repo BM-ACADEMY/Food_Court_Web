@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { v4: uuidv4 } = require("uuid");
 
 const customerSchema = new mongoose.Schema(
   {
@@ -11,7 +12,7 @@ const customerSchema = new mongoose.Schema(
     },
     registration_type: {
       type: String,
-      enum: ["online", "offline"], 
+      enum: ["online", "offline"],
       required: true,
     },
     registration_fee_paid: {
@@ -25,7 +26,7 @@ const customerSchema = new mongoose.Schema(
       trim: true,
       index: true,
     },
-      status: {
+    status: {
       type: String,
       enum: ["Active", "Inactive", "Blocked", "Lost"],
       default: "Active",
@@ -33,11 +34,22 @@ const customerSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true
+    timestamps: true,
   }
 );
 
+// ✅ Generate UUID for `qr_code` if not set
+customerSchema.pre("save", function (next) {
+  if (!this.qr_code) {
+    this.qr_code = uuidv4();
+  }
+  next();
+});
+
 // Compound index: (user_id, qr_code)
-customerSchema.index({ user_id: 1, qr_code: 1 }, { name: "idx_customers_user_qr" });
+customerSchema.index(
+  { user_id: 1, qr_code: 1 },
+  { name: "idx_customers_user_qr" }
+);
 
 module.exports = mongoose.model("Customer", customerSchema);

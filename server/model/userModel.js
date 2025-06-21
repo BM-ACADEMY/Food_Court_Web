@@ -37,9 +37,6 @@ const userSchema = new mongoose.Schema(
     flag_reason: {
       type: String,
     },
-    // last_activity_at: {
-    //   type: Date,
-    // },
   },
   {
     timestamps:true
