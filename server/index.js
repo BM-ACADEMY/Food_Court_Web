@@ -21,9 +21,6 @@ const transactionRoute=require('./route/transactionRoute');
 const loginLogRoute=require('./route/loginLogRoute');
 const apiIntegrationRoute=require('./route/apiIntegrationRoute');
 const userBalanceRoute=require('./route/userBalanceRoute');
-
-
-
 const app = express();
 app.use(cors({ origin: '*' }));
 app.use(helmet());
