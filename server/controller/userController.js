@@ -11,31 +11,40 @@ const Restaurant = require("../model/restaurantModel");
 const Customer = require("../model/customerModel");
 const mongoose = require("mongoose");
 
-// Utility to send SMS using BhashSMS
-const sendOtpSms = async (mobile, otp) => {
-  const message = `Your OTP is ${otp} to verify your mobile number on Pegasus2025.`;
 
-  const params = {
-    user: process.env.SMS_USER, // e.g. "FreshBloom"
-    pass: process.env.SMS_PASS, // e.g. your password
-    sender: process.env.SMS_SENDER, // e.g. "FRHBLM" (must be approved)
+// Function to generate a 6-digit OTP
+function generateOtp() {
+  return Math.floor(100000 + Math.random() * 900000);
+}
+
+// Function to send OTP SMS
+async function sendOtpSms(mobile) {
+  const otp = generateOtp();
+  const message = `Dear User, Your OTP for login to FreshBloom is ${otp}. Please do not share this OTP. Regards Piyums`;
+
+  // Build query parameters (auto URL-encodes)
+  const params = new URLSearchParams({
+    user: 'FreshBloom',
+    pass: '123456',
+    sender: 'FSHBLM',
     phone: mobile,
     text: message,
-    priority: process.env.SMS_PRIORITY || "ndnd",
-    stype: process.env.SMS_STYPE || "normal",
-  };
+    priority: 'ndnd',
+    stype: 'normal',
+  });
 
-  const url = `http://bhashsms.com/api/sendmsg.php?${qs.stringify(params)}`;
+  const url = `https://bhashsms.com/api/sendmsg.php?${params.toString()}`;
 
   try {
-    const res = await axios.get(url);
-    console.log("SMS API response:", res.data); // optional for debugging
-    return res.data;
+    const response = await axios.get(url);
+    console.log('✅ OTP sent successfully:', otp);
+    console.log('📨 SMS API response:', response.data);
   } catch (err) {
-    console.error("Failed to send OTP SMS:", err.message);
-    throw new Error("Failed to send OTP SMS");
+    console.error('❌ Failed to send OTP SMS:', err.message);
   }
-};
+}
+
+
 // Create User
 exports.createUser = async (req, res) => {
   try {
@@ -79,8 +88,8 @@ exports.createUser = async (req, res) => {
     const otpExpiry = new Date(Date.now() + 5 * 60 * 1000); // 5 mins
 
     // ✅ Send OTP via SMS (optional)
-    // const otpres = await sendOtpSms(phone_number, otp);
-    // console.log(otpres, "res");
+    const otpres = await sendOtpSms(phone_number);
+    console.log(otpres, "res");
 
     // ✅ Hash password
     const password_hash = await bcrypt.hash(password, 10);
