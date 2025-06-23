@@ -2,6 +2,8 @@ const express = require('express');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 const cors =require('cors');
+const helmet=require('helmet');
+const morgan=require('morgan');
 
 // Load environment variables from .env file
 dotenv.config();
@@ -24,7 +26,9 @@ const userBalanceRoute=require('./route/userBalanceRoute');
 
 const app = express();
 app.use(cors({ origin: '*' }));
-
+app.use(helmet());
+app.use(express.json());
+app.use(morgan('dev'));
 // Optional: manually allow CORS headers for more control
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
@@ -48,10 +52,10 @@ app.use('/api/login-logs',loginLogRoute);
 app.use('/api/api-integrations',apiIntegrationRoute);
 app.use('/api/user-balance',userBalanceRoute);
 
-const PORT=process.env.PORT || 5000;
+const PORT=process.env.PORT || 4000;
 // Connect to MongoDB and then start the server
 connectDB().then(() => {
   app.listen(PORT,'0.0.0.0', () => {
-    console.log('🚀 Server running on http://localhost:5000');
+    console.log(`🚀 Server running on ${PORT}`);
   });
 });

@@ -7,6 +7,9 @@ const userController = require("../controller/userController");
 // POST /api/users/create
 router.post("/create-user", userController.createUser);
 
+//verify otp
+router.post("/verify-otp", userController.verifyOtp);
+
 // GET /api/users/all
 router.get("/fetch-all-users", userController.getUsers);
 
