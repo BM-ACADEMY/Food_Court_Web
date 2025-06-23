@@ -16,9 +16,9 @@ const cardOptions = [
     title: "Deduct / Refund",
     description: "Process customer payments and refunds",
     icon: <Wallet className="text-white" size={40} />,
-    bgColor: "#2c3598",
+    bgColor: "#000052",
     hoverColor: "#1f296b",
-    route: "/restaurant/deduct", // Route to navigate
+    route: "/restaurant/deduct-refund", // Route to navigate
   },
   {
     title: "Restaurant History",
@@ -36,7 +36,7 @@ const RestaurantDashboard = () => {
   return (
     <div className="min-h-[60vh] md:min-h-[80vh] bg-[#f9fafb] px-6 py-10 flex flex-col items-center gap-10">
       {/* Welcome Banner */}
-      <div className="bg-[#2c3598] text-white px-6 py-6 rounded-xl shadow-md w-full max-w-4xl text-center">
+      <div className="bg-[#000052] text-white px-6 py-6 rounded-xl shadow-md w-full max-w-4xl text-center">
         <h1 className="text-2xl sm:text-3xl font-bold mb-1">
           Welcome to Pegasus 2k25 Food Court
         </h1>

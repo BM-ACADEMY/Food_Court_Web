@@ -1,38 +1,48 @@
 
-import React from "react";
-import Home from "@/Modules/User/pages/Landing/Home";
-import Mainpage from "@/Modules/User/pages/UserDasboardpage/Main/Mainpage";
-import RestaurantMain from "@/Modules/Restaurant/pages/main/RestaurantMain";
-import DeductRefund from "@/Modules/Restaurant/pages/DeductRefund";
-import TransactionDashboard from "@/Modules/Restaurant/pages/History";
+// import React from "react";
+// import { Routes, Route } from "react-router-dom";
 
-// src/App.tsx
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import MasterAdminRoutes from "@/routes/masterAdmin";
-// import CustomerRoutes from "@/routes/CustomerRoutes";
-// import AdminRoutes from "@/routes/AdminRoutes";
-// import RestaurantRoutes from "@/routes/RestaurantRoutes";
-// import TreasuryRoutes from "@/routes/TreasuryRoutes";
-import "./App.css"
-function App() {
-  const user = { role: "masteradmin" }; // Replace with actual auth logic
+// import Home from "@/Modules/User/pages/Landing/Home";
+// import Mainpage from "@/Modules/User/pages/UserDasboardpage/Main/Mainpage";
+// import RestaurantMain from "@/Modules/Restaurant/pages/main/RestaurantMain";
+
+// function App() {
+//   return (
+//     <Routes>
+//       <Route path="/" element={<Home />} />
+//       <Route path="/userdashboard" element={<Mainpage />} />
+//       <Route path="/restaurant/*" element={<RestaurantMain />} />
+//     </Routes>
+//   );
+// }
+
+// export default App;
 
 
+
+import { BrowserRouter as Router } from "react-router-dom";
+import AppRoutes from "@/routes/appRoutes";
+import { ToastContainer, toast ,Bounce } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+
+
+export default function App() {
   return (
-
-    <Routes>
-      <Route path="/" element={<Home />} />
-      <Route path="/userdashboard" element={<Mainpage />} />
-
-      {/* Parent Route with shared layout */}
-      <Route path="/restaurant" element={<RestaurantMain />}>
-        <Route index element={<></>} />
-        <Route path="deduct" element={<DeductRefund />} />
-        <Route path="history" element={<TransactionDashboard/>}/>
-      </Route>
-    </Routes>
+    <Router>
+      <AppRoutes />
+       <ToastContainer
+        position="top-center"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick={false}
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="colored"
+        transition={Bounce}
+      />
+    </Router>
   );
-};
-
-export default App;
-
+}

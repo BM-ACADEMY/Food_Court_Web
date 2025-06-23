@@ -3,8 +3,15 @@ import React from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { useNavigate } from "react-router-dom";
 
 const LoginForm = ({ onBack, onForgotPassword, onLoginWithOtp }) => {
+  const navigate = useNavigate();
+
+  const handleLogin = () => {
+    navigate("/customer/userdashboard");
+  };
+
   return (
     <div className="z-10 w-full max-w-md mt-6 shadow-xl rounded-2xl overflow-hidden border bg-white">
       {/* Header */}
@@ -52,8 +59,11 @@ const LoginForm = ({ onBack, onForgotPassword, onLoginWithOtp }) => {
         </div>
 
         {/* Login Button */}
-        <Button className="w-full h-12 text-lg bg-[#05025b] hover:bg-[#1a1a7b]">
-          Login with Password
+        <Button
+          className="w-full h-12 text-lg bg-[#05025b] hover:bg-[#1a1a7b]"
+          onClick={handleLogin}
+        >
+          Login
         </Button>
 
         {/* Divider */}

@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ChevronsUpDown, LogOut, User, Save } from "lucide-react";
 
-const UserDashboardHeader = () => {
+const Restaurant = () => {
   const [openAccount, setOpenAccount] = useState(false);
 
   const [user, setUser] = useState({
@@ -139,4 +139,4 @@ const UserDashboardHeader = () => {
   );
 };
 
-export default UserDashboardHeader;
+export default Restaurant;

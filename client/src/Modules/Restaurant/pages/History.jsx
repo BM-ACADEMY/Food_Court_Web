@@ -39,6 +39,16 @@ import {
 } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+
 
 const PER_PAGE = 15;
 
@@ -256,15 +266,51 @@ export default function TransactionDashboard() {
       </div>
 
       {/* Pagination */}
-      <div className="mt-4 flex justify-end gap-2 text-sm">
-        <Button variant="outline" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>Prev</Button>
-        {Array.from({ length: totalPages }).map((_, i) => (
-          <Button key={i} variant={currentPage === i + 1 ? "default" : "outline"} onClick={() => setCurrentPage(i + 1)}>
-            {i + 1}
-          </Button>
-        ))}
-        <Button variant="outline" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)}>Next</Button>
-      </div>
+     <Pagination className="mt-6 justify-end">
+  <PaginationContent>
+    <PaginationItem>
+      <PaginationPrevious
+        href="#"
+        onClick={(e) => {
+          e.preventDefault();
+          setCurrentPage((p) => Math.max(1, p - 1));
+        }}
+      />
+    </PaginationItem>
+
+    {Array.from({ length: totalPages }).map((_, i) => (
+      <PaginationItem key={i}>
+        <PaginationLink
+          href="#"
+          isActive={currentPage === i + 1}
+          onClick={(e) => {
+            e.preventDefault();
+            setCurrentPage(i + 1);
+          }}
+        >
+          {i + 1}
+        </PaginationLink>
+      </PaginationItem>
+    ))}
+
+    {totalPages > 5 && (
+      <PaginationItem>
+        <PaginationEllipsis />
+      </PaginationItem>
+    )}
+
+    <PaginationItem>
+      <PaginationNext
+        href="#"
+        onClick={(e) => {
+          e.preventDefault();
+          setCurrentPage((p) => Math.min(totalPages, p + 1));
+        }}
+      />
+    </PaginationItem>
+  </PaginationContent>
+</Pagination>
+
 
       {/* Export Dialog */}
       <Dialog open={openDialog} onOpenChange={setOpenDialog}>
