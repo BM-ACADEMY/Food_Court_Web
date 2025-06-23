@@ -1,7 +1,14 @@
+
+
 // AppRoutes.tsx
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 // import Login from "@/pages/login/Login";
 // import NotFound from "@/pages/NotFound";
+// import CustomerRoutes from "./CustomerRoutes";
+import TreasuryRoutes from "./treasury";
+// import RestaurantRoutes from "./RestaurantRoutes";
+// import AdminRoutes from "./AdminRoutes";
+// import MasterAdminRoutes from "./masterAdmin";
 
 // import TreasuryRoutes from "./treasury";
 // import RestaurantRoutes from "./RestaurantRoutes";
@@ -12,7 +19,8 @@ import Restaurant from "./restaurant";
 
 export default function AppRoutes() {
   // const user = JSON.parse(localStorage.getItem("user")) || null; 
-  const user={role:"customer"}
+  const user={role:"masteradmin"}
+  // const user={role:"treasury"}
   const location = useLocation();
 
   // User is not logged in and not on /login
@@ -49,6 +57,13 @@ export default function AppRoutes() {
      
       
       <Route path="*" element={<NotFound />} /> */}
+
+      {/* <Route path="/admin/*" element={<AdminRoutes />} />
+      <Route path="/customer/*" element={<CustomerRoutes />} />
+      <Route path="/restaurant/*" element={<RestaurantRoutes />} /> */}
+      <Route path="/treasury/*" element={<TreasuryRoutes />} />
+
+      {/* <Route path="*" element={<NotFound />} /> */}
     </Routes>
   );
 }

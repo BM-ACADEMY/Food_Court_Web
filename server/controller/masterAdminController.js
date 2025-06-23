@@ -3,11 +3,12 @@ const MasterAdmin = require("../model/masterAdminModel");
 // Create Master Admin
 exports.createMasterAdmin = async (req, res) => {
   try {
-    const { user_id, point_creation_limit = 500000.00 } = req.body;
+    const { user_id, point_creation_limit,master_admin_to_admin } = req.body;
 
     const masterAdmin = new MasterAdmin({
       user_id,
       point_creation_limit,
+      master_admin_to_admin
     });
 
     await masterAdmin.save();

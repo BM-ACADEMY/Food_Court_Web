@@ -7,7 +7,6 @@ exports.createRestaurant = async (req, res) => {
       user_id,
       restaurant_name,
       location,
-      owner_name,
       qr_code,
     } = req.body;
 
@@ -15,7 +14,6 @@ exports.createRestaurant = async (req, res) => {
       user_id,
       restaurant_name,
       location,
-      owner_name,
       qr_code,
     });
 

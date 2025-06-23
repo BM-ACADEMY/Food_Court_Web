@@ -6,7 +6,7 @@ const masterAdminController = require("../controller/masterAdminController");
 
 router.post("/create-master-admin", masterAdminController.createMasterAdmin);
 router.get("/fetch-all-master-admin", masterAdminController.getMasterAdmins);
-router.get("/fetch-master-admin/:id", masterAdminController.getMasterAdminById);
+router.get("/fetch-master-admin-by-id/:id", masterAdminController.getMasterAdminById);
 router.put("/update-master-admin/:id", masterAdminController.updateMasterAdmin);
 router.delete("/delete-master-admin/:id", masterAdminController.deleteMasterAdmin);
 
