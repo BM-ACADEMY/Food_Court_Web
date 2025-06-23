@@ -1,6 +1,6 @@
 const Customer = require("../model/customerModel");
 
-// Create Customer
+// Existing controller functions (unchanged)
 exports.createCustomer = async (req, res) => {
   try {
     const {
@@ -18,13 +18,12 @@ exports.createCustomer = async (req, res) => {
     });
 
     await customer.save();
-    res.status(201).json({ success: true,message:"User added Successfully", data: customer });
+    res.status(201).json({ success: true, message: "User added Successfully", data: customer });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }
 };
 
-// Get All Customers
 exports.getCustomers = async (req, res) => {
   try {
     const customers = await Customer.find().populate("user_id", "name email phone_number");
@@ -34,7 +33,6 @@ exports.getCustomers = async (req, res) => {
   }
 };
 
-// Get Customer by ID
 exports.getCustomerById = async (req, res) => {
   try {
     const customer = await Customer.findById(req.params.id).populate("user_id");
@@ -47,7 +45,6 @@ exports.getCustomerById = async (req, res) => {
   }
 };
 
-// Update Customer
 exports.updateCustomer = async (req, res) => {
   try {
     const customer = await Customer.findByIdAndUpdate(req.params.id, req.body, {
@@ -63,7 +60,6 @@ exports.updateCustomer = async (req, res) => {
   }
 };
 
-// Delete Customer
 exports.deleteCustomer = async (req, res) => {
   try {
     const customer = await Customer.findByIdAndDelete(req.params.id);
@@ -72,6 +68,25 @@ exports.deleteCustomer = async (req, res) => {
       return res.status(404).json({ success: false, message: "Customer not found" });
 
     res.status(200).json({ success: true, message: "Customer deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// New function to fetch customer by QR code
+exports.getCustomerByQrCode = async (req, res) => {
+  try {
+    const { qr_code } = req.query;
+    if (!qr_code) {
+      return res.status(400).json({ success: false, message: "QR code is required" });
+    }
+
+    const customer = await Customer.findOne({ qr_code }).populate("user_id", "name email phone_number");
+    if (!customer) {
+      return res.status(404).json({ success: false, message: "No customer found for this QR code" });
+    }
+
+    res.status(200).json({ success: true, data: customer });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

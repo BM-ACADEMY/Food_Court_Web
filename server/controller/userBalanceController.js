@@ -26,7 +26,11 @@ exports.getBalanceByUserId = async (req, res) => {
     const balance = await UserBalance.findOne({ user_id });
 
     if (!balance) {
-      return res.status(404).json({ success: false, message: 'Balance not found' });
+      // Return default balance instead of 404
+      return res.status(200).json({
+        success: true,
+        data: { user_id, balance: "0.00" }
+      });
     }
 
     res.status(200).json({ success: true, data: balance });

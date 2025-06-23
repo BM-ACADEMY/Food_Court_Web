@@ -8,15 +8,8 @@ import {
   Wallet,
 } from "lucide-react";
 
-function RegistrationSuccess() {
+function RegistrationSuccess({ registrationData }) {
   const [showTopUp, setShowTopUp] = useState(false);
-
-  const registrationData = {
-    name: "John Doe",
-    phone: "+91 98765 43210",
-    registrationTime: "03:26 PM, 19 Jun 2025",
-    currentBalance: "₹0.00",
-  };
 
   if (showTopUp) {
     return <TopUp customer={registrationData} />;

@@ -23,6 +23,7 @@ import {
   Phone,
   ArrowRightCircle,
 } from "lucide-react";
+import axios from "axios";
 
 function RegisterCustomer() {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -31,8 +32,12 @@ function RegisterCustomer() {
     email: "",
     phoneNumber: "",
   });
+  const [userId, setUserId] = useState(null);
   const [isRegistered, setIsRegistered] = useState(false);
   const [cameraError, setCameraError] = useState("");
+  const [fetchError, setFetchError] = useState("");
+  const [registrationData, setRegistrationData] = useState(null);
+  const [isStopping, setIsStopping] = useState(false);
 
   const qrRef = useRef(null);
   const html5QrCodeRef = useRef(null);
@@ -51,7 +56,7 @@ function RegisterCustomer() {
         { facingMode: "environment" },
         { fps: 10, qrbox: { width: 300, height: 350 } },
         (decodedText) => handleScanSuccess(decodedText),
-        (error) => console.warn("QR scan error:", error)
+        
       );
     } catch (err) {
       console.error("Camera start failed:", err);
@@ -63,25 +68,51 @@ function RegisterCustomer() {
   };
 
   const stopScanner = async () => {
-    if (html5QrCodeRef.current) {
-      try {
-        await html5QrCodeRef.current.stop();
-        html5QrCodeRef.current.clear();
-      } catch (err) {
-        console.error("Stop failed:", err);
-      } finally {
-        html5QrCodeRef.current = null;
+    if (isStopping || !html5QrCodeRef.current) return;
+
+    setIsStopping(true);
+    try {
+      const qrCode = html5QrCodeRef.current;
+      if (qrCode && qrCode.isScanning) {
+        await qrCode.stop();
+        await qrCode.clear();
       }
+      html5QrCodeRef.current = null;
+    } catch (err) {
+      console.error("Stop failed:", err.message);
+    } finally {
+      setIsStopping(false);
     }
   };
 
-  const handleScanSuccess = (decodedText) => {
-    setFormData((prev) => ({
-      ...prev,
-      customerName: decodedText, // 👈 Set plain scanned text to customerName
-    }));
+  const handleScanSuccess = async (decodedText) => {
+    setFetchError("");
+    try {
+      const response = await axios.get("http://localhost:4000/api/customers/fetch-by-qr", {
+        params: { qr_code: decodedText },
+      });
 
-    setIsScannerOpen(false); // Close scanner dialog
+      if (response.data.success && response.data.data) {
+        const { name, email, phone_number, _id } = response.data.data.user_id;
+        console.log("Scanned userId:", _id); // Debug log
+        setUserId(_id);
+        setFormData({
+          customerName: name || "",
+          email: email || "",
+          phoneNumber: phone_number || "",
+        });
+      } else {
+        setFetchError("No user found for this QR code.");
+      }
+    } catch (err) {
+      console.error("Error fetching user by QR code:", err);
+      setFetchError(
+        err.response?.data?.message || "Failed to fetch user details. Please try again."
+      );
+    } finally {
+      await stopScanner();
+      setIsScannerOpen(false);
+    }
   };
 
   useEffect(() => {
@@ -94,9 +125,8 @@ function RegisterCustomer() {
         clearTimeout(timeout);
         stopScanner();
       };
-    } else {
-      stopScanner();
     }
+    return () => stopScanner();
   }, [isScannerOpen]);
 
   const handleInputChange = (e) => {
@@ -104,14 +134,67 @@ function RegisterCustomer() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleRegister = (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
-    console.log("Registering user:", formData);
-    setIsRegistered(true);
+    if (!userId) {
+      setFetchError("No user selected. Please scan a valid QR code.");
+      return;
+    }
+
+    try {
+      // Update user details
+      const updateResponse = await axios.put(`http://localhost:4000/api/users/update-user/${userId}`, {
+        name: formData.customerName,
+        email: formData.email,
+        phone_number: formData.phoneNumber,
+      });
+
+      if (!updateResponse.data.success) {
+        throw new Error(updateResponse.data.message || "Failed to update user details");
+      }
+
+      // Fetch user balance
+      let balance = "0.00";
+      try {
+        const balanceResponse = await axios.get(`http://localhost:4000/api/user-balance/fetch-balance-by-id/${userId}`);
+        if (balanceResponse.data.success && balanceResponse.data.data) {
+          balance = balanceResponse.data.data.balance.toString();
+        }
+      } catch (balanceErr) {
+        if (balanceErr.response?.status === 404) {
+          console.warn(`No balance found for userId ${userId}, defaulting to ₹0.00`);
+        } else {
+          throw balanceErr; // Rethrow other errors
+        }
+      }
+
+      // Set registration data
+      setRegistrationData({
+        name: formData.customerName,
+        phone: formData.phoneNumber,
+        registrationTime: new Date().toLocaleString("en-IN", {
+          hour: "numeric",
+          minute: "numeric",
+          hour12: true,
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        }),
+        currentBalance: `₹${parseFloat(balance).toFixed(2)}`,
+      });
+
+      setIsRegistered(true);
+    } catch (err) {
+      console.error("Error during registration:", err);
+      const errorMessage = err.response?.status === 404
+        ? "User balance not found. Default balance used."
+        : err.response?.data?.message || "Failed to register user. Please try again.";
+      setFetchError(errorMessage);
+    }
   };
 
-  if (isRegistered) {
-    return <RegistrationSuccess />;
+  if (isRegistered && registrationData) {
+    return <RegistrationSuccess registrationData={registrationData} />;
   }
 
   return (
@@ -141,13 +224,16 @@ function RegisterCustomer() {
                 <div className="relative w-full h-64 bg-gray-100 border border-dashed border-[#070149] rounded-lg overflow-hidden">
                   {!html5QrCodeRef.current && (
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <ScanLine className="w-20 h-20 text-[#070149]" />
+                      <ScanLine className="w-20 h-20 text-[#040442]" />
                     </div>
                   )}
                   <div id="qr-reader" ref={qrRef} className="w-full h-full" />
                 </div>
                 {cameraError && (
                   <p className="text-red-500 text-sm mt-2">{cameraError}</p>
+                )}
+                {fetchError && (
+                  <p className="text-red-500 text-sm mt-2">{fetchError}</p>
                 )}
                 <Button
                   onClick={() => setIsScannerOpen(false)}
@@ -163,7 +249,7 @@ function RegisterCustomer() {
             <div>
               <label
                 htmlFor="customerName"
-                className=" text-lg font-medium text-gray-700 mb-1 flex items-center gap-2"
+                className="text-lg font-medium text-gray-700 mb-1 flex items-center gap-2"
               >
                 <User className="w-5 h-5" />
                 Customer Name
@@ -182,7 +268,7 @@ function RegisterCustomer() {
             <div>
               <label
                 htmlFor="email"
-                className=" text-lg font-medium text-gray-700 mb-1 flex items-center gap-2"
+                className="text-lg font-medium text-gray-700 mb-1 flex items-center gap-2"
               >
                 <Mail className="w-5 h-5" />
                 Email
@@ -201,7 +287,7 @@ function RegisterCustomer() {
             <div>
               <label
                 htmlFor="phoneNumber"
-                className=" text-lg font-medium text-gray-700 mb-1 flex items-center gap-2"
+                className="text-lg font-medium text-gray-700 mb-1 flex items-center gap-2"
               >
                 <Phone className="w-5 h-5" />
                 Phone Number
