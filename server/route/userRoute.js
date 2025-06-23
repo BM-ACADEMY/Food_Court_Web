@@ -4,6 +4,17 @@ const userController = require("../controller/userController");
 
 // Base route: /api/users
 
+
+// login function
+router.post("/login", userController.loginUser);
+
+//logout function
+router.post("/logout", userController.logoutUser);
+
+//get the token
+router.get("/me", userController.getMe);
+
+
 // POST /api/users/create
 router.post("/create-user", userController.createUser);
 

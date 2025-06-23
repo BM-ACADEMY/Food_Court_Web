@@ -10,7 +10,94 @@ const TreasurySubcom = require("../model/treasurySubcomModel");
 const Restaurant = require("../model/restaurantModel");
 const Customer = require("../model/customerModel");
 const mongoose = require("mongoose");
+const jwt = require("jsonwebtoken");
+const UserBalance = require("../model/userBalanceModel");
 
+//login function
+exports.loginUser = async (req, res) => {
+  const { emailOrPhone, password } = req.body;
+
+  const user = await User.findOne({
+    $or: [{ email: emailOrPhone }, { phone_number: emailOrPhone }],
+  });
+
+  if (!user) {
+    return res.status(404).json({ message: "User not found" });
+  }
+
+  const isMatch = await bcrypt.compare(password, user.password_hash);
+  if (!isMatch) {
+    return res.status(401).json({ message: "Invalid credentials" });
+  }
+
+  const token = jwt.sign(
+    { id: user._id, role: user.role },
+    process.env.JWT_SECRET,
+    { expiresIn: "1d" }
+  );
+
+  res.cookie("token", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "Lax",
+    maxAge: 24 * 60 * 60 * 1000, // 1 day
+  });
+
+  res.json({ success: true, message: "Login successful" });
+};
+
+exports.getMe = async (req, res) => {
+  const token = req.cookies.token;
+
+  if (!token) return res.status(401).json({ message: "Not logged in" });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Find user and populate role
+    const user = await User.findById(decoded.id)
+      .select("-password_hash")
+      .populate("role_id");
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Fetch balance
+    const userBalance = await UserBalance.findOne({ user_id: user._id });
+    const balance = userBalance
+      ? parseFloat(userBalance.balance.toString())
+      : 0.0;
+
+    // Prepare response object
+    const userObj = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      phone_number: user.phone_number,
+      is_flagged: user.is_flagged,
+      flag_reason: user.flag_reason,
+      number_verified: user.number_verified,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      role: user.role_id, // full role object
+      balance, // user's balance
+    };
+
+    res.json({ user: userObj });
+  } catch (err) {
+    console.error("getMe error:", err);
+    return res.status(401).json({ message: "Invalid token" });
+  }
+};
+
+//logout function
+exports.logoutUser = (req, res) => {
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "Lax",
+  });
+  res.json({ message: "Logged out successfully" });
+};
 
 // Function to generate a 6-digit OTP
 function generateOtp() {
@@ -24,27 +111,25 @@ async function sendOtpSms(mobile) {
 
   // Build query parameters (auto URL-encodes)
   const params = new URLSearchParams({
-    user: 'FreshBloom',
-    pass: '123456',
-    sender: 'FSHBLM',
+    user: "FreshBloom",
+    pass: "123456",
+    sender: "FSHBLM",
     phone: mobile,
     text: message,
-    priority: 'ndnd',
-    stype: 'normal',
+    priority: "ndnd",
+    stype: "normal",
   });
 
   const url = `https://bhashsms.com/api/sendmsg.php?${params.toString()}`;
 
   try {
     const response = await axios.get(url);
-    console.log('✅ OTP sent successfully:', otp);
-    console.log('📨 SMS API response:', response.data);
+    console.log("✅ OTP sent successfully:", otp);
+    console.log("📨 SMS API response:", response.data);
   } catch (err) {
-    console.error('❌ Failed to send OTP SMS:', err.message);
+    console.error("❌ Failed to send OTP SMS:", err.message);
   }
 }
-
-
 // Create User
 exports.createUser = async (req, res) => {
   try {
@@ -366,14 +451,15 @@ exports.updateUser = async (req, res) => {
     ).populate("role_id"); // ✅ Populate role
 
     if (!updatedUser)
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
 
     res.status(200).json({ success: true, data: updatedUser });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }
 };
-
 
 // Delete user
 exports.deleteUser = async (req, res) => {
