@@ -10,10 +10,28 @@ import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { FileText, FileSpreadsheet, FileSignature } from "lucide-react";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 const RestaurantHistory = () => {
   const [date, setDate] = useState(new Date());
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [openDialog, setOpenDialog] = useState(false);
+  const [exportFormat, setExportFormat] = useState("csv");
+
   const restaurants = ["Olive Garden", "The Capital Grille", "Red Lobster", "Ruth's Chris"];
   const transactionTypes = ["Purchase", "Refund"];
 
@@ -30,17 +48,36 @@ const RestaurantHistory = () => {
     { id: "TXN00078", customer: "Kavita Sharma (CUST010)", amount: -260, dateTime: "13/3/2023 01:20 pm", status: "Completed" },
   ];
 
-  const handleExport = () => {
-    const csv = [
-      ["Transaction ID, Customer, Amount, Date & Time, Status"],
-      ...transactions.map(row => `${row.id}, "${row.customer}", ₹${row.amount}, ${row.dateTime}, ${row.status}`),
-    ].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "transaction_history.csv";
-    a.click();
+  const exportData = () => {
+    if (exportFormat === "csv") {
+      const csv = [
+        ["Transaction ID, Customer, Amount, Date & Time, Status"],
+        ...transactions.map(row => `${row.id}, "${row.customer}", ₹${row.amount}, ${row.dateTime}, ${row.status}`),
+      ].join("\n");
+      const blob = new Blob([csv], { type: "text/csv" });
+      saveAs(blob, "transaction_history.csv");
+    } else if (exportFormat === "excel") {
+      const ws = XLSX.utils.json_to_sheet(transactions);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Transactions");
+      const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+      const blob = new Blob([excelBuffer], { type: "application/octet-stream" });
+      saveAs(blob, "transaction_history.xlsx");
+    } else if (exportFormat === "pdf") {
+      const doc = new jsPDF();
+      autoTable(doc, {
+        head: [["Transaction ID", "Customer", "Amount", "Date & Time", "Status"]],
+        body: transactions.map(row => [
+          row.id,
+          row.customer,
+          `₹${row.amount}`,
+          row.dateTime,
+          row.status,
+        ]),
+      });
+      doc.save("transaction_history.pdf");
+    }
+    setOpenDialog(false);
   };
 
   return (
@@ -48,9 +85,13 @@ const RestaurantHistory = () => {
       <Card className="w-full max-w-5xl mx-auto">
         <CardHeader className="flex flex-col sm:flex-row items-center justify-between space-y-2 sm:space-y-0 pb-2">
           <CardTitle className="text-xl sm:text-2xl font-bold" style={{ color: '#070149' }}>Restaurant History</CardTitle>
-          <Button onClick={handleExport} className="bg-[#070149] text-white text-sm sm:text-base">Export Data</Button>
+          <Button onClick={() => setOpenDialog(true)} className="bg-[#070149] text-white text-sm sm:text-base">
+            Export Data
+          </Button>
         </CardHeader>
+
         <CardContent className="p-4 sm:p-6">
+          {/* Filters */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-gray-700">Restaurant Name</label>
@@ -122,6 +163,8 @@ const RestaurantHistory = () => {
               </Select>
             </div>
           </div>
+
+          {/* Table */}
           <div className="overflow-x-auto">
             <h2 className="text-lg sm:text-xl font-semibold mb-2" style={{ color: '#070149' }}>Transaction History</h2>
             <table className="w-full text-xs sm:text-sm text-left text-gray-500 min-w-[600px]">
@@ -148,21 +191,64 @@ const RestaurantHistory = () => {
                 ))}
               </tbody>
             </table>
+
+            {/* Pagination */}
             <div className="flex flex-col sm:flex-row justify-between items-center mt-4 gap-2">
               <span className="text-gray-600 text-xs sm:text-sm">Showing 1 to 10 of 10 transactions</span>
               <div className="flex items-center gap-2">
                 <div className="flex gap-1">
-                  <Button variant="outline" size="sm" disabled={true}>←</Button>
+                  <Button variant="outline" size="sm" disabled>←</Button>
                   <Button variant="outline" size="sm">1</Button>
-                  <Button variant="outline" size="sm">2</Button>
-                  <Button variant="outline" size="sm"></Button>
-                  <Button variant="outline" size="sm"></Button>
                   <Button variant="outline" size="sm">→</Button>
                 </div>
                 <Button variant="outline" size="sm" onClick={() => window.history.back()}>×</Button>
               </div>
             </div>
           </div>
+
+          {/* Export Dialog */}
+          <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle className="text-lg font-semibold">
+                  Export Transactions
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <RadioGroup
+                  value={exportFormat}
+                  onValueChange={setExportFormat}
+                  className="space-y-2"
+                >
+                  <div className="flex items-center gap-2 cursor-pointer hover:bg-muted p-2 rounded">
+                    <RadioGroupItem value="csv" id="csv" />
+                    <Label htmlFor="csv" className="flex items-center gap-2">
+                      <FileText size={18} /> CSV
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2 cursor-pointer hover:bg-muted p-2 rounded">
+                    <RadioGroupItem value="excel" id="excel" />
+                    <Label htmlFor="excel" className="flex items-center gap-2">
+                      <FileSpreadsheet size={18} /> Excel (.xlsx)
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2 cursor-pointer hover:bg-muted p-2 rounded">
+                    <RadioGroupItem value="pdf" id="pdf" />
+                    <Label htmlFor="pdf" className="flex items-center gap-2">
+                      <FileSignature size={18} /> PDF
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              <DialogFooter className="pt-4">
+                <DialogClose asChild>
+                  <Button variant="outline">Cancel</Button>
+                </DialogClose>
+                <Button onClick={exportData}>Export</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
         </CardContent>
       </Card>
     </div>

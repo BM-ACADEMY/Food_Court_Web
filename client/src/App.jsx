@@ -1,39 +1,27 @@
 
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import Header from '@/Modules/Treasury_subcom/components/header/Navbar';
-import Footer from '@/Modules/User/components/footer/Footer';
-import Home from '@/Modules/Treasury_subcom/Pages/Home';
-import RegisterCustomer from './Modules/Treasury_subcom/Pages/RegisterCustomer';
-import TopUpOnlineUser from './Modules/Treasury_subcom/Pages/TopUpOnlineUser';
-import CustomerHistory from './Modules/Treasury_subcom/Pages/CustomerHistory';
-import RestaurantHistory from './Modules/Treasury_subcom/Pages/RestaurantHistory';
-import UserHistory from './Modules/Treasury_subcom/Pages/UserHistory';
-
-// src/App.tsx
-// import CustomerRoutes from "@/routes/CustomerRoutes";
-// import AdminRoutes from "@/routes/AdminRoutes";
-// import RestaurantRoutes from "@/routes/RestaurantRoutes";
-// import TreasuryRoutes from "@/routes/TreasuryRoutes";
-
-function App() {
-  const user = { role: "masteradmin" }; // Replace with actual auth logic
+import { BrowserRouter as Router } from "react-router-dom";
+import AppRoutes from "@/routes/appRoutes";
+import { ToastContainer, toast ,Bounce } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 
+export default function App() {
   return (
     <Router>
-      <Header />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/register-customer" element={<RegisterCustomer />} />
-        <Route path="/topup-online-user" element={<TopUpOnlineUser/>} />
-        <Route path="/customer-history" element={<CustomerHistory/>} />
-        <Route path="/restaurant-history" element={<RestaurantHistory/>} />
-        <Route path="/user-history" element={<UserHistory/>} />
-      </Routes>
-      <Footer />
+      <AppRoutes />
+       <ToastContainer
+        position="top-center"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick={false}
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="colored"
+        transition={Bounce}
+      />
     </Router>
   );
 }
-
-export default App;
