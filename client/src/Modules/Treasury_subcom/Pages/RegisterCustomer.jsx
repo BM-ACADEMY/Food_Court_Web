@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useRef, useEffect } from "react";
 import {
   Card,
@@ -42,7 +40,6 @@ function RegisterCustomer() {
   const startScanner = async () => {
     setCameraError("");
     try {
-      // Stop any existing scanner instance
       if (html5QrCodeRef.current) {
         await stopScanner();
       }
@@ -79,32 +76,16 @@ function RegisterCustomer() {
   };
 
   const handleScanSuccess = (decodedText) => {
-    try {
-      const data = JSON.parse(decodedText);
-      // Validate required fields
-      if (!data.name || !data.email || !data.phone) {
-        alert("Invalid QR code: Missing name, email, or phone.");
-        return;
-      }
+    setFormData((prev) => ({
+      ...prev,
+      customerName: decodedText, // 👈 Set plain scanned text to customerName
+    }));
 
-      // Map QR data to form fields
-      setFormData({
-        customerName: data.name,
-        email: data.email,
-        phoneNumber: data.phone,
-      });
-
-      // Close scanner dialog
-      setIsScannerOpen(false);
-    } catch (err) {
-      console.error("Failed to parse QR code:", err);
-      alert("Invalid QR code format. Please try a valid QR code.");
-    }
+    setIsScannerOpen(false); // Close scanner dialog
   };
 
   useEffect(() => {
     if (isScannerOpen) {
-      // Delay to ensure dialog content is rendered
       const timeout = setTimeout(() => {
         startScanner();
       }, 300);

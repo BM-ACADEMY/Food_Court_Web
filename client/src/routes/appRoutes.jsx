@@ -2,16 +2,16 @@
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 // import Login from "@/pages/login/Login";
 // import NotFound from "@/pages/NotFound";
-// import CustomerRoutes from "./CustomerRoutes";
+import CustomerRoutes from "./customer";
 import TreasuryRoutes from "./treasury";
-// import RestaurantRoutes from "./RestaurantRoutes";
+import RestaurantRoutes from "./Restaurant";
 // import AdminRoutes from "./AdminRoutes";
-// import MasterAdminRoutes from "./masterAdmin";
+import MasterAdminRoutes from "./masterAdmin";
 
 export default function AppRoutes() {
   // const user = JSON.parse(localStorage.getItem("user")) || null; 
 
-  const user={role:"treasury"}
+  const user = { role: "treasury" }
   // const user={role:"treasury"}
   const location = useLocation();
 
@@ -42,21 +42,13 @@ export default function AppRoutes() {
     <Routes>
       {/* <Route path="/login" element={<Login />} /> */}
       <Route path="/master-admin/*" element={<MasterAdminRoutes />} />
-
       <Route path="/treasury/*" element={<TreasuryRoutes />} />
-      {/* <Route path="/admin/*" element={<AdminRoutes />} />
+      {/* <Route path="*" element={<NotFound />} />  */}
+      <Route path="/treasury/*" element={<TreasuryRoutes />} />
       <Route path="/customer/*" element={<CustomerRoutes />} />
       <Route path="/restaurant/*" element={<RestaurantRoutes />} />
+      {/* <Route path="/admin/*" element={<AdminRoutes />} /> */}
 
-       
-      <Route path="*" element={<NotFound />} /> */}
-
-      {/* <Route path="/admin/*" element={<AdminRoutes />} />
-      <Route path="/customer/*" element={<CustomerRoutes />} />
-      <Route path="/restaurant/*" element={<RestaurantRoutes />} /> */}
-      <Route path="/treasury/*" element={<TreasuryRoutes />} />
-
-      {/* <Route path="*" element={<NotFound />} /> */}
     </Routes>
   );
 }

@@ -16,17 +16,26 @@ const Footer = () => {
           {/* Center Section */}
           <div>
             <h3 className="font-bold text-lg sm:text-xl mb-3">Contact Support</h3>
+            
             <div className="flex items-start gap-2 mb-1 text-[#8ef5b7]">
               <Phone className="w-4 h-4 mt-1" />
-              <p className="text-white">Rahul: +91 98765 43210</p>
+              <a href="tel:+919876543210" className="text-white hover:underline">
+                Rahul: +91 98765 43210
+              </a>
             </div>
+
             <div className="flex items-start gap-2 mb-1 text-[#8ef5b7]">
               <Phone className="w-4 h-4 mt-1" />
-              <p className="text-white">Priya: +91 87654 32109</p>
+              <a href="tel:+918765432109" className="text-white hover:underline">
+                Priya: +91 87654 32109
+              </a>
             </div>
+
             <div className="flex items-start gap-2 text-[#8ef5b7]">
               <Mail className="w-4 h-4 mt-1" />
-              <p className="text-white break-words">support@pegasus2k25.edu</p>
+              <a href="mailto:support@pegasus2k25.edu" className="text-white hover:underline break-words">
+                support@pegasus2k25.edu
+              </a>
             </div>
           </div>
 
@@ -49,7 +58,16 @@ const Footer = () => {
 
         {/* Bottom Note */}
         <p className="text-center text-[#cfcfd8] text-xs sm:text-sm">
-          © 2025 Pegasus. All rights reserved.
+          © {new Date().getFullYear()}{" "}
+          <a
+            href="https://bmtechx.in/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-white"
+          >
+            BMTechx.in
+          </a>{" "}
+          All Rights Reserved.
         </p>
       </div>
     </footer>
