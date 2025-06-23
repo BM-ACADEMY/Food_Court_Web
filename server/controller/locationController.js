@@ -8,7 +8,7 @@ exports.createLocation = async (req, res) => {
     const location = new Location({ name });
     await location.save();
 
-    res.status(201).json({ success: true, data: location });
+    res.status(201).json({ success: true,message:"Location Added Successfully", data: location });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }
@@ -44,7 +44,7 @@ exports.updateLocation = async (req, res) => {
     if (!updated)
       return res.status(404).json({ success: false, message: "Location not found" });
 
-    res.status(200).json({ success: true, data: updated });
+    res.status(200).json({ success: true, message:"Location updated Successfully", data: updated });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }

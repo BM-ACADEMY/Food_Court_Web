@@ -5,8 +5,8 @@ exports.createAdmin = async (req, res) => {
   try {
     const {
       user_id,
-      admin_to_admin_transfer_limit = 100000.00,
-      admin_to_subcom_transfer_limit = 50000.00,
+      admin_to_admin_transfer_limit ,
+      admin_to_subcom_transfer_limit ,
     } = req.body;
 
     const admin = new Admin({

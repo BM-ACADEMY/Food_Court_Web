@@ -16,7 +16,7 @@ const userSchema = new mongoose.Schema(
     email: {
       type: String,
       unique: true,
-      sparse: true, // allows null+unique combo
+      sparse: true,
       lowercase: true,
       trim: true,
     },
@@ -37,16 +37,30 @@ const userSchema = new mongoose.Schema(
     flag_reason: {
       type: String,
     },
-    // last_activity_at: {
-    //   type: Date,
-    // },
+
+    // ✅ OTP and verification
+    phone_number_otp: {
+      type: String,
+      default: null, // null until OTP is generated
+    },
+    number_verified: {
+      type: Boolean,
+      default: false, // false until OTP is verified
+    },
+      otp_expires_at: {
+      type: Date,
+      default: null,
+    },
   },
   {
-    timestamps:true
+    timestamps: true,
   }
 );
 
 // Compound index: (role_id, email, phone_number)
-userSchema.index({ role_id: 1, email: 1, phone_number: 1 }, { name: "idx_users_role_email_phone" });
+userSchema.index(
+  { role_id: 1, email: 1, phone_number: 1 },
+  { name: "idx_users_role_email_phone" }
+);
 
 module.exports = mongoose.model("User", userSchema);

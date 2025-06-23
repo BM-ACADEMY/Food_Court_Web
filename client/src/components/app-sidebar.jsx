@@ -41,49 +41,49 @@ const data = {
   navMain: [
     {
       title: "Dashboard",
-      url: "/",
+      url: "/master-admin",
       icon: SquareTerminal,
       isActive: true,
     },
     {
       title: "Customer Users",
-      url: "/customers/customerList",
+      url: "/master-admin/customers/customer-list",
       icon: Users,
      
     },
     {
       title: "Restaurant Users",
-      url: "/restaurant/restaurant-list",
+      url: "/master-admin/restaurant/restaurant-list",
       icon: ChefHat,
      
     },
     {
       title: "Treasury Subcom Users",
-      url: "/treasurySubcom/treasury-subcom-list",
+      url: "/master-admin/treasury-subcom/treasury-subcom-list",
       icon: UserCog,
       
     },
     {
       title: "Admin Users",
-      url: "/admin/admin-list",
+      url: "/master-admin/admin/admin-list",
       icon: Shield,
       
     },
     {
       title: "Transaction History",
-      url: "/transaction-history",
+      url: "/master-admin/transaction-history",
       icon: History,
 
     },
     {
       title: "Add / Delete Access",
-      url: "/adddelete/add-new-user",
+      url: "/master-admin/adddelete/add-new-user",
       icon: KeyRound,
     
     },
     {
       title: "Point Exchange",
-      url: "/points/point-exchange",
+      url: "/master-admin/points/point-exchange",
       icon: Coins,
     },
   ],
