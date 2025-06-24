@@ -5,8 +5,8 @@ import CustomerRoutes from "./customer";
 import RestaurantRoutes from "./restaurant";
 import TreasuryRoutes from "./treasury";
 import Login from "@/Modules/User/pages/Landing/Home";
-import NotFound from "@/Modules/Notfound";
 import { ProtectedRoute } from "@/context/ProtectedRoute";
+import NotFound from "@/Modules/NotFound";
 
 export default function AppRoutes() {
   const { user, loading } = useAuth();
