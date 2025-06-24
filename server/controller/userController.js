@@ -10,7 +10,171 @@ const TreasurySubcom = require("../model/treasurySubcomModel");
 const Restaurant = require("../model/restaurantModel");
 const Customer = require("../model/customerModel");
 const mongoose = require("mongoose");
+const jwt = require("jsonwebtoken");
+const UserBalance = require("../model/userBalanceModel");
+const { sendOtpSms } = require("../utils/sentSmsOtp"); 
+const LoginLog=require("../model/loginLogModel");
 
+//login function
+exports.loginUser = async (req, res) => {
+  const { emailOrPhone, password } = req.body;
+
+  try {
+    // Find user by email or phone number
+    const user = await User.findOne({
+      $or: [{ email: emailOrPhone }, { phone_number: emailOrPhone }],
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Verify password
+    const isMatch = await bcrypt.compare(password, user.password_hash);
+    if (!isMatch) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
+
+    // Set token in cookie
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Lax",
+      maxAge: 24 * 60 * 60 * 1000, // 1 day
+    });
+
+    // Create login log
+    await LoginLog.create({
+      user_id: user._id,
+      login_time: new Date(),
+    });
+
+    res.json({ success: true, message: "Login successful" });
+  } catch (error) {
+    console.error("Login error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.getMe = async (req, res) => {
+  const token = req.cookies.token;
+
+  if (!token) return res.status(401).json({ message: "Not logged in" });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Find user and populate role
+    const user = await User.findById(decoded.id)
+      .select("-password_hash")
+      .populate("role_id");
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Fetch balance
+    const userBalance = await UserBalance.findOne({ user_id: user._id });
+    const balance = userBalance
+      ? parseFloat(userBalance.balance.toString())
+      : 0.0;
+
+    // Prepare response object
+    const userObj = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      phone_number: user.phone_number,
+      is_flagged: user.is_flagged,
+      flag_reason: user.flag_reason,
+      number_verified: user.number_verified,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      role: user.role_id, // full role object
+      balance, // user's balance
+    };
+
+    res.json({ user: userObj });
+  } catch (err) {
+    console.error("getMe error:", err);
+    return res.status(401).json({ message: "Invalid token" });
+  }
+};
+
+//logout function
+exports.logoutUser = async (req, res) => {
+  try {
+    // Get user ID from middleware
+    const userId = req.user?.id;
+    console.log("Logout attempt for userId:", userId);
+
+    // Validate userId
+    if (!userId) {
+      console.warn("No user ID provided for logout");
+      return res.status(401).json({ success: false, message: "No user ID provided" });
+    }
+
+    // Update the most recent login log with logout time
+    const updatedLog = await LoginLog.findOneAndUpdate(
+      { user_id: userId, logout_time: null },
+      { logout_time: new Date() },
+      { sort: { login_time: -1 }, new: true } // Return updated document
+    );
+
+    if (!updatedLog) {
+      console.warn(`No open login log found for user ${userId}`);
+    } else {
+      console.log("Updated login log:", updatedLog);
+    }
+
+    // Clear token cookie
+    res.clearCookie("token", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Lax",
+    });
+
+    res.status(200).json({ success: true, message: "Logged out successfully" });
+  } catch (error) {
+    console.error("Logout error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+
+exports.getSessionHistory = async (req, res) => {
+  try {
+    const { userId, startDate, endDate } = req.query;
+
+    // Validate userId
+    if (!userId || !mongoose.isValidObjectId(userId)) {
+      return res.status(400).json({ success: false, message: "Invalid user ID" });
+    }
+
+    // Build query
+    const query = { user_id: userId };
+    if (startDate || endDate) {
+      query.login_time = {};
+      if (startDate) query.login_time.$gte = new Date(startDate);
+      if (endDate) query.login_time.$lte = new Date(endDate);
+    }
+
+    // Fetch session logs
+    const sessions = await LoginLog.find(query)
+      .sort({ login_time: -1 })
+      .select("login_time logout_time created_at");
+
+    res.status(200).json({ success: true, data: sessions });
+  } catch (error) {
+    console.error("Session history error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
 
 // Function to generate a 6-digit OTP
 function generateOtp() {
@@ -18,33 +182,31 @@ function generateOtp() {
 }
 
 // Function to send OTP SMS
-async function sendOtpSms(mobile) {
-  const otp = generateOtp();
-  const message = `Dear User, Your OTP for login to FreshBloom is ${otp}. Please do not share this OTP. Regards Piyums`;
+// async function sendOtpSms(mobile) {
+//   const otp = generateOtp();
+//   const message = `Dear User, Your OTP for login to FreshBloom is ${otp}. Please do not share this OTP. Regards Piyums`;
 
-  // Build query parameters (auto URL-encodes)
-  const params = new URLSearchParams({
-    user: 'FreshBloom',
-    pass: '123456',
-    sender: 'FSHBLM',
-    phone: mobile,
-    text: message,
-    priority: 'ndnd',
-    stype: 'normal',
-  });
+//   // Build query parameters (auto URL-encodes)
+//   const params = new URLSearchParams({
+//     user: "FreshBloom",
+//     pass: "123456",
+//     sender: "FSHBLM",
+//     phone: mobile,
+//     text: message,
+//     priority: "ndnd",
+//     stype: "normal",
+//   });
 
-  const url = `https://bhashsms.com/api/sendmsg.php?${params.toString()}`;
+//   const url = `https://bhashsms.com/api/sendmsg.php?${params.toString()}`;
 
-  try {
-    const response = await axios.get(url);
-    console.log('✅ OTP sent successfully:', otp);
-    console.log('📨 SMS API response:', response.data);
-  } catch (err) {
-    console.error('❌ Failed to send OTP SMS:', err.message);
-  }
-}
-
-
+//   try {
+//     const response = await axios.get(url);
+//     console.log("✅ OTP sent successfully:", otp);
+//     console.log("📨 SMS API response:", response.data);
+//   } catch (err) {
+//     console.error("❌ Failed to send OTP SMS:", err.message);
+//   }
+// }
 // Create User
 exports.createUser = async (req, res) => {
   try {
@@ -88,8 +250,8 @@ exports.createUser = async (req, res) => {
     const otpExpiry = new Date(Date.now() + 5 * 60 * 1000); // 5 mins
 
     // ✅ Send OTP via SMS (optional)
-    const otpres = await sendOtpSms(phone_number);
-    console.log(otpres, "res");
+    // const otpres = await sendOtpSms(phone_number,otp);
+    // console.log(otpres, "res");
 
     // ✅ Hash password
     const password_hash = await bcrypt.hash(password, 10);
@@ -335,6 +497,31 @@ exports.getUsers = async (req, res) => {
   }
 };
 
+
+
+exports.getAllUsersforHistory = async (req, res) => {
+  try {
+    const requestingUserId = req.user?.id;
+    const requestingUser = await User.findById(requestingUserId).populate("role_id");
+
+    if (!requestingUser) {
+      return res.status(404).json({ success: false, message: "Requesting user not found" });
+    }
+
+    const roleName = requestingUser.role_id?.name || "";
+    if (!["Master-Admin", "Admin"].includes(roleName)) {
+      return res.status(403).json({ success: false, message: "Unauthorized to view users" });
+    }
+
+    const users = await User.find().populate("role_id", "name").select("name email role_id");
+    res.status(200).json({ success: true, data: users });
+  } catch (error) {
+    console.error("Get users error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+
 // Get user by ID
 exports.getUserById = async (req, res) => {
   try {
@@ -366,14 +553,15 @@ exports.updateUser = async (req, res) => {
     ).populate("role_id"); // ✅ Populate role
 
     if (!updatedUser)
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
 
     res.status(200).json({ success: true, data: updatedUser });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }
 };
-
 
 // Delete user
 exports.deleteUser = async (req, res) => {
