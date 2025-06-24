@@ -13,15 +13,7 @@ const loginLogSchema = new mongoose.Schema(
     },
     logout_time: {
       type: Date,
-    },
-    location_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Location",
-    },
-    device_info: {
-      type: String,
-      trim: true,
-    },
+    }
   },
   {
     timestamps: {

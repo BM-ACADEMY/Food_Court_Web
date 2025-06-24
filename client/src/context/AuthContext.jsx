@@ -42,12 +42,28 @@ export const AuthProvider = ({ children }) => {
             console.error("Logout failed", err);
         }
     };
+
+    const getSessionHistory = async (userId, startDate, endDate) => {
+        try {
+            const res = await axios.get(
+                `${import.meta.env.VITE_BASE_URL}/users/sessions`,
+                {
+                    params: { userId, startDate, endDate },
+                    withCredentials: true,
+                }
+            );
+            return res.data.data; // Array of session logs
+        } catch (err) {
+            console.error("Fetch session history failed:", err);
+            throw err;
+        }
+    };
     useEffect(() => {
         fetchUser(); // auto load user on first mount
     }, []);
 
     return (
-        <AuthContext.Provider value={{ user, loading, login, logout }}>
+        <AuthContext.Provider value={{ user, setUser, loading, login, logout, getSessionHistory }}>
             {children}
         </AuthContext.Provider>
     );
