@@ -25,8 +25,8 @@ import {
   Wallet,
   ListOrdered,
   Clock,
-  FileText, 
-  FileSpreadsheet, 
+  FileText,
+  FileSpreadsheet,
   FileSignature
 } from "lucide-react";
 import {
@@ -266,90 +266,90 @@ export default function TransactionDashboard() {
       </div>
 
       {/* Pagination */}
-     <Pagination className="mt-6 justify-end">
-  <PaginationContent>
-    <PaginationItem>
-      <PaginationPrevious
-        href="#"
-        onClick={(e) => {
-          e.preventDefault();
-          setCurrentPage((p) => Math.max(1, p - 1));
-        }}
-      />
-    </PaginationItem>
+      <Pagination className="mt-6 justify-end">
+        <PaginationContent>
+          <PaginationItem>
+            <PaginationPrevious
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                setCurrentPage((p) => Math.max(1, p - 1));
+              }}
+            />
+          </PaginationItem>
 
-    {Array.from({ length: totalPages }).map((_, i) => (
-      <PaginationItem key={i}>
-        <PaginationLink
-          href="#"
-          isActive={currentPage === i + 1}
-          onClick={(e) => {
-            e.preventDefault();
-            setCurrentPage(i + 1);
-          }}
-        >
-          {i + 1}
-        </PaginationLink>
-      </PaginationItem>
-    ))}
+          {Array.from({ length: totalPages }).map((_, i) => (
+            <PaginationItem key={i}>
+              <PaginationLink
+                href="#"
+                isActive={currentPage === i + 1}
+                onClick={(e) => {
+                  e.preventDefault();
+                  setCurrentPage(i + 1);
+                }}
+              >
+                {i + 1}
+              </PaginationLink>
+            </PaginationItem>
+          ))}
 
-    {totalPages > 5 && (
-      <PaginationItem>
-        <PaginationEllipsis />
-      </PaginationItem>
-    )}
+          {totalPages > 5 && (
+            <PaginationItem>
+              <PaginationEllipsis />
+            </PaginationItem>
+          )}
 
-    <PaginationItem>
-      <PaginationNext
-        href="#"
-        onClick={(e) => {
-          e.preventDefault();
-          setCurrentPage((p) => Math.min(totalPages, p + 1));
-        }}
-      />
-    </PaginationItem>
-  </PaginationContent>
-</Pagination>
-
+          <PaginationItem>
+            <PaginationNext
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                setCurrentPage((p) => Math.min(totalPages, p + 1));
+              }}
+            />
+          </PaginationItem>
+        </PaginationContent>
+      </Pagination>
+              
 
       {/* Export Dialog */}
       <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-  <DialogContent className="sm:max-w-md">
-    <DialogHeader>
-      <DialogTitle className="text-lg font-semibold">Export Transactions</DialogTitle>
-    </DialogHeader>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold">Export Transactions</DialogTitle>
+          </DialogHeader>
 
-    <div className="space-y-3">
-      <RadioGroup value={exportFormat} onValueChange={setExportFormat}>
-        <div className="flex items-center gap-3 p-2 rounded-md hover:bg-muted cursor-pointer">
-          <RadioGroupItem value="csv" id="export-csv" />
-          <Label htmlFor="export-csv" className="flex items-center gap-2">
-            <FileText size={18} /> CSV
-          </Label>
-        </div>
-        <div className="flex items-center gap-3 p-2 rounded-md hover:bg-muted cursor-pointer">
-          <RadioGroupItem value="excel" id="export-excel" />
-          <Label htmlFor="export-excel" className="flex items-center gap-2">
-            <FileSpreadsheet size={18} /> Excel (.xlsx)
-          </Label>
-        </div>
-        <div className="flex items-center gap-3 p-2 rounded-md hover:bg-muted cursor-pointer">
-          <RadioGroupItem value="pdf" id="export-pdf" />
-          <Label htmlFor="export-pdf" className="flex items-center gap-2">
-            <FileSignature size={18} /> PDF
-          </Label>
-        </div>
-      </RadioGroup>
-    </div>
+          <div className="space-y-3">
+            <RadioGroup value={exportFormat} onValueChange={setExportFormat}>
+              <div className="flex items-center gap-3 p-2 rounded-md hover:bg-muted cursor-pointer">
+                <RadioGroupItem value="csv" id="export-csv" />
+                <Label htmlFor="export-csv" className="flex items-center gap-2">
+                  <FileText size={18} /> CSV
+                </Label>
+              </div>
+              <div className="flex items-center gap-3 p-2 rounded-md hover:bg-muted cursor-pointer">
+                <RadioGroupItem value="excel" id="export-excel" />
+                <Label htmlFor="export-excel" className="flex items-center gap-2">
+                  <FileSpreadsheet size={18} /> Excel (.xlsx)
+                </Label>
+              </div>
+              <div className="flex items-center gap-3 p-2 rounded-md hover:bg-muted cursor-pointer">
+                <RadioGroupItem value="pdf" id="export-pdf" />
+                <Label htmlFor="export-pdf" className="flex items-center gap-2">
+                  <FileSignature size={18} /> PDF
+                </Label>
+              </div>
+            </RadioGroup>
+          </div>
 
-    <DialogFooter className="pt-4">
-      <DialogClose asChild>
-        <Button variant="outline">Cancel</Button>
-      </DialogClose>
-      <Button onClick={exportData}>Export</Button>
-    </DialogFooter>
-  </DialogContent>
-</Dialog>
+          <DialogFooter className="pt-4">
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button onClick={exportData}>Export</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
     </div>
   );

@@ -1,25 +1,17 @@
-import React from "react";
 import { Routes, Route } from "react-router-dom";
-import RestaurantHeader from "@/Modules/Restaurant/components/Header/Navbar";
+import RestaurantLayout from "./RestaurantLayout";
 import RestaurantDashboard from "@/Modules/Restaurant/pages/RestaurantHome";
 import DeductRefund from "@/Modules/Restaurant/pages/DeductRefund";
 import TransactionDashboard from "@/Modules/Restaurant/pages/History";
-import Footer from "@/Modules/Restaurant/components/Footer/Footer";
 
-const Restaurant = () => {
+export default function RestaurantRoutes() {
   return (
-    <div>
-      <RestaurantHeader />
-
-      <Routes>
-        <Route path="/" element={<RestaurantDashboard />} />
-        <Route path="/deduct-refund" element={<DeductRefund />} />
-        <Route path="/history" element={<TransactionDashboard />} />
-      </Routes>
-
-      <Footer />
-    </div>
+    <Routes>
+      <Route path="/" element={<RestaurantLayout />}>
+        <Route index element={<RestaurantDashboard />} />
+        <Route path="deduct-refund" element={<DeductRefund />} />
+        <Route path="history" element={<TransactionDashboard />} />
+      </Route>
+    </Routes>
   );
-};
-
-export default Restaurant;
+}

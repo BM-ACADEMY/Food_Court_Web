@@ -4,6 +4,7 @@ const connectDB = require('./config/db');
 const cors =require('cors');
 const helmet=require('helmet');
 const morgan=require('morgan');
+const cookieParser = require('cookie-parser');
 
 // Load environment variables from .env file
 dotenv.config();
@@ -22,13 +23,20 @@ const loginLogRoute=require('./route/loginLogRoute');
 const apiIntegrationRoute=require('./route/apiIntegrationRoute');
 const userBalanceRoute=require('./route/userBalanceRoute');
 const app = express();
-app.use(cors({ origin: '*' }));
+app.use(cookieParser());
+app.use(
+  cors({
+    origin: process.env.DEV_FRONTEND_URL, // your frontend URL
+    credentials: true, // allow cookies (required for JWT in cookies)
+  })
+);
 app.use(helmet());
 app.use(express.json());
 app.use(morgan('dev'));
 // Optional: manually allow CORS headers for more control
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Origin", process.env.DEV_FRONTEND_URL); // ✅ must match exact origin
+  res.header("Access-Control-Allow-Credentials", "true"); // ✅ required for cookies
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
   next();

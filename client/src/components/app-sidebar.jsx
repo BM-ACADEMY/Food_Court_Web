@@ -110,7 +110,7 @@ export function AppSidebar({
       className="top-(--header-height) h-[calc(100svh-var(--header-height))]!"
       {...props}>
       <SidebarHeader>
-        <SidebarMenu>
+        {/* <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <a href="#">
@@ -125,13 +125,13 @@ export function AppSidebar({
               </a>
             </SidebarMenuButton>
           </SidebarMenuItem>
-        </SidebarMenu>
+        </SidebarMenu> */}
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        {/* <NavUser user={data.user} /> */}
       </SidebarFooter>
     </Sidebar>
   );
