@@ -52,7 +52,7 @@ exports.createRole = async (req, res) => {
 exports.getRoles = async (req, res) => {
   try {
     const roles = await Role.find().sort({ created_at: -1 });
-    res.status(200).json({ success: true, data: roles });
+    res.status(200).json({ success: true,message:"Fetch role successfully", data: roles });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

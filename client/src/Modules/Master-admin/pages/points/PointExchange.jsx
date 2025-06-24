@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect,useRef } from "react";
 import {
     Select,
     SelectTrigger,
@@ -17,10 +17,22 @@ import {
     DollarSign,
     ArrowRightLeft,
     Search,
-    Filter,
-    Eye
+    Eye,
+    PiggyBank
 } from "lucide-react";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import AddPointForm from "./AddPointForm";
+import axios from "axios";
+import RecentTransactions from "./RecentTransactions";
+import { useAuth } from "@/context/AuthContext";
+import AddFundModalForm from "./AddFundsForm";
+import DashboardCards from "./DashboardCards";
 
 const mockData = {
     treasuryBalance: 250000,
@@ -161,14 +173,93 @@ const TransactionRow = ({ dateTime, transactionId, member, amount, status, upi, 
         </TableCell>
     </TableRow>
 );
+
+const roleIdFieldMap = {
+    "role-1": "master_admin_id",
+    "role-2": "admin_id",
+    "role-3": "treasury_subcom_id",
+    "role-4": "restaurant_id",
+    "role-5": "customer_id",
+};
+
 const PointExchange = () => {
     const [status, setStatus] = useState("");
     const [sortBy, setSortBy] = useState("");
+    const [searchTerm, setSearchTerm] = useState("");
+    const { user } = useAuth();
+    const [roles, setRoles] = useState([]);
+    const [users, setUsers] = useState([]);
     const [visibleTransactions, setVisibleTransactions] = useState(transactions.slice(0, 5));
+    const [open, setOpen] = useState(false);
+    const [selectedRoleId, setSelectedRoleId] = useState("");
+    const [page, setPage] = useState(1);
+    const [selectedReceiver, setSelectedReceiver] = useState(null);
+    const [openModal, setOpenModal] = useState(false);
+      const transactionRef = useRef(null);
 
+  const scrollToTransactions = () => {
+    transactionRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
     const loadMore = () => {
         setVisibleTransactions(transactions);
     };
+
+    useEffect(() => {
+        fetchAllRoles();
+        if (selectedRoleId) {
+            fetchUsers(selectedRoleId, 1);
+        }
+    }, [searchTerm, status, sortBy]);
+
+    const fetchAllRoles = async () => {
+        try {
+            const res = await axios.get(`${import.meta.env.VITE_BASE_URL}/roles/fetch-all-roles`);
+            const fetchedRoles = res.data.data || [];
+            setRoles(fetchedRoles);
+
+            // Auto-select "Treasury Subcom" role on load
+            const treasuryRole = fetchedRoles.find(role => role.name.toLowerCase().includes("treasury"));
+            if (treasuryRole) {
+                setSelectedRoleId(treasuryRole.role_id);
+                fetchUsers(treasuryRole.role_id, 1);
+            }
+        } catch (err) {
+            console.error("Failed to fetch roles:", err);
+        }
+    };
+
+    const fetchUsers = async (roleId, pageNum = 1) => {
+        try {
+            const query = new URLSearchParams({
+                page: pageNum,
+                search: searchTerm || "",
+                status: status || "all",
+                sort: sortBy || "",
+            });
+
+            const res = await axios.get(`${import.meta.env.VITE_BASE_URL}/users/with-balance-by-role/${roleId}?${query}`);
+
+            if (pageNum === 1) {
+                setUsers(res.data.data);
+            } else {
+                setUsers((prev) => [...prev, ...res.data.data]);
+            }
+
+            setPage(pageNum);
+        } catch (err) {
+            console.error("Failed to fetch users:", err);
+        }
+    };
+
+    const handleRoleSelect = (roleId) => {
+        setSelectedRoleId(roleId);
+        fetchUsers(roleId, 1);
+    };
+
+    const handleLoadMore = () => {
+        fetchUsers(selectedRoleId, page + 1);
+    };
+
     return (
         <div className="p-6 min-h-screen">
             {/* Header */}
@@ -180,38 +271,37 @@ const PointExchange = () => {
                     </p>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="outline">
+
+                    <Button variant="secondary" className="cursor-pointer" onClick={() => setOpen(true)}>
+                        <PiggyBank className="w-4 h-4 mr-2" /> Credit Master admin Point
+                    </Button>
+
+                    <Button variant="outline" className="cursor-pointer" onClick={scrollToTransactions}>
                         <History className="w-4 h-4 mr-2" /> Transaction History
                     </Button>
-                    <Button className="bg-[#00004D] cursor-pointer">
+                    {/* <Button className="bg-[#00004D] cursor-pointer">
                         <Send className="w-4 h-4 mr-2" /> Bulk Fund Transfer
-                    </Button>
+                    </Button> */}
+                    {/* ✅ Modal for Credit Point */}
+                    <Dialog open={open} onOpenChange={setOpen}>
+                        <DialogContent className="max-w-sm">
+                            <DialogHeader>
+                                <DialogTitle className="flex items-center gap-2 font-bold text-[#00004D]">
+                                    <PiggyBank className="w-5 h-5 text-yellow-500" />
+                                    Credit Master Admin Point
+                                </DialogTitle>
+                            </DialogHeader>
+
+                            {/* You can use your form component or inline form */}
+                            <AddPointForm onSuccess={() => setOpen(false)} />
+                        </DialogContent>
+                    </Dialog>
                 </div>
             </div>
 
             {/* Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <CardComponent
-                    title="Main Treasury Balance"
-                    amount={`₹ ${mockData.treasuryBalance.toLocaleString()}`}
-                    subtitle={`+₹ ${mockData.treasuryChange.toLocaleString()} from last month`}
-                    icon={<DollarSign className="text-blue-600" />}
-                    bg="blue-100"
-                />
-                <CardComponent
-                    title="Total Subcom Funds"
-                    amount={`₹ ${mockData.subcomFunds.toLocaleString()}`}
-                    subtitle={`Distributed across ${mockData.memberCount} members`}
-                    icon={<Users className="text-green-600" />}
-                    bg="green-100"
-                />
-                <CardComponent
-                    title="Transfers This Month"
-                    amount={mockData.transfersThisMonth}
-                    subtitle={`₹ ${mockData.totalTransferred.toLocaleString()} total transferred`}
-                    icon={<ArrowRightLeft className="text-purple-600" />}
-                    bg="purple-100"
-                />
+            <div >
+               <DashboardCards />
             </div>
 
             {/* Search and Filters */}
@@ -222,7 +312,10 @@ const PointExchange = () => {
                         <Input
                             placeholder="Search members by name or ID..."
                             className="pl-10"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
                         />
+
                     </div>
                 </div>
 
@@ -235,6 +328,18 @@ const PointExchange = () => {
                             <SelectItem value="all">All</SelectItem>
                             <SelectItem value="active">Active</SelectItem>
                             <SelectItem value="inactive">Inactive</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <Select value={selectedRoleId} onValueChange={handleRoleSelect}>
+                        <SelectTrigger className="w-[200px]">
+                            <SelectValue placeholder="Select Role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {roles.map((role) => (
+                                <SelectItem key={role._id} value={role.role_id}>
+                                    {role.name}
+                                </SelectItem>
+                            ))}
                         </SelectContent>
                     </Select>
 
@@ -250,118 +355,140 @@ const PointExchange = () => {
                         </SelectContent>
                     </Select>
 
-                    <Button variant="secondary" className="cursor-pointer">
+                    {/* <Button variant="secondary" className="cursor-pointer">
                         <Filter className="w-4 h-4 mr-2" /> Filters
-                    </Button>
+                    </Button> */}
                 </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-                {treasuryMembers.map((member, idx) => (
-                    <Card
-                        key={idx}
-                        className={`border-t-4 p-5 shadow ${member.status === "Active"
-                            ? "border-green-500"
-                            : member.status === "Low Balance"
-                                ? "border-yellow-500"
-                                : "border-red-500"
-                            }`}
-                    >
-                        <CardContent className="p-0">
-                            <div className="flex justify-between items-start">
-                                <div className="flex items-center gap-3">
-                                    <div className="rounded-full w-10 h-10 flex items-center justify-center font-bold text-white text-sm" style={{ backgroundColor: getColorFromInitials(member.initials) }}>
-                                        {member.initials}
+                {users.map((user, idx) => {
+                    const initials = user.name?.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
+                    const balance = user.balance || 0;
+                    const status = balance === 0 ? "Inactive" : balance < 1000 ? "Low Balance" : "Active";
+                    const budgetPercent = Math.min(Math.round((balance / 30000) * 100), 100); // adjust max budget logic as needed
+                    const fieldKey = roleIdFieldMap[user.role_id?.role_id] || "user_id";
+                    const rawId = user[fieldKey] || "";
+                    const memberId = rawId?.slice(-5).toUpperCase() || "N/A";
+
+                    const lastTransfer = user.lastTransaction
+                        ? {
+                            amount: parseFloat(user.lastTransaction.amount?.toString() || "0"),
+                            timeAgo: user.lastTransaction.timeAgo || "recently"
+                        }
+                        : null;
+
+                    return (
+                        <Card
+                            key={idx}
+                            className={`border-t-4 p-5 shadow ${status === "Active"
+                                ? "border-green-500"
+                                : status === "Low Balance"
+                                    ? "border-yellow-500"
+                                    : "border-red-500"
+                                }`}
+                        >
+                            <CardContent className="p-0">
+                                <div className="flex justify-between items-start">
+                                    <div className="flex items-center gap-3">
+                                        <div
+                                            className="rounded-full w-10 h-10 flex items-center justify-center font-bold text-white text-sm"
+                                            style={{ backgroundColor: getColorFromInitials(initials) }}
+                                        >
+                                            {initials}
+                                        </div>
+                                        <div>
+                                            <h3 className="text-lg font-semibold leading-tight">{user.name}</h3>
+                                            <p className="text-sm text-muted-foreground">Current Balance</p>
+                                        </div>
+                                    </div>
+                                    <Badge className={`text-xs ${statusBadgeColor[status]}`}>{status}</Badge>
+                                </div>
+
+                                <div className="mt-2 flex justify-between items-center">
+                                    <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                                        <div
+                                            className={`h-full ${getBarColor({ status })}`}
+                                            style={{ width: `${budgetPercent}%` }}
+                                        ></div>
+                                    </div>
+                                    <span className="text-sm font-bold text-blue-600 ml-2">
+                                        ₹ {balance.toLocaleString()}
+                                    </span>
+                                </div>
+
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    {budgetPercent}% of allocated budget
+                                </p>
+
+                                <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                                    <div>
+                                        <p className="text-muted-foreground">Member ID</p>
+                                        <p className="font-medium">#{memberId}</p>
                                     </div>
                                     <div>
-                                        <h3 className="text-lg font-semibold leading-tight">{member.name}</h3>
-                                        <p className="text-sm text-muted-foreground">Current Balance</p>
+                                        <p className="text-muted-foreground">Last Transfer</p>
+                                        <p className="font-medium">
+                                            {lastTransfer
+                                                ? `₹ ${lastTransfer.amount.toLocaleString()} (${new Date(lastTransfer.timeAgo).toLocaleString("en-US", {
+                                                    year: "numeric",
+                                                    month: "short",
+                                                    day: "2-digit",
+                                                    hour: "numeric",
+                                                    minute: "2-digit",
+                                                    hour12: true,
+                                                })})`
+                                                : "N/A"}
+                                        </p>
+
                                     </div>
-                                </div>
-                                <Badge className={`text-xs ${statusBadgeColor[member.status]}`}>{member.status}</Badge>
-                            </div>
+                                    <div className="col-span-2">
+                                        <p className="text-muted-foreground">Last Login</p>
+                                        <p className="font-medium">
+                                            {user.lastLogin
+                                                ? new Intl.DateTimeFormat("en-US", {
+                                                    year: "numeric",
+                                                    month: "short",
+                                                    day: "2-digit",
+                                                    hour: "numeric",
+                                                    minute: "2-digit",
+                                                    hour12: true,
+                                                }).format(new Date(user.lastLogin))
+                                                : "N/A"}
+                                        </p>
+                                    </div>
 
-                            <div className="mt-2 flex justify-between items-center">
-                                <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                                    <div
-                                        className={`h-full ${getBarColor(member)}`}
-                                        style={{ width: `${member.budgetPercent}%` }}
-                                    ></div>
                                 </div>
-                                <span className="text-sm font-bold text-blue-600 ml-2">
-                                    ₹ {member.balance.toLocaleString()}
-                                </span>
-                            </div>
 
-                            <p className="text-xs text-muted-foreground mt-1">
-                                {member.budgetPercent}% of allocated budget
-                            </p>
+                                <Button
+                                    className={`mt-4 w-full bg-[#00004D] cursor-pointer
+                                        }`}
+                                    onClick={() => {
+                                        setSelectedReceiver(user); // pass entire user or just user._id
+                                        setOpenModal(true);
+                                    }}
+                                >
+                                    + Add Funds
+                                </Button>
+                            </CardContent>
+                        </Card>
 
-                            <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                                <div>
-                                    <p className="text-muted-foreground">Member ID</p>
-                                    <p className="font-medium">#{member.memberId}</p>
-                                </div>
-                                <div>
-                                    <p className="text-muted-foreground">Last Transfer</p>
-                                    <p className="font-medium">
-                                        {member.lastTransfer
-                                            ? `₹ ${member.lastTransfer.amount.toLocaleString()} (${member.lastTransfer.timeAgo})`
-                                            : "N/A"}
-                                    </p>
-                                </div>
-                                <div className="col-span-2">
-                                    <p className="text-muted-foreground">Last Login</p>
-                                    <p className="font-medium">{member.lastLogin}</p>
-                                </div>
-                            </div>
-
-                            <Button
-                                className={`mt-4 w-full bg-[#00004D] cursor-pointer ${member.status === "Inactive"
-                                    ? "bg-gray-300 pointer-events-none text-gray-600"
-                                    : ""
-                                    }`}
-                            >
-                                + Add Funds
-                            </Button>
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
-            <div className="container mx-auto p-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Recent Fund Transfers</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>DATE & TIME</TableHead>
-                                    <TableHead>TRANSACTION ID</TableHead>
-                                    <TableHead>MEMBER</TableHead>
-                                    <TableHead>AMOUNT</TableHead>
-                                    <TableHead>STATUS</TableHead>
-                                    <TableHead>UPI ID</TableHead>
-                                    <TableHead>LOCATION</TableHead>
-                                    <TableHead>ACTIONS</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {visibleTransactions.map((transaction, index) => (
-                                    <TransactionRow key={index} {...transaction} />
-                                ))}
-                            </TableBody>
-                        </Table>
-                        {visibleTransactions.length < transactions.length && (
-                            <button
-                                onClick={loadMore}
-                                className="mt-4 text-blue-600 hover:underline"
-                            >
-                                View All Transactions
-                            </button>
+                    );
+                })}
+                <Dialog open={openModal} onOpenChange={setOpenModal}>
+                    <DialogContent className="sm:max-w-[500px]">
+                        {selectedReceiver && (
+                            <AddFundModalForm
+                                senderId={user._id}
+                                receiver={selectedReceiver}
+                                onClose={() => setOpenModal(false)}
+                            />
                         )}
-                    </CardContent>
-                </Card>
+                    </DialogContent>
+                </Dialog>
+            </div>
+
+            <div className="container mx-auto p-6" ref={transactionRef}>
+                <RecentTransactions />
             </div>
         </div>
     );

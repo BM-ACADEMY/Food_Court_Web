@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { use, useState } from "react";
 import Pegasus from "@/assets/pegasus.png";
 import {
   DropdownMenu,
@@ -20,8 +20,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ChevronsUpDown, LogOut, User, Save } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 const UserDashboardHeader = () => {
+  const {logout}=useAuth();
   const [openAccount, setOpenAccount] = useState(false);
 
   const [user, setUser] = useState({
@@ -68,7 +70,7 @@ const UserDashboardHeader = () => {
                 <DropdownMenuItem className="gap-2" onClick={() => setOpenAccount(true)}>
                   <User className="h-4 w-4" /> Account
                 </DropdownMenuItem>
-                <DropdownMenuItem className="gap-2 text-red-600" onClick={handleLogout}>
+                <DropdownMenuItem className="gap-2 text-red-600" onClick={logout}>
                   <LogOut className="h-4 w-4" /> Logout
                 </DropdownMenuItem>
               </DropdownMenuContent>

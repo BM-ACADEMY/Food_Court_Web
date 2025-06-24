@@ -19,6 +19,8 @@ router.get("/fetch-users-for-history", userController.getAllUsersforHistory);
 
 router.get("/sessions", authMiddleware,userController.getSessionHistory);
 
+// GET /api/users/with-balance-by-role/:role_id?page=1
+router.get("/with-balance-by-role/:role_id", userController.getUsersWithBalanceByRole);
 
 // POST /api/users/create
 router.post("/create-user", userController.createUser);

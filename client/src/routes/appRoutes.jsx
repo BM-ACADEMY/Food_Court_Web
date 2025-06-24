@@ -4,7 +4,7 @@ import MasterAdminRoutes from "./masterAdmin";
 import CustomerRoutes from "./customer";
 import RestaurantRoutes from "./restaurant";
 import TreasuryRoutes from "./treasury";
-// import AdminRoutes from "./admin"; 
+import AdminRoutes from "./adminRoute";
 import Login from "@/Modules/User/pages/Landing/Home";
 import NotFound from "@/Modules/Notfound";
 import { ProtectedRoute } from "@/context/ProtectedRoute";
@@ -26,7 +26,7 @@ export default function AppRoutes() {
       case "Admin":
         return <Navigate to="/admin" replace />;
       case "Customer":
-        return <Navigate to="/customer" replace />;
+        return <Navigate to="/customer/userdashboard" replace />;
       case "Restaurant":
         return <Navigate to="/restaurant" replace />;
       case "Treasury-Subcom":
@@ -54,14 +54,14 @@ export default function AppRoutes() {
       />
 
       {/* Admin Routes */}
-      {/* <Route
+      <Route
         path="/admin/*"
         element={
           <ProtectedRoute allowedRole="Admin">
             <AdminRoutes />
           </ProtectedRoute>
         }
-      /> */}
+      />
 
       {/* Customer Routes */}
       <Route
@@ -98,3 +98,4 @@ export default function AppRoutes() {
     </Routes>
   );
 }
+

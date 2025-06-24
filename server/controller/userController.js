@@ -12,8 +12,10 @@ const Customer = require("../model/customerModel");
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 const UserBalance = require("../model/userBalanceModel");
-const { sendOtpSms } = require("../utils/sentSmsOtp"); 
-const LoginLog=require("../model/loginLogModel");
+const { sendOtpSms } = require("../utils/sentSmsOtp");
+const LoginLog = require("../model/loginLogModel");
+const Role = require("../model/roleModel");
+const Transaction = require("../model/transactionModel");
 
 //login function
 exports.loginUser = async (req, res) => {
@@ -46,8 +48,8 @@ exports.loginUser = async (req, res) => {
     res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "Lax",
-      maxAge: 24 * 60 * 60 * 1000, // 1 day
+      sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+      maxAge: 86400000,
     });
 
     // Create login log
@@ -116,7 +118,9 @@ exports.logoutUser = async (req, res) => {
     // Validate userId
     if (!userId) {
       console.warn("No user ID provided for logout");
-      return res.status(401).json({ success: false, message: "No user ID provided" });
+      return res
+        .status(401)
+        .json({ success: false, message: "No user ID provided" });
     }
 
     // Update the most recent login log with logout time
@@ -136,7 +140,7 @@ exports.logoutUser = async (req, res) => {
     res.clearCookie("token", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "Lax",
+      sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
     });
 
     res.status(200).json({ success: true, message: "Logged out successfully" });
@@ -146,14 +150,15 @@ exports.logoutUser = async (req, res) => {
   }
 };
 
-
 exports.getSessionHistory = async (req, res) => {
   try {
     const { userId, startDate, endDate } = req.query;
 
     // Validate userId
     if (!userId || !mongoose.isValidObjectId(userId)) {
-      return res.status(400).json({ success: false, message: "Invalid user ID" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid user ID" });
     }
 
     // Build query
@@ -497,30 +502,35 @@ exports.getUsers = async (req, res) => {
   }
 };
 
-
-
 exports.getAllUsersforHistory = async (req, res) => {
   try {
     const requestingUserId = req.user?.id;
-    const requestingUser = await User.findById(requestingUserId).populate("role_id");
+    const requestingUser = await User.findById(requestingUserId).populate(
+      "role_id"
+    );
 
     if (!requestingUser) {
-      return res.status(404).json({ success: false, message: "Requesting user not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Requesting user not found" });
     }
 
     const roleName = requestingUser.role_id?.name || "";
     if (!["Master-Admin", "Admin"].includes(roleName)) {
-      return res.status(403).json({ success: false, message: "Unauthorized to view users" });
+      return res
+        .status(403)
+        .json({ success: false, message: "Unauthorized to view users" });
     }
 
-    const users = await User.find().populate("role_id", "name").select("name email role_id");
+    const users = await User.find()
+      .populate("role_id", "name")
+      .select("name email role_id");
     res.status(200).json({ success: true, data: users });
   } catch (error) {
     console.error("Get users error:", error);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
-
 
 // Get user by ID
 exports.getUserById = async (req, res) => {
@@ -576,5 +586,166 @@ exports.deleteUser = async (req, res) => {
       .json({ success: true, message: "User deleted successfully" });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+const roleModelMap = {
+  "role-1": MasterAdmin,
+  "role-2": Admin,
+  "role-3": TreasurySubcom,
+  "role-4": Restaurant,
+  "role-5": Customer,
+};
+
+exports.getUsersWithBalanceByRole = async (req, res) => {
+  const { role_id } = req.params;
+  const page = parseInt(req.query.page) || 1;
+  const limit = 10;
+  const search = req.query.search || "";
+  const status = req.query.status || "all"; // active, inactive, all
+  const sort = req.query.sort || ""; // name, balance-high, balance-low, recent
+
+  try {
+    const role = await Role.findOne({ role_id });
+    if (!role) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Role not found" });
+    }
+
+    // 1. Base user query
+    const userQuery = {
+      role_id: role._id,
+    };
+
+    if (search) {
+      userQuery["$or"] = [
+        { name: { $regex: search, $options: "i" } },
+        { phone_number: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    let users = await User.find(userQuery).populate("role_id").lean();
+
+    const userIds = users.map((u) => u._id);
+
+    // 2. Balances
+    const balances = await UserBalance.find({ user_id: { $in: userIds } });
+
+    const balanceMap = {};
+    for (const b of balances) {
+      balanceMap[b.user_id.toString()] = parseFloat(b.balance.toString());
+    }
+
+    // 3. Filter by status after getting balances
+    if (status === "active") {
+      users = users.filter((u) => (balanceMap[u._id.toString()] || 0) > 0);
+    } else if (status === "inactive") {
+      users = users.filter((u) => (balanceMap[u._id.toString()] || 0) === 0);
+    }
+
+    // Recreate userIds after filtering
+    const filteredUserIds = users.map((u) => u._id);
+
+    // 4. Transactions
+    const transactions = await Transaction.aggregate([
+      {
+        $match: {
+          $or: [
+            { sender_id: { $in: filteredUserIds } },
+            { receiver_id: { $in: filteredUserIds } },
+          ],
+          status: "Success",
+        },
+      },
+      { $sort: { created_at: -1 } },
+      {
+        $group: {
+          _id: {
+            $cond: [
+              { $in: ["$sender_id", filteredUserIds] },
+              "$sender_id",
+              "$receiver_id",
+            ],
+          },
+          amount: { $first: "$amount" },
+          created_at: { $first: "$created_at" },
+        },
+      },
+    ]);
+
+    const txnMap = {};
+    for (const txn of transactions) {
+      txnMap[txn._id.toString()] = {
+        amount: parseFloat(txn.amount.toString()),
+        timeAgo: txn.created_at,
+      };
+    }
+
+    // 5. Last logins
+    const loginLogs = await LoginLog.aggregate([
+      { $match: { user_id: { $in: filteredUserIds } } },
+      { $sort: { created_at: -1 } },
+      {
+        $group: {
+          _id: "$user_id",
+          lastLogin: { $first: "$created_at" },
+        },
+      },
+    ]);
+
+    const loginMap = {};
+    for (const log of loginLogs) {
+      loginMap[log._id.toString()] = log.lastLogin;
+    }
+
+    // 6. Extra profile info
+    const dynamicModel = roleModelMap[role_id];
+    let extraInfos = [];
+    if (dynamicModel) {
+      extraInfos = await dynamicModel
+        .find({ user_id: { $in: filteredUserIds } })
+        .lean();
+    }
+
+    const extraInfoMap = {};
+    for (const info of extraInfos) {
+      extraInfoMap[info.user_id.toString()] = info;
+    }
+
+    // 7. Merge all
+    let usersWithData = users.map((user) => {
+      const uid = user._id.toString();
+      return {
+        ...user,
+        balance: balanceMap[uid] || 0,
+        lastTransaction: txnMap[uid] || null,
+        lastLogin: loginMap[uid] || null,
+        ...(extraInfoMap[uid] || {}),
+      };
+    });
+
+    // 8. Sorting
+    if (sort === "name") {
+      usersWithData.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sort === "balance-high") {
+      usersWithData.sort((a, b) => b.balance - a.balance);
+    } else if (sort === "balance-low") {
+      usersWithData.sort((a, b) => a.balance - b.balance);
+    } else if (sort === "recent") {
+      usersWithData.sort(
+        (a, b) =>
+          new Date(b.lastTransaction?.timeAgo || 0) -
+          new Date(a.lastTransaction?.timeAgo || 0)
+      );
+    }
+
+    // 9. Pagination
+    const paginated = usersWithData.slice((page - 1) * limit, page * limit);
+
+    return res.json({ success: true, data: paginated });
+  } catch (err) {
+    console.error("Error fetching users with balance, txn, login:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };
