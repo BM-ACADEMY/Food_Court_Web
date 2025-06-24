@@ -1,25 +1,9 @@
-
-// import { Routes, Route, Navigate, useLocation } from "react-router-dom";
-// // import Login from "@/pages/login/Login";
-// // import NotFound from "@/pages/NotFound";
-// import CustomerRoutes from "./customer";
-// import TreasuryRoutes from "./treasury";
-// import RestaurantRoutes from "./Restaurant";
-// // import AdminRoutes from "./AdminRoutes";
-// import MasterAdminRoutes from "./masterAdmin";
-
-// export default function AppRoutes() {
-//   // const user = JSON.parse(localStorage.getItem("user")) || null; 
-
-//   const user = { role: "treasury" }
-//   // const user={role:"treasury"}
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import MasterAdminRoutes from "./masterAdmin";
 import CustomerRoutes from "./customer";
 import RestaurantRoutes from "./restaurant";
 import TreasuryRoutes from "./treasury";
-// import AdminRoutes from "./admin"; 
 import Login from "@/Modules/User/pages/Landing/Home";
 import NotFound from "@/Modules/Notfound";
 import { ProtectedRoute } from "@/context/ProtectedRoute";
@@ -41,7 +25,7 @@ export default function AppRoutes() {
       case "Admin":
         return <Navigate to="/admin" replace />;
       case "Customer":
-        return <Navigate to="/customer" replace />;
+        return <Navigate to="/customer/userdashboard" replace />; // Direct to dashboard
       case "Restaurant":
         return <Navigate to="/restaurant" replace />;
       case "Treasury-Subcom":
@@ -54,20 +38,11 @@ export default function AppRoutes() {
 
   return (
     <Routes>
-      {/* <Route path="/login" element={<Login />} /> */}
-      <Route path="/master-admin/*" element={<MasterAdminRoutes />} />
-      <Route path="/treasury/*" element={<TreasuryRoutes />} />
-      {/* <Route path="*" element={<NotFound />} />  */}
-      <Route path="/treasury/*" element={<TreasuryRoutes />} />
-      <Route path="/customer/*" element={<CustomerRoutes />} />
-      <Route path="/restaurant/*" element={<RestaurantRoutes />} />
-      {/* <Route path="/admin/*" element={<AdminRoutes />} /> */}
-
-      {/* Root and login routes for unauthenticated users */}
+      {/* Public routes for unauthenticated users */}
       <Route path="/" element={<Login />} />
       <Route path="/login" element={<Login />} />
 
-      {/* Master-Admin Routes */}
+      {/* Protected routes */}
       <Route
         path="/master-admin/*"
         element={
@@ -76,18 +51,6 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       />
-
-      {/* Admin Routes */}
-      {/* <Route
-        path="/admin/*"
-        element={
-          <ProtectedRoute allowedRole="Admin">
-            <AdminRoutes />
-          </ProtectedRoute>
-        }
-      /> */}
-
-      {/* Customer Routes */}
       <Route
         path="/customer/*"
         element={
@@ -96,8 +59,6 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       />
-
-      {/* Restaurant Routes */}
       <Route
         path="/restaurant/*"
         element={
@@ -106,8 +67,6 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       />
-
-      {/* Treasury-Subcom Routes */}
       <Route
         path="/treasury/*"
         element={
@@ -117,7 +76,7 @@ export default function AppRoutes() {
         }
       />
 
-      {/* Catch-all */}
+      {/* Catch-all for unknown routes */}
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

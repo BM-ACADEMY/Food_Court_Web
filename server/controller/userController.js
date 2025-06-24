@@ -84,6 +84,9 @@ exports.getMe = async (req, res) => {
       ? parseFloat(userBalance.balance.toString())
       : 0.0;
 
+    // Fetch customer data
+    const customer = await Customer.findOne({ user_id: user._id }).lean();
+
     // Prepare response object
     const userObj = {
       _id: user._id,
@@ -95,8 +98,9 @@ exports.getMe = async (req, res) => {
       number_verified: user.number_verified,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
-      role: user.role_id, // full role object
-      balance, // user's balance
+      role: user.role_id, // Full role object
+      balance, // User's balance from UserBalance table
+      customer_id: customer ? customer.customer_id : "N/A", // Customer ID from Customer table
     };
 
     res.json({ user: userObj });
