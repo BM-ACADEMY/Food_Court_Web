@@ -33,6 +33,7 @@ function RegisterCustomer() {
     phoneNumber: "",
   });
   const [userId, setUserId] = useState(null);
+  const [customerId, setCustomerId] = useState(null);
   const [isRegistered, setIsRegistered] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [fetchError, setFetchError] = useState("");
@@ -56,7 +57,6 @@ function RegisterCustomer() {
         { facingMode: "environment" },
         { fps: 10, qrbox: { width: 300, height: 350 } },
         (decodedText) => handleScanSuccess(decodedText),
-        
       );
     } catch (err) {
       console.error("Camera start failed:", err);
@@ -88,21 +88,38 @@ function RegisterCustomer() {
   const handleScanSuccess = async (decodedText) => {
     setFetchError("");
     try {
+      console.log(`Scanning QR code: ${decodedText}`);
       const response = await axios.get("http://localhost:4000/api/customers/fetch-by-qr", {
         params: { qr_code: decodedText },
       });
+      console.log("Customer response:", JSON.stringify(response.data, null, 2));
 
       if (response.data.success && response.data.data) {
-        const { name, email, phone_number, _id } = response.data.data.user_id;
-        console.log("Scanned userId:", _id); // Debug log
-        setUserId(_id);
-        setFormData({
-          customerName: name || "",
-          email: email || "",
-          phoneNumber: phone_number || "",
-        });
+        const { user_id, customer_id } = response.data.data;
+        const userIdString = user_id?._id ? user_id._id.toString() : user_id.toString();
+
+        if (!userIdString || !/^[0-9a-fA-F]{24}$/.test(userIdString)) {
+          throw new Error("Invalid user ID received from customer data");
+        }
+
+        console.log(`Fetching user for userId: ${userIdString}`);
+        const userResponse = await axios.get(`http://localhost:4000/api/users/fetch-user-by-id/${userIdString}`);
+        console.log("User response:", JSON.stringify(userResponse.data, null, 2));
+
+        if (userResponse.data.success && userResponse.data.data) {
+          const { name, email, phone_number } = userResponse.data.data;
+          setUserId(userIdString);
+          setCustomerId(customer_id);
+          setFormData({
+            customerName: name || "",
+            email: email || "",
+            phoneNumber: phone_number || "",
+          });
+        } else {
+          setFetchError("No user details found for this QR code.");
+        }
       } else {
-        setFetchError("No user found for this QR code.");
+        setFetchError("No customer found for this QR code.");
       }
     } catch (err) {
       console.error("Error fetching user by QR code:", err);
@@ -142,36 +159,39 @@ function RegisterCustomer() {
     }
 
     try {
-      // Update user details
+      console.log(`Updating user for userId: ${userId}`);
       const updateResponse = await axios.put(`http://localhost:4000/api/users/update-user/${userId}`, {
         name: formData.customerName,
         email: formData.email,
         phone_number: formData.phoneNumber,
       });
+      console.log("User update response:", JSON.stringify(updateResponse.data, null, 2));
 
       if (!updateResponse.data.success) {
         throw new Error(updateResponse.data.message || "Failed to update user details");
       }
 
-      // Fetch user balance
-      let balance = "0.00";
+      let customerIdForDisplay = customerId;
       try {
-        const balanceResponse = await axios.get(`http://localhost:4000/api/user-balance/fetch-balance-by-id/${userId}`);
-        if (balanceResponse.data.success && balanceResponse.data.data) {
-          balance = balanceResponse.data.data.balance.toString();
+        console.log(`Fetching customer for userId: ${userId}`);
+        const customerResponse = await axios.get(`http://localhost:4000/api/customers/fetch-all-customer`, {
+          params: { user_id: userId },
+        });
+        console.log("Customer response:", JSON.stringify(customerResponse.data, null, 2));
+        if (customerResponse.data.success && customerResponse.data.data.length > 0) {
+          customerIdForDisplay = customerResponse.data.data.find(c => c.user_id.toString() === userId)?.customer_id || customerId;
         }
-      } catch (balanceErr) {
-        if (balanceErr.response?.status === 404) {
-          console.warn(`No balance found for userId ${userId}, defaulting to ₹0.00`);
-        } else {
-          throw balanceErr; // Rethrow other errors
-        }
+      } catch (customerErr) {
+        console.warn("Error fetching customer_id for display:", customerErr.response?.data || customerErr.message);
+        customerIdForDisplay = customerId || "N/A";
       }
 
-      // Set registration data
+      // Include user_id in registrationData with consistent key
       setRegistrationData({
         name: formData.customerName,
         phone: formData.phoneNumber,
+        customerId: customerIdForDisplay || "N/A",
+        user_id: userId, // Changed from userId to user_id for consistency
         registrationTime: new Date().toLocaleString("en-IN", {
           hour: "numeric",
           minute: "numeric",
@@ -180,14 +200,13 @@ function RegisterCustomer() {
           month: "short",
           year: "numeric",
         }),
-        currentBalance: `₹${parseFloat(balance).toFixed(2)}`,
       });
 
       setIsRegistered(true);
     } catch (err) {
-      console.error("Error during registration:", err);
-      const errorMessage = err.response?.status === 404
-        ? "User balance not found. Default balance used."
+      console.error("Error during registration:", err.response?.data || err.message);
+      const errorMessage = err.response?.status === 400
+        ? err.response.data.message || "Invalid user data. Please try again."
         : err.response?.data?.message || "Failed to register user. Please try again.";
       setFetchError(errorMessage);
     }
