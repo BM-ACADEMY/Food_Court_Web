@@ -1,7 +1,13 @@
 const mongoose = require("mongoose");
+const Counter = require("./counterModel");
 
 const transactionSchema = new mongoose.Schema(
   {
+    transaction_id: {
+      type: String,
+      unique: true,
+      index: true,
+    },
     sender_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -13,13 +19,13 @@ const transactionSchema = new mongoose.Schema(
       required: true,
     },
     amount: {
-      type: mongoose.Schema.Types.Decimal128,
+      type: String,
       required: true,
     },
     transaction_type: {
       type: String,
       required: true,
-      enum: ["Transfer", "TopUp", "Refund"], 
+      enum: ["Transfer", "TopUp", "Refund"],
     },
     payment_method: {
       type: String,
@@ -47,11 +53,25 @@ const transactionSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: {
-      createdAt: "created_at",
-      updatedAt: false,
-    },
+    timestamps: { createdAt: "created_at", updatedAt: false },
   }
 );
+
+// Pre-save hook to generate unique transaction_id
+transactionSchema.pre("save", async function (next) {
+  if (!this.transaction_id) {
+    try {
+      const counter = await Counter.findByIdAndUpdate(
+        { _id: "transaction_id" },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true }
+      );
+      this.transaction_id = `TXN${counter.seq.toString().padStart(6, "0")}`; // e.g., TXN000001
+    } catch (err) {
+      return next(err);
+    }
+  }
+  next();
+});
 
 module.exports = mongoose.model("Transaction", transactionSchema);

@@ -13,6 +13,9 @@ router.get("/fetch-all-restaurant", restaurantController.getRestaurants);
 // Get by ID
 router.get("/fetch-restaurant-by-id/:id", restaurantController.getRestaurantById);
 
+// Get by QR code
+router.get("/fetch-by-qr", restaurantController.getRestaurantByQrCode);
+
 // Update
 router.put("/update-restaurant/:id", restaurantController.updateRestaurant);
 

@@ -47,6 +47,25 @@ exports.getRestaurantById = async (req, res) => {
   }
 };
 
+// Get Restaurant by QR Code
+exports.getRestaurantByQrCode = async (req, res) => {
+  try {
+    const { qr_code } = req.query;
+    if (!qr_code) {
+      return res.status(400).json({ success: false, message: "QR code is required" });
+    }
+
+    const restaurant = await Restaurant.findOne({ qr_code }).populate("user_id", "name email");
+    if (!restaurant) {
+      return res.status(404).json({ success: false, message: "No restaurant found for this QR code" });
+    }
+
+    res.status(200).json({ success: true, data: restaurant });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 // Update Restaurant
 exports.updateRestaurant = async (req, res) => {
   try {
