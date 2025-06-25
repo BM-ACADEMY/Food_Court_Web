@@ -5,6 +5,8 @@ const User=require('../model/userModel')
 const moment=require('moment');
 const Role =require('../model/roleModel');
 const mongoose=require('mongoose');
+const Admin =require('../model/adminModel');
+const TreasurySubcom=require('../model/treasurySubcomModel')
 
 // Create Transaction
 exports.createTransaction = async (req, res) => {
@@ -67,60 +69,7 @@ exports.getAllRecentTransaction = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-// controller/transactionController.js
 
-// exports.transferFunds = async (req, res) => {
-//   const {
-//     sender_id,
-//     receiver_id,
-//     amount,
-//     transaction_type,
-//     payment_method,
-//     remarks,
-//   } = req.body;
-
-//   try {
-//     if (!sender_id || !receiver_id || !amount) {
-//       return res.status(400).json({ message: "Missing required fields" });
-//     }
-
-//     const amt = Number(amount);
-//     const senderBalance = await UserBalance.findOne({ user_id: sender_id });
-
-//     if (!senderBalance || parseFloat(senderBalance.balance.toString()) < amt) {
-//       return res.status(400).json({ message: "Insufficient balance" });
-//     }
-
-//     // Deduct from sender
-//     await UserBalance.updateOne(
-//       { user_id: sender_id },
-//       { $inc: { balance: -amt } }
-//     );
-
-//     // Credit to receiver
-//     await UserBalance.findOneAndUpdate(
-//       { user_id: receiver_id },
-//       { $inc: { balance: amt } },
-//       { upsert: true }
-//     );
-
-//     // Save transaction
-//     const transaction = await Transaction.create({
-//       sender_id,
-//       receiver_id,
-//       amount,
-//       transaction_type,
-//       payment_method,
-//       remarks,
-//       status: "Success",
-//     });
-
-//     return res.status(200).json({ success: true, transaction });
-//   } catch (err) {
-//     console.error(err);
-//     return res.status(500).json({ message: "Server error" });
-//   }
-// };
 exports.transferFunds = async (req, res) => {
   const {
     sender_id,
@@ -133,6 +82,7 @@ exports.transferFunds = async (req, res) => {
   } = req.body;
 
   try {
+    // Validate required fields
     if (!sender_id || !receiver_id || !amount) {
       return res.status(400).json({ message: "Missing required fields" });
     }
@@ -145,10 +95,10 @@ exports.transferFunds = async (req, res) => {
     // ✅ Check balance
     const senderBalance = await UserBalance.findOne({ user_id: sender_id });
     if (!senderBalance || parseFloat(senderBalance.balance.toString()) < amt) {
-      return res.status(400).json({ message: "Insufficient balance" });
+      return res.status(400).json({ message: "Insufficient funds" });
     }
 
-    // ✅ Fetch roles of sender and receiver
+    // ✅ Get users and their roles
     const [sender, receiver] = await Promise.all([
       User.findById(sender_id).populate("role_id"),
       User.findById(receiver_id).populate("role_id"),
@@ -174,36 +124,157 @@ exports.transferFunds = async (req, res) => {
           });
         }
       }
+
+      // Check if sender is Admin and receiver is Admin
+      if (senderRole === "Admin" && receiverRole === "Admin") {
+        const adminData = await Admin.findOne({ user_id: sender_id });
+        const transferLimit = parseFloat(adminData?.admin_to_admin_transfer_limit?.toString() || "0");
+
+        if (amt > transferLimit) {
+          return res.status(400).json({
+            message: `Transfer exceeds Admin to Admin per-transaction limit of ₹${transferLimit}`,
+          });
+        }
+      }
+
+      // Check if sender is Admin and receiver is Treasury-Subcom
+      if (senderRole === "Admin" && receiverRole === "Treasury-Subcom") {
+        const adminData = await Admin.findOne({ user_id: sender_id });
+        const transferLimit = parseFloat(adminData?.admin_to_subcom_transfer_limit?.toString() || "0");
+
+        if (amt > transferLimit) {
+          return res.status(400).json({
+            message: `Transfer exceeds Admin to Treasury Subcom per-transaction limit of ₹${transferLimit}`,
+          });
+        }
+      }
+
+      // Check if sender is Treasury-Subcom and receiver is Admin
+      if (senderRole === "Treasury-Subcom" && receiverRole === "Admin") {
+        const subcomData = await TreasurySubcom.findOne({ user_id: sender_id });
+        const transferLimit = parseFloat(subcomData?.subcom_to_admin_transfer_limit?.toString() || "0");
+
+        if (amt > transferLimit) {
+          return res.status(400).json({
+            message: `Transfer exceeds Treasury Subcom to Admin per-transaction limit of ₹${transferLimit}`,
+          });
+        }
+      }
     }
 
-    // ✅ Deduct from sender
-    await UserBalance.updateOne({ user_id: sender_id }, { $inc: { balance: -amt } });
-
-    // ✅ Credit to receiver
-    await UserBalance.findOneAndUpdate(
+    // ✅ Proceed with the transaction
+    await UserBalance.updateOne(
+      { user_id: sender_id },
+      { $inc: { balance: -amt } }
+    );
+    await UserBalance.updateOne(
       { user_id: receiver_id },
       { $inc: { balance: amt } },
       { upsert: true }
     );
 
-    // ✅ Record transaction
-    const transaction = await Transaction.create({
+    // Create transaction record
+    await Transaction.create({
       sender_id,
       receiver_id,
-      amount,
+      amount: amt,
       transaction_type,
       payment_method,
       remarks,
-      status: "Success",
+      status: 'completed',
+      created_at: new Date(),
     });
 
-    return res.status(200).json({ success: true, transaction });
-
-  } catch (err) {
-    console.error("Transfer error:", err);
-    return res.status(500).json({ message: "Server error" });
+    res.json({ success: true, message: "Funds transferred successfully" });
+  } catch (error) {
+    console.error('Error in transferFunds:', error);
+    res.status(500).json({ message: "Server error", details: error.message });
   }
 };
+
+// exports.transferFunds = async (req, res) => {
+//   const {
+//     sender_id,
+//     receiver_id,
+//     amount,
+//     transaction_type,
+//     payment_method,
+//     remarks,
+//     mode = "normal", // Default to "normal"
+//   } = req.body;
+
+//   try {
+//     if (!sender_id || !receiver_id || !amount) {
+//       return res.status(400).json({ message: "Missing required fields" });
+//     }
+
+//     const amt = Number(amount);
+//     if (isNaN(amt) || amt <= 0) {
+//       return res.status(400).json({ message: "Invalid amount" });
+//     }
+
+//     // ✅ Check balance
+//     const senderBalance = await UserBalance.findOne({ user_id: sender_id });
+//     if (!senderBalance || parseFloat(senderBalance.balance.toString()) < amt) {
+//       return res.status(400).json({ message: "Insufficient balance" });
+//     }
+
+//     // ✅ Fetch roles of sender and receiver
+//     const [sender, receiver] = await Promise.all([
+//       User.findById(sender_id).populate("role_id"),
+//       User.findById(receiver_id).populate("role_id"),
+//     ]);
+
+//     if (!sender || !receiver) {
+//       return res.status(404).json({ message: "Sender or Receiver not found" });
+//     }
+
+//     // ✅ Only enforce limit check in NORMAL mode
+//     if (mode === "normal") {
+//       const senderRole = sender.role_id?.name;
+//       const receiverRole = receiver.role_id?.name;
+
+//       // Check if sender is Master-Admin and receiver is Admin
+//       if (senderRole === "Master-Admin" && receiverRole === "Admin") {
+//         const masterAdminData = await MasterAdmin.findOne({ user_id: sender_id });
+//         const transferLimit = parseFloat(masterAdminData?.master_admin_to_admin?.toString() || "0");
+
+//         if (amt > transferLimit) {
+//           return res.status(400).json({
+//             message: `Transfer exceeds Master Admin's per-transaction limit of ₹${transferLimit}`,
+//           });
+//         }
+//       }
+//     }
+
+//     // ✅ Deduct from sender
+//     await UserBalance.updateOne({ user_id: sender_id }, { $inc: { balance: -amt } });
+
+//     // ✅ Credit to receiver
+//     await UserBalance.findOneAndUpdate(
+//       { user_id: receiver_id },
+//       { $inc: { balance: amt } },
+//       { upsert: true }
+//     );
+
+//     // ✅ Record transaction
+//     const transaction = await Transaction.create({
+//       sender_id,
+//       receiver_id,
+//       amount,
+//       transaction_type,
+//       payment_method,
+//       remarks,
+//       status: "Success",
+//     });
+
+//     return res.status(200).json({ success: true, transaction });
+
+//   } catch (err) {
+//     console.error("Transfer error:", err);
+//     return res.status(500).json({ message: "Server error" });
+//   }
+// };
 
 // Get transaction by ID
 exports.getTransactionById = async (req, res) => {

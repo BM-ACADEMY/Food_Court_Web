@@ -7,6 +7,10 @@ import TreasurySubcomList from "@/Modules/Admin/pages/treasurySubcom/TreasurySub
 import RestaurantList from "@/Modules/Admin/pages/restaurant/RestaurantList";
 import AdminList from "@/Modules/Admin/pages/admin/AdminList";
 import SessionHistory from "@/Modules/Admin/pages/account/SessionHistory";
+import { LocationManager } from "@/Modules/Admin/pages/locations/locationPage";
+import { UpiManager } from "@/Modules/Admin/pages/upi/UpiPage";
+import GenerateQr from "@/Modules/Admin/pages/offlineQrcode/OfflineQrcode";
+import PointExchange from "@/Modules/Admin/pages/points/PointExchange";
 
 export default function AdminRoutes() {
   return (
@@ -18,7 +22,11 @@ export default function AdminRoutes() {
         <Route path="treasury-subcom/treasury-subcom-list" element={<TreasurySubcomList />} />  
         <Route path="restaurant/restaurant-list" element={<RestaurantList />} />  
         <Route path="admin/admin-list" element={<AdminList />} />  
+         <Route path="points/point-exchange" element={<PointExchange />} />
         <Route path="history" element={<SessionHistory />} />  
+        <Route path="locations" element={<LocationManager />} />  
+        <Route path="upi" element={<UpiManager />} />  
+        <Route path="qrcode" element={<GenerateQr />} />  
       </Route>
     </Routes>
   );

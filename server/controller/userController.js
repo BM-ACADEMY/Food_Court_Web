@@ -56,6 +56,7 @@ exports.loginUser = async (req, res) => {
     await LoginLog.create({
       user_id: user._id,
       login_time: new Date(),
+      status:true
     });
 
     res.json({ success: true, message: "Login successful" });
@@ -126,7 +127,7 @@ exports.logoutUser = async (req, res) => {
     // Update the most recent login log with logout time
     const updatedLog = await LoginLog.findOneAndUpdate(
       { user_id: userId, logout_time: null },
-      { logout_time: new Date() },
+      { logout_time: new Date(),status:false },
       { sort: { login_time: -1 }, new: true } // Return updated document
     );
 

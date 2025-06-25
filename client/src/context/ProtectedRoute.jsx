@@ -1,32 +1,67 @@
+// import { Navigate, useLocation } from "react-router-dom";
+// import { useAuth } from "@/context/AuthContext";
+
+// const roleRoutes = {
+//   "Master-Admin": "/master-admin",
+//   "Admin": "/admin",
+//   "Customer": "/customer",
+//   "Restaurant": "/restaurant",
+//   "Treasury-Subcom": "/treasury",
+// };
+
+// export function ProtectedRoute({ children, allowedRole }) {
+//   const { user, loading } = useAuth();
+//   const location = useLocation();
+
+//   // Debug: Log role check
+//   console.log('ProtectedRoute: user role=', user?.role?.name, 'allowedRole=', allowedRole, 'pathname=', location.pathname);
+
+//   if (loading) return <div>Loading...</div>;
+
+//   if (!user) {
+//     console.log('No user, redirecting to /login');
+//     return <Navigate to="/login" replace state={{ from: location }} />;
+//   }
+
+//   if (user.role.name !== allowedRole) {
+//     const redirectPath = roleRoutes[user.role.name] || "/login";
+//     console.log(`Role mismatch, redirecting to ${redirectPath}`);
+//     return <Navigate to={redirectPath} state={{ from: location }} replace />;
+//   }
+
+//   return children;
+// }
+
+
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 
+
+// Redirection paths by role_id
 const roleRoutes = {
-  "Master-Admin": "/master-admin",
-  "Admin": "/admin",
-  "Customer": "/customer",
-  "Restaurant": "/restaurant",
-  "Treasury-Subcom": "/treasury",
+  "role-1": "/master-admin",
+  "role-2": "/admin",
+  "role-3": "/treasury",
+  "role-4": "/restaurant",
+  "role-5": "/customer",
 };
 
 export function ProtectedRoute({ children, allowedRole }) {
   const { user, loading } = useAuth();
   const location = useLocation();
 
-  // Debug: Log role check
-  console.log('ProtectedRoute: user role=', user?.role?.name, 'allowedRole=', allowedRole, 'pathname=', location.pathname);
-
   if (loading) return <div>Loading...</div>;
 
   if (!user) {
-    console.log('No user, redirecting to /login');
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  if (user.role.name !== allowedRole) {
-    const redirectPath = roleRoutes[user.role.name] || "/login";
-    console.log(`Role mismatch, redirecting to ${redirectPath}`);
-    return <Navigate to={redirectPath} state={{ from: location }} replace />;
+  if (user.role.role_id !== allowedRole) {
+    console.log(typeof user.role.role_id,"role");
+    
+    const redirectPath = roleRoutes[user.role.role_id] || "/login";
+    console.log(`Role mismatch: redirecting to ${redirectPath}`);
+    return <Navigate to={redirectPath} replace />;
   }
 
   return children;
