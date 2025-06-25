@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { Button } from "@/components/ui/button";
-import { ScanLine, Play, Square } from "lucide-react";
+import { ScanLine, Play, Square, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -20,22 +20,26 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import axios from "axios";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Refund() {
   const qrRef = useRef(null);
   const html5QrCodeRef = useRef(null);
   const [scanning, setScanning] = useState(false);
   const [cameraError, setCameraError] = useState("");
+  const [manualQrCode, setManualQrCode] = useState("");
   const [customer, setCustomer] = useState({
     name: "",
     id: "",
     balance: 0,
+    customer_id: "",
   });
   const [amount, setAmount] = useState("");
-
   const [showResultDialog, setShowResultDialog] = useState(false);
   const [resultMessage, setResultMessage] = useState("");
   const [isSuccess, setIsSuccess] = useState(true);
+  const { user } = useAuth();
 
   const getBackCamera = async () => {
     try {
@@ -88,32 +92,49 @@ export default function Refund() {
       }
     } catch (err) {
       console.error("Camera start failed:", err);
-      setCameraError("Failed to access camera. Please check permissions.");
+      setCameraError("Failed to access camera. Please check permissions or use manual QR input.");
       html5QrCodeRef.current = null;
     }
   };
 
-  const handleScanSuccess = decodedText => {
+  const handleScanSuccess = async (decodedText) => {
     try {
-      const data = JSON.parse(decodedText);
-      if (!data.name || !data.id || typeof data.balance !== "number") {
-        setResultMessage("Invalid QR code data. Please scan a valid customer QR.");
-        setIsSuccess(false);
-        setShowResultDialog(true);
-        return;
-      }
+      const response = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/customers/fetch-by-qr?qr_code=${decodedText}`,
+        { withCredentials: true }
+      );
+      const { data } = response.data;
+
+      const balanceResponse = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/user-balance/fetch-balance-by-id/${data.user_id._id}`,
+        { withCredentials: true }
+      );
+      const balance = parseFloat(balanceResponse.data.data.balance || "0.00");
+
       setCustomer({
-        name: data.name,
-        id: data.id,
-        balance: data.balance,
+        name: data.user_id.name,
+        id: data.user_id._id,
+        customer_id: data.customer_id,
+        balance,
       });
       stopScanner();
     } catch (err) {
-      console.error("QR parse error:", err);
-      setResultMessage("Failed to parse QR code. Please scan a valid customer QR.");
+      console.error("QR fetch error:", err);
+      setResultMessage("Failed to fetch customer details. Please scan a valid customer QR.");
       setIsSuccess(false);
       setShowResultDialog(true);
     }
+  };
+
+  const handleManualQrSubmit = async () => {
+    if (!manualQrCode) {
+      setResultMessage("Please enter a valid QR code.");
+      setIsSuccess(false);
+      setShowResultDialog(true);
+      return;
+    }
+    await handleScanSuccess(manualQrCode);
+    setManualQrCode("");
   };
 
   const stopScanner = async () => {
@@ -129,7 +150,7 @@ export default function Refund() {
     }
   };
 
-  const handleRefund = () => {
+  const handleRefund = async () => {
     const refundAmount = parseFloat(amount);
     if (isNaN(refundAmount) || refundAmount <= 0) {
       setResultMessage("Please enter a valid amount greater than 0.");
@@ -138,15 +159,80 @@ export default function Refund() {
       return;
     }
 
-    const newBalance = customer.balance + refundAmount;
-    setCustomer(prev => ({
-      ...prev,
-      balance: newBalance,
-    }));
-    setAmount("");
-    setResultMessage(`Refund successful! New balance: ₹${newBalance.toFixed(2)}`);
-    setIsSuccess(true);
-    setShowResultDialog(true);
+    try {
+      // Check restaurant balance
+      const restaurantBalanceResponse = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/user-balance/fetch-balance-by-id/${user._id}`,
+        { withCredentials: true }
+      );
+      const restaurantBalance = parseFloat(restaurantBalanceResponse.data.data.balance || "0.00");
+      if (refundAmount > restaurantBalance) {
+        setResultMessage(`Insufficient restaurant balance. Current balance: ₹${restaurantBalance.toFixed(2)}`);
+        setIsSuccess(false);
+        setShowResultDialog(true);
+        return;
+      }
+
+      // Format amount to string with two decimal places
+      const formattedAmount = refundAmount.toFixed(2);
+      const transactionPayload = {
+        sender_id: user._id,
+        receiver_id: customer.id,
+        amount: formattedAmount,
+        transaction_type: "Refund",
+        payment_method: "Gpay",
+        status: "Success",
+        remarks: `Refund to ${customer.name} from restaurant`,
+      };
+      console.log("Transaction Payload:", transactionPayload);
+
+      // Create transaction
+      const transactionResponse = await axios.post(
+        `${import.meta.env.VITE_BASE_URL}/transactions/create-transaction`,
+        transactionPayload,
+        { withCredentials: true }
+      );
+      console.log("Transaction Response:", transactionResponse.data);
+
+      // Update restaurant balance
+      const newRestaurantBalance = (restaurantBalance - refundAmount).toFixed(2);
+      await axios.post(
+        `${import.meta.env.VITE_BASE_URL}/user-balance/create-or-update-balance`,
+        {
+          user_id: user._id,
+          balance: newRestaurantBalance,
+        },
+        { withCredentials: true }
+      );
+
+      // Update customer balance
+      const newCustomerBalance = (customer.balance + refundAmount).toFixed(2);
+      await axios.post(
+        `${import.meta.env.VITE_BASE_URL}/user-balance/create-or-update-balance`,
+        {
+          user_id: customer.id,
+          balance: newCustomerBalance,
+        },
+        { withCredentials: true }
+      );
+
+      // Update local state
+      setCustomer(prev => ({
+        ...prev,
+        balance: parseFloat(newCustomerBalance),
+      }));
+      setAmount("");
+      setResultMessage(`Refund successful! New customer balance: ₹${newCustomerBalance}`);
+      setIsSuccess(true);
+      setShowResultDialog(true);
+    } catch (err) {
+      console.error("Refund error:", err);
+      const errorMessage = err.response?.data?.message || "Failed to process refund. Please try again.";
+      setResultMessage(`Error: ${errorMessage}`);
+      console.error("Error Response:", err.response?.data);
+      setIsSuccess(false);
+      setShowResultDialog(true);
+    }
   };
 
   useEffect(() => {
@@ -160,7 +246,7 @@ export default function Refund() {
   return (
     <>
       <Card className="mt-10 w-full max-w-6xl p-8 rounded-2xl shadow-md bg-white mx-auto">
-        <h2 className="text-2xl font-bold text-[#00004d] mb-6 text-left">
+        <h2 className="text-2xl font-bold text-[#000052] mb-6 text-left">
           Refund QRCode Scanner
         </h2>
 
@@ -174,7 +260,7 @@ export default function Refund() {
               <div className="w-full h-56 rounded-md overflow-hidden relative">
                 {!scanning && (
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <ScanLine className="w-40 h-40 text-[#00004d] opacity-90" />
+                    <ScanLine className="w-40 h-40 text-[#000052] opacity-90" />
                   </div>
                 )}
                 <div
@@ -188,11 +274,33 @@ export default function Refund() {
               )}
             </div>
 
+            <div className="mt-4 w-full max-w-sm">
+              <Label htmlFor="manualQrCode" className="text-sm">
+                Enter QR Code Manually
+              </Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="manualQrCode"
+                  type="text"
+                  className="h-8 px-3 text-sm"
+                  placeholder="Enter customer QR code"
+                  value={manualQrCode}
+                  onChange={e => setManualQrCode(e.target.value)}
+                />
+                <Button
+                  onClick={handleManualQrSubmit}
+                  className="bg-[#000052] hover:bg-[#000052cb] text-white text-sm"
+                >
+                  Submit QR
+                </Button>
+              </div>
+            </div>
+
             <div className="mt-6 w-full flex justify-center">
               {!scanning ? (
                 <Button
                   onClick={startScanner}
-                  className="bg-[#000066] hover:bg-[#000080] text-white text-sm flex items-center gap-2"
+                  className="bg-[#000052] hover:bg-[#000052cb] text-white text-sm flex items-center gap-2"
                 >
                   <Play className="w-4 h-4" />
                   Start Scanner
@@ -214,7 +322,7 @@ export default function Refund() {
               <CardHeader>
                 <CardTitle>Customer Details</CardTitle>
                 <CardDescription>
-                  Scan QR to fetch customer details and Refund points.
+                  Scan or enter QR to fetch customer details and refund points.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -224,7 +332,7 @@ export default function Refund() {
                       Name: {customer.name || "Not scanned"}
                     </p>
                     <p className="text-sm text-gray-500">
-                      ID: {customer.id || "Not scanned"}
+                      Customer ID: {customer.customer_id || "Not scanned"}
                     </p>
                   </div>
                   <div className="text-right">
@@ -236,18 +344,18 @@ export default function Refund() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="deductAmount" className="text-sm">
+                  <Label htmlFor="refundAmount" className="text-sm">
                     Refund Amount
                   </Label>
                   <div className="flex items-center gap-2">
                     <span className="text-base pt-1">₹</span>
                     <Input
-                      id="deductAmount"
+                      id="refundAmount"
                       type="number"
                       min="0"
                       step="0.01"
                       className="h-8 px-3 text-sm"
-                      placeholder="Amount to Refund"
+                      placeholder="Amount to refund"
                       value={amount}
                       onChange={e => setAmount(e.target.value)}
                       disabled={!customer.id}
@@ -267,17 +375,54 @@ export default function Refund() {
         </div>
       </Card>
 
-      {/* ✅ Result Dialog */}
       <Dialog open={showResultDialog} onOpenChange={setShowResultDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className={isSuccess ? "text-green-600" : "text-red-600"}>
-              {isSuccess ? "Success" : "Error"}
-            </DialogTitle>
+            <div className={`flex items-center gap-3 ${isSuccess ? 'text-green-600' : 'text-red-600'}`}>
+              {isSuccess ? (
+                <CheckCircle2 className="w-6 h-6" />
+              ) : (
+                <XCircle className="w-6 h-6" />
+              )}
+              <DialogTitle className="text-lg">
+                {isSuccess ? "Refund Successful" : "Refund Failed"}
+              </DialogTitle>
+            </div>
           </DialogHeader>
-          <p className="text-sm text-gray-700">{resultMessage}</p>
+          <div className="flex flex-col items-center text-center gap-4 py-4">
+            {isSuccess ? (
+              <>
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                  <CheckCircle2 className="w-10 h-10 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-gray-700 font-medium">{resultMessage}</p>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Transaction completed successfully
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+                  <AlertCircle className="w-10 h-10 text-red-600" />
+                </div>
+                <div>
+                  <p className="text-gray-700 font-medium">{Rafael}</p>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Please try again or contact support
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
           <DialogFooter>
-            <Button onClick={() => setShowResultDialog(false)}>OK</Button>
+            <Button
+              onClick={() => setShowResultDialog(false)}
+              className={`w-full ${isSuccess ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
+            >
+              {isSuccess ? 'Continue' : 'Try Again'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
