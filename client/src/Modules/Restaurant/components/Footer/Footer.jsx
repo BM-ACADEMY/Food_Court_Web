@@ -25,23 +25,23 @@ const Footer = () => {
           <ul className="space-y-2 text-gray-300">
             <li className="flex items-center gap-2">
               <Phone className="h-5 w-5" />
-              <a href="tel:+919876543210" className="hover:underline">
-                +91 9876543210
+              <a href="tel:+916369777051" className="hover:underline">
+                Samuel Vincent D G: +91 6369777051
               </a>
             </li>
             <li className="flex items-center gap-2">
               <MessageSquare className="h-5 w-5" />
-              <a href="tel:+919876543211" className="hover:underline">
-                +91 9876543211
+              <a href="tel:+917010124947" className="hover:underline">
+                Mohith Varshan G: +91 7010124947
               </a>
             </li>
             <li className="flex items-center gap-2">
               <Mail className="h-5 w-5" />
               <a
-                href="mailto:support@pegasus2k25.com"
+                href="mailto:pegasus25coupons@gmail.com"
                 className="hover:underline"
               >
-                support@pegasus2k25.com
+                pegasus25coupons@gmail.com
               </a>
             </li>
           </ul>

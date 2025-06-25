@@ -1,26 +1,49 @@
-import React from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, Info } from "lucide-react";
-import qrImageUrl from "@/assets/qrcode.jpeg"; // ✅ FIXED
+import QRCode from "qrcode";
+import { useAuth } from "@/context/AuthContext";
+import axios from "axios";
 
 const TopUpSection = () => {
-  const handleDownload = async () => {
-    try {
-      const response = await fetch(qrImageUrl);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
+  const { user } = useAuth();
+  const [qrDataUrl, setQrDataUrl] = useState("");
+  const canvasRef = useRef(null);
 
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "pegasus-qr-code.png";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("QR code download failed:", error);
-    }
+  useEffect(() => {
+    const generateQrCode = async () => {
+      if (!user?._id) return;
+
+      try {
+        const res = await axios.get(
+          `${import.meta.env.VITE_BASE_URL}/customers/fetch-by-qr`,
+          {
+            params: { qr_code: user?.qr_code || "" },
+            withCredentials: true,
+          }
+        );
+
+        const qr_code = res.data?.data?.qr_code;
+
+        if (qr_code) {
+          const url = await QRCode.toDataURL(qr_code);
+          setQrDataUrl(url);
+        }
+      } catch (err) {
+        console.error("Failed to fetch QR code:", err);
+      }
+    };
+
+    generateQrCode();
+  }, [user]);
+
+  const handleDownload = () => {
+    if (!qrDataUrl) return;
+    const link = document.createElement("a");
+    link.href = qrDataUrl;
+    link.download = "pegasus-qr-code.png";
+    link.click();
   };
 
   return (
@@ -34,7 +57,11 @@ const TopUpSection = () => {
               Scan QR Code
             </p>
             <div className="w-full h-48 flex items-center justify-center">
-              <img src={qrImageUrl} alt="QR Code" className="h-full object-contain" />
+              {qrDataUrl ? (
+                <img src={qrDataUrl} alt="Generated QR Code" className="h-full object-contain" />
+              ) : (
+                <p className="text-sm text-gray-500">Loading QR...</p>
+              )}
             </div>
             <div className="mt-4 text-center">
               <Button
