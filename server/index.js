@@ -30,17 +30,43 @@ app.use(
     credentials: true, // allow cookies (required for JWT in cookies)
   })
 );
+
+
+app.use(cors({
+  origin: process.env.FRONTEND_URL, // ✅ only your frontend domain
+  credentials: true,                // ✅ required for cookies
+}));
+
+// app.use(cors({
+//     origin: [process.env.FRONTEND_URL, process.env.PRODUCTION_URL],
+//     credentials: true,
+//     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+//     allowedHeaders: ['Content-Type', 'Authorization']
+// }))
+
+// app.use((req, res, next) => {
+//     const allowedOrigins = [process.env.FRONTEND_URL, process.env.PRODUCTION_URL];
+//     const origin = req.headers.origin;
+    
+//     if (allowedOrigins.includes(origin)) {
+//         res.header("Access-Control-Allow-Origin", origin);
+//     }
+
+//     res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
+//     res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+//     next();
+// });
 app.use(helmet());
 app.use(express.json());
 app.use(morgan('dev'));
 // Optional: manually allow CORS headers for more control
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", process.env.DEV_FRONTEND_URL); // ✅ must match exact origin
-  res.header("Access-Control-Allow-Credentials", "true"); // ✅ required for cookies
-  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
-  next();
-});
+// app.use((req, res, next) => {
+//   res.header("Access-Control-Allow-Origin", process.env.DEV_FRONTEND_URL); // ✅ must match exact origin
+//   res.header("Access-Control-Allow-Credentials", "true"); // ✅ required for cookies
+//   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
+//   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+//   next();
+// });
 
 
 app.use('/api/roles',roleRoute);
