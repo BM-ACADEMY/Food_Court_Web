@@ -1,13 +1,5 @@
-import * as React from "react"
+import * as React from "react";
 import {
-  BookOpen,
-  Bot,
-  Command,
-  Frame,
-  LifeBuoy,
-  Map,
-  PieChart,
-  Send,
   Users,
   UserCog,
   History,
@@ -16,122 +8,107 @@ import {
   Coins,
   Shield,
   SquareTerminal,
-} from "lucide-react"
+  MapPin,
+  FileText
+} from "lucide-react";
 
-import { NavMain } from "@/components/nav-main"
-import { NavProjects } from "@/components/nav-projects"
-import { NavSecondary } from "@/components/nav-secondary"
-import { NavUser } from "@/components/nav-user"
+import { NavMain } from "@/components/nav-main";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
 
-const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
+import { useAuth } from "@/context/AuthContext"; // ✅ import your auth hook
+
+const navLinks = [
+  {
+    title: "Dashboard",
+    url: "/master-admin",
+    icon: SquareTerminal,
   },
-  navMain: [
-    {
-      title: "Dashboard",
-      url: "/master-admin",
-      icon: SquareTerminal,
-      isActive: true,
-    },
-    {
-      title: "Customer Users",
-      url: "/master-admin/customers/customer-list",
-      icon: Users,
-     
-    },
-    {
-      title: "Restaurant Users",
-      url: "/master-admin/restaurant/restaurant-list",
-      icon: ChefHat,
-     
-    },
-    {
-      title: "Treasury Subcom Users",
-      url: "/master-admin/treasury-subcom/treasury-subcom-list",
-      icon: UserCog,
-      
-    },
-    {
-      title: "Admin Users",
-      url: "/master-admin/admin/admin-list",
-      icon: Shield,
-      
-    },
-    {
-      title: "Transaction History",
-      url: "/master-admin/transaction-history",
-      icon: History,
+  {
+    title: "Customer Users",
+    url: "/master-admin/customers/customer-list",
+    icon: Users,
+  },
+  {
+    title: "Restaurant Users",
+    url: "/master-admin/restaurant/restaurant-list",
+    icon: ChefHat,
+  },
+  {
+    title: "Treasury Subcom Users",
+    url: "/master-admin/treasury-subcom/treasury-subcom-list",
+    icon: UserCog,
+  },
+  {
+    title: "Admin Users",
+    url: "/master-admin/admin/admin-list",
+    icon: Shield,
+  },
+  {
+    title: "Transaction History",
+    url: "/master-admin/transaction-history",
+    icon: History,
+  },
+  {
+    title: "Add / Delete Access",
+    url: "/master-admin/adddelete/add-new-user",
+    icon: KeyRound,
+  },
+  {
+    title: "Point Exchange",
+    url: "/master-admin/points/point-exchange",
+    icon: Coins,
+  },
+  {
+    title: "Locations",
+    url: "/master-admin/locations",
+    icon: MapPin,
+  },
+  {
+    title: "Upi",
+    url: "/master-admin/upi",
+    icon: FileText,
+  },
+];
 
-    },
-    {
-      title: "Add / Delete Access",
-      url: "/master-admin/adddelete/add-new-user",
-      icon: KeyRound,
-    
-    },
-    {
-      title: "Point Exchange",
-      url: "/master-admin/points/point-exchange",
-      icon: Coins,
-    },
-  ],
-  // navSecondary: [
-  //   {
-  //     title: "Support",
-  //     url: "#",
-  //     icon: LifeBuoy,
-  //   },
-  //   {
-  //     title: "Feedback",
-  //     url: "#",
-  //     icon: Send,
-  //   },
-  // ],
+export function AppSidebar(props) {
+  const { user } = useAuth(); // ✅ Get user from context
 
-}
+  // Extract name
+  const userName = user?.name || "User";
 
-export function AppSidebar({
-  ...props
-}) {
+  // Filter nav items by role
+  const filteredNav =
+    user?.role?.role_id === "role-1"
+      ? navLinks // Master Admin: full access
+      : navLinks.filter((item) =>
+          [
+            "Dashboard",
+            "Customer Users",
+            "Restaurant Users",
+            "Treasury Subcom Users",
+            "Admin Users",
+            "Transaction History",
+          ].includes(item.title)
+        );
+
   return (
     <Sidebar
       className="top-(--header-height) h-[calc(100svh-var(--header-height))]!"
-      {...props}>
+      {...props}
+    >
       <SidebarHeader>
-        {/* <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild>
-              <a href="#">
-                <div
-                  className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                  <Command className="size-4" />
-                </div>
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">Acme Inc</span>
-                  <span className="truncate text-xs">Enterprise</span>
-                </div>
-              </a>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu> */}
+        <div className="px-4 py-2 font-semibold text-lg">Welcome, {userName}</div>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain items={filteredNav} />
       </SidebarContent>
       <SidebarFooter>
-        {/* <NavUser user={data.user} /> */}
+        {/* Optional: Add logout or footer links */}
       </SidebarFooter>
     </Sidebar>
   );

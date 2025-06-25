@@ -1,14 +1,25 @@
-// import { Routes, Route } from "react-router-dom";
-// import ModuleLayout from "./moduleRoute";
-// import AdminDashboard from "@/Modules/Admin/pages/Dashboard"; // Create this component if needed
+import { Routes, Route } from "react-router-dom";
+import ModuleLayout from "./moduleRoute";
+import Dashboard from "@/Modules/Admin/pages/dashboard/Dashboard";
+import TransactionHistory from "@/Modules/Admin/pages/transaction/TransactionPage";
+import CustomerList from "@/Modules/Admin/pages/customer/customerList";
+import TreasurySubcomList from "@/Modules/Admin/pages/treasurySubcom/TreasurySubcom";
+import RestaurantList from "@/Modules/Admin/pages/restaurant/RestaurantList";
+import AdminList from "@/Modules/Admin/pages/admin/AdminList";
+import SessionHistory from "@/Modules/Admin/pages/account/SessionHistory";
 
-// export default function AdminRoutes() {
-//   return (
-//     <Routes>
-//       <Route path="/" element={<ModuleLayout />}>
-//         <Route index element={<AdminDashboard />} />
-//         {/* Add more admin-specific routes as needed */}
-//       </Route>
-//     </Routes>
-//   );
-// }
+export default function AdminRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<ModuleLayout />}>
+        <Route index element={<Dashboard />} />
+        <Route path="transaction-history" element={<TransactionHistory />} />  
+        <Route path="customers/customer-list" element={<CustomerList />} />  
+        <Route path="treasury-subcom/treasury-subcom-list" element={<TreasurySubcomList />} />  
+        <Route path="restaurant/restaurant-list" element={<RestaurantList />} />  
+        <Route path="admin/admin-list" element={<AdminList />} />  
+        <Route path="history" element={<SessionHistory />} />  
+      </Route>
+    </Routes>
+  );
+}
