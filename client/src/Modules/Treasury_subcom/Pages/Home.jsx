@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { UserPlus, CreditCard, Users, Utensils, User } from "lucide-react";
+import { UserPlus, CreditCard, Users, Utensils, User, QrCode } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 function Home() {
@@ -10,6 +10,7 @@ function Home() {
     { title: "Customer History", icon: Users, color: "text-purple-600", path: "/treasury/customer-history" },
     { title: "Restaurant History", icon: Utensils, color: "text-red-600", path: "/treasury/restaurant-history" },
     { title: "User History", icon: User, color: "text-orange-600", path: "/treasury/user-history" },
+    { title: "Generate QR", icon: QrCode, color: "text-indigo-600", path: "/treasury/generate-qr" },
   ];
 
   return (

@@ -7,6 +7,7 @@ import TopUpOnlineUser from "@/Modules/Treasury_subcom/Pages/TopUpOnlineUser";
 import CustomerHistory from "@/Modules/Treasury_subcom/Pages/CustomerHistory";
 import RestaurantHistory from "@/Modules/Treasury_subcom/Pages/RestaurantHistory";
 import UserHistory from "@/Modules/Treasury_subcom/Pages/UserHistory";
+import GenerateQr from "@/Modules/Treasury_subcom/Pages/GenerateQr";
 
 export default function TreasuryRoutes() {
   return (
@@ -18,7 +19,8 @@ export default function TreasuryRoutes() {
         <Route path="customer-history" element={<CustomerHistory />} />
         <Route path="restaurant-history" element={<RestaurantHistory />} />
         <Route path="user-history" element={<UserHistory />} />
-      </Route>
+        <Route path="generate-qr" element={<GenerateQr />} />
+        </Route>
     </Routes>
   );
 }

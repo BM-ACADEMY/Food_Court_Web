@@ -15,6 +15,9 @@ router.get("/fetch-all-customer-details", customerController.getAllCustomerDetai
 // Get by ID
 router.get("/fetch-customer-by-id/:id", customerController.getCustomerById);
 
+// Get by QR code
+router.get("/fetch-by-qr", customerController.getCustomerByQrCode);
+
 // Update
 router.put("/update-customer/:id", customerController.updateCustomer);
 
