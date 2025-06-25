@@ -30,7 +30,7 @@ const app = express();
 app.use(cookieParser());
 app.use(
   cors({
-    origin: process.env.DEV_FRONTEND_URL, // your frontend URL
+    origin:[process.env.DEV_FRONTEND_URL,"https://pegasus2025.com","https://pegasus2025.com"], // your frontend URL
     credentials: true, // allow cookies (required for JWT in cookies)
   })
 );
