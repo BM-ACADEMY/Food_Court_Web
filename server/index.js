@@ -22,6 +22,9 @@ const transactionRoute=require('./route/transactionRoute');
 const loginLogRoute=require('./route/loginLogRoute');
 const apiIntegrationRoute=require('./route/apiIntegrationRoute');
 const userBalanceRoute=require('./route/userBalanceRoute');
+const upiRoute=require('./route/upiRoute');
+
+
 const app = express();
 app.use(cookieParser());
 app.use(
@@ -56,6 +59,7 @@ app.use('/api/transactions',transactionRoute);
 app.use('/api/login-logs',loginLogRoute);
 app.use('/api/api-integrations',apiIntegrationRoute);
 app.use('/api/user-balance',userBalanceRoute);
+app.use('/api/upis',upiRoute);
 
 const PORT=process.env.PORT || 4000;
 // Connect to MongoDB and then start the server

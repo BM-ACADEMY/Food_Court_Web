@@ -10,6 +10,8 @@ router.post("/create-customer", customerController.createCustomer);
 // Get all
 router.get("/fetch-all-customer", customerController.getCustomers);
 
+router.get("/fetch-all-customer-details", customerController.getAllCustomerDetails);
+
 // Get by ID
 router.get("/fetch-customer-by-id/:id", customerController.getCustomerById);
 

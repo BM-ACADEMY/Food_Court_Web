@@ -27,7 +27,6 @@ const restaurantSchema = new mongoose.Schema(
     },
     qr_code: {
       type: String,
-      // required: true,
       unique: true,
       trim: true,
       index: true,

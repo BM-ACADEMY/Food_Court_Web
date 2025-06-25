@@ -8,6 +8,8 @@ import {
   Coins,
   Shield,
   SquareTerminal,
+  MapPin,
+  FileText
 } from "lucide-react";
 
 import { NavMain } from "@/components/nav-main";
@@ -60,6 +62,16 @@ const navLinks = [
     title: "Point Exchange",
     url: "/master-admin/points/point-exchange",
     icon: Coins,
+  },
+  {
+    title: "Locations",
+    url: "/master-admin/locations",
+    icon: MapPin,
+  },
+  {
+    title: "Upi",
+    url: "/master-admin/upi",
+    icon: FileText,
   },
 ];
 
