@@ -1,6 +1,7 @@
 import { useState } from "react";
 import axios from "axios";
 import { useAuth } from "@/context/AuthContext";
+import TopUpSuccess from "./TopUpSuccess";
 
 function TopUp({ customer }) {
   const { user } = useAuth();
@@ -9,6 +10,7 @@ function TopUp({ customer }) {
   const [remarks, setRemarks] = useState("");
   const [topUpComplete, setTopUpComplete] = useState(false);
   const [transactionId, setTransactionId] = useState("");
+  const [newBalance, setNewBalance] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -24,6 +26,7 @@ function TopUp({ customer }) {
   ];
 
   const formatAmount = (value) => {
+    console.log("formatAmount input:", value);
     if (!value) return "";
     const num = parseFloat(value);
     return isNaN(num) ? "" : num.toFixed(2);
@@ -33,6 +36,41 @@ function TopUp({ customer }) {
     const value = e.target.value;
     if (value === "" || /^(\d*\.?\d{0,2})$/.test(value)) {
       setAmount(value);
+    }
+  };
+
+  const fetchBalance = async (userId) => {
+    try {
+      const response = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/user-balance/fetch-balance-by-id/${userId}`,
+        { withCredentials: true }
+      );
+      console.log("Balance fetch response:", response.data);
+
+      if (!response.data.success || !response.data.data) {
+        throw new Error("Failed to fetch balance data");
+      }
+
+      // Extract balance and handle Decimal128
+      const balance = response.data.data.balance;
+      if (balance === undefined || balance === null) {
+        throw new Error("Balance field is missing in response");
+      }
+
+      let balanceValue;
+      if (typeof balance === "string") {
+        balanceValue = balance;
+      } else if (balance.$numberDecimal) {
+        balanceValue = balance.$numberDecimal; // Extract the string value from Decimal128
+      } else {
+        balanceValue = balance.toString(); // Fallback for other cases
+      }
+      console.log("Extracted balance value:", balanceValue);
+
+      return balanceValue;
+    } catch (err) {
+      console.error("Balance fetch error:", err);
+      throw err;
     }
   };
 
@@ -58,10 +96,9 @@ function TopUp({ customer }) {
       return;
     }
 
-    // Validate customer.user_id format (ObjectId check)
     const objectIdPattern = /^[0-9a-fA-F]{24}$/;
-    if (!objectIdPattern.test(customer.user_id)) {
-      setError("Invalid customer ID format. Please ensure the ID is valid.");
+    if (!objectIdPattern.test(customer.user_id) || !objectIdPattern.test(user._id)) {
+      setError("Invalid user or customer ID format. Please ensure the IDs are valid.");
       return;
     }
 
@@ -71,32 +108,40 @@ function TopUp({ customer }) {
     try {
       const formattedAmount = parsedAmount.toFixed(2);
 
-      // Step: Update balance (creates transaction internally)
-      const balanceData = {
-        user_id: customer.user_id,
-        balance: formattedAmount,
-        transaction_type: "Credit",
+      const transferData = {
+        sender_id: user._id,
+        receiver_id: customer.user_id,
+        amount: formattedAmount,
+        transaction_type: "TopUp",
         payment_method: selectedMethod,
         remarks: remarks || undefined,
       };
 
-      console.log("Sending balance data:", balanceData);
-      console.log("API URL:", `${import.meta.env.VITE_BASE_URL}/user-balance/create-or-update-balance`);
+      console.log("Sending transfer data:", transferData);
+      console.log("API URL:", `${import.meta.env.VITE_BASE_URL}/transactions/transfer`);
 
-      const balanceResponse = await axios.post(
-        `${import.meta.env.VITE_BASE_URL}/user-balance/create-or-update-balance`,
-        balanceData,
+      const transferResponse = await axios.post(
+        `${import.meta.env.VITE_BASE_URL}/transactions/transfer`,
+        transferData,
         { withCredentials: true }
       );
 
-      console.log("Balance response:", balanceResponse.data);
+      console.log("Transfer response:", transferResponse.data);
 
-      if (!balanceResponse.data.success) {
-        throw new Error(balanceResponse.data.message || "Failed to update balance");
+      if (!transferResponse.data.success) {
+        throw new Error(transferResponse.data.message || "Failed to process top-up");
       }
 
-      // Use transaction ID from balance response
-      setTransactionId(balanceResponse.data.transaction._id);
+      const transaction = transferResponse.data.transaction;
+      if (!transaction.transaction_id) {
+        throw new Error("Transaction ID missing in response");
+      }
+
+      // Fetch the receiver's updated balance
+      const balanceValue = await fetchBalance(customer.user_id);
+
+      setTransactionId(transaction.transaction_id);
+      setNewBalance(balanceValue);
       setTopUpComplete(true);
     } catch (err) {
       console.error("Top-up error:", {
@@ -106,17 +151,17 @@ function TopUp({ customer }) {
         fullError: err,
       });
       const errorMessage =
-        err.response?.status === 400 && err.response?.data?.message.includes("creation limit")
+        err.response?.status === 400 && err.response?.data?.message.includes("Insufficient balance")
+          ? "Sender has insufficient balance to complete the top-up."
+          : err.response?.status === 400 && err.response?.data?.message.includes("Invalid data")
+          ? "Invalid data provided. Please check your inputs."
+          : err.response?.status === 400 && err.response?.data?.message.includes("limit")
           ? err.response.data.message
-          : err.response?.status === 400 && err.response?.data?.message.includes("not a valid enum value")
-          ? "Invalid payment method selected. Please try again."
-          : err.response?.status === 400 && err.response?.data?.message.includes("duplicate key")
-          ? "Duplicate transaction error. Please try again or contact support."
           : err.response?.status === 404
-          ? "API endpoint not found. Please check the server configuration."
+          ? "User or balance not found. Please check the server configuration."
           : err.response?.status === 500
           ? err.response?.data?.message || "Server error occurred. Please try again or contact support."
-          : err.response?.data?.message || "An error occurred during top-up.";
+          : err.message || "An error occurred during top-up.";
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -124,65 +169,27 @@ function TopUp({ customer }) {
   };
 
   if (topUpComplete) {
+    const successData = {
+      name: customer.name,
+      amount: formatAmount(amount),
+      method: paymentMethods.find((method) => method.value === selectedMethod)?.label || selectedMethod,
+      newBalance: formatAmount(newBalance),
+      transactionId: transactionId,
+    };
+    console.log("Success data passed to TopUpSuccess:", successData);
+
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-        <div className="w-full max-w-2xl bg-white rounded-lg shadow-md overflow-hidden">
-          <div className="bg-[#040442] text-white text-lg font-semibold px-4 py-3 text-center">
-            Top Up Successful
-          </div>
-          <div className="p-6 text-center">
-            <div className="flex justify-center mb-4">
-              <div className="text-green-500 text-6xl">✅</div>
-            </div>
-            <h2 className="text-xl font-bold mb-2">Top Up Complete!</h2>
-            <p className="text-gray-600 mb-6">The card has been topped up successfully:</p>
-            <div className="bg-gray-100 p-4 rounded-md text-left mb-6">
-              <div className="grid grid-cols-[160px_1fr] gap-4 mb-2">
-                <span className="text-gray-700 font-medium">Customer:</span>
-                <span className="text-gray-900 font-semibold">{customer.name}</span>
-              </div>
-              <div className="grid grid-cols-[160px_1fr] gap-4 mb-2">
-                <span className="text-gray-700 font-medium">Amount Added:</span>
-                <span className="text-gray-900 font-semibold">₹{formatAmount(amount)}</span>
-              </div>
-              <div className="grid grid-cols-[160px_1fr] gap-4 mb-2">
-                <span className="text-gray-700 font-medium">Payment Method:</span>
-                <span className="text-gray-900 font-semibold">
-                  {paymentMethods.find((method) => method.value === selectedMethod)?.label}
-                </span>
-              </div>
-              <div className="grid grid-cols-[160px_1fr] gap-4 mb-2">
-                <span className="text-gray-700 font-medium">New Balance:</span>
-                <span className="text-gray-900 font-semibold">₹{formatAmount(amount)}</span>
-              </div>
-              <div className="grid grid-cols-[160px_1fr] gap-4">
-                <span className="text-gray-700 font-medium">Transaction ID:</span>
-                <span className="text-gray-900 font-semibold">{transactionId}</span>
-              </div>
-            </div>
-            <div className="flex justify-center gap-4">
-              <button
-                className="bg-[#040442] text-white px-6 py-2 rounded-md hover:bg-[#2a2a72] transition"
-                onClick={() => window.location.href = "/treasury/register-customer"}
-              >
-                Register New User
-              </button>
-              <button
-                onClick={() => {
-                  setTopUpComplete(false);
-                  setAmount("");
-                  setRemarks("");
-                  setSelectedMethod(null);
-                  setTransactionId("");
-                }}
-                className="border border-[#040442] text-[#040442] px-6 py-2 rounded-md hover:bg-gray-200 transition"
-              >
-                Top Up Another Card
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <TopUpSuccess
+        data={successData}
+        onNewTopUp={() => {
+          setTopUpComplete(false);
+          setAmount("");
+          setRemarks("");
+          setSelectedMethod(null);
+          setTransactionId("");
+          setNewBalance("");
+        }}
+      />
     );
   }
 

@@ -347,3 +347,20 @@ exports.getAllCustomerDetails = async (req, res) => {
     res.status(500).json({ error: "Server error", details: error.message });
   }
 };
+exports.getCustomerByQrCode = async (req, res) => {
+  try {
+    const { qr_code } = req.query;
+    if (!qr_code) {
+      return res.status(400).json({ success: false, message: "QR code is required" });
+    }
+
+    const customer = await Customer.findOne({ qr_code }).populate("user_id", "name email phone_number");
+    if (!customer) {
+      return res.status(404).json({ success: false, message: "No customer found for this QR code" });
+    }
+
+    res.status(200).json({ success: true, data: customer });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
