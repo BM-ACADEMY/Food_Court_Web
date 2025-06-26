@@ -23,25 +23,24 @@ const loginLogRoute=require('./route/loginLogRoute');
 const apiIntegrationRoute=require('./route/apiIntegrationRoute');
 const userBalanceRoute=require('./route/userBalanceRoute');
 const feeRoute=require('./route/feeRoute');
+const upiRoute=require('./route/upiRoute');
+const dashboardRoute=require('./route/dashboardRoute');
+
 const app = express();
 app.use(cookieParser());
-app.use(
-  cors({
-    origin: process.env.DEV_FRONTEND_URL, // your frontend URL
-    credentials: true, // allow cookies (required for JWT in cookies)
-  })
-);
+app.use(cors({
+  origin: [
+    process.env.DEV_FRONTEND_URL,
+    "https://pegasus2025.com",
+    "https://www.pegasus2025.com"
+  ],
+  credentials: true,
+}));
+
 app.use(helmet());
 app.use(express.json());
 app.use(morgan('dev'));
-// Optional: manually allow CORS headers for more control
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", process.env.DEV_FRONTEND_URL); // ✅ must match exact origin
-  res.header("Access-Control-Allow-Credentials", "true"); // ✅ required for cookies
-  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
-  next();
-});
+
 
 
 app.use('/api/roles',roleRoute);
@@ -58,6 +57,8 @@ app.use('/api/login-logs',loginLogRoute);
 app.use('/api/api-integrations',apiIntegrationRoute);
 app.use('/api/user-balance',userBalanceRoute);
 app.use('/api/fees', feeRoute);
+app.use('/api/upis',upiRoute);
+app.use('/api/dashboards',dashboardRoute);
 
 const PORT=process.env.PORT || 4000;
 // Connect to MongoDB and then start the server

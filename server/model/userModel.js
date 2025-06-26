@@ -37,17 +37,15 @@ const userSchema = new mongoose.Schema(
     flag_reason: {
       type: String,
     },
-
-    // ✅ OTP and verification
     phone_number_otp: {
       type: String,
-      default: null, // null until OTP is generated
+      default: null,
     },
     number_verified: {
       type: Boolean,
-      default: false, // false until OTP is verified
+      default: false,
     },
-      otp_expires_at: {
+    otp_expires_at: {
       type: Date,
       default: null,
     },
@@ -57,7 +55,6 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-// Compound index: (role_id, email, phone_number)
 userSchema.index(
   { role_id: 1, email: 1, phone_number: 1 },
   { name: "idx_users_role_email_phone" }
