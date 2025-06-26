@@ -22,9 +22,9 @@ const transactionRoute=require('./route/transactionRoute');
 const loginLogRoute=require('./route/loginLogRoute');
 const apiIntegrationRoute=require('./route/apiIntegrationRoute');
 const userBalanceRoute=require('./route/userBalanceRoute');
+const feeRoute=require('./route/feeRoute');
 const upiRoute=require('./route/upiRoute');
 const dashboardRoute=require('./route/dashboardRoute');
-
 
 const app = express();
 app.use(cookieParser());
@@ -56,6 +56,7 @@ app.use('/api/transactions',transactionRoute);
 app.use('/api/login-logs',loginLogRoute);
 app.use('/api/api-integrations',apiIntegrationRoute);
 app.use('/api/user-balance',userBalanceRoute);
+app.use('/api/fees', feeRoute);
 app.use('/api/upis',upiRoute);
 app.use('/api/dashboards',dashboardRoute);
 

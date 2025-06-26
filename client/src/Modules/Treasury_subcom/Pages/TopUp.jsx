@@ -18,6 +18,7 @@ function TopUp({ customer }) {
   console.log("TopUp - Logged-in user:", user);
   console.log("TopUp - Customer:", customer);
   console.log("Customer user_id:", customer.user_id);
+  console.log("Sender ID vs Receiver ID:", { senderId: user?._id, receiverId: customer.user_id });
 
   const paymentMethods = [
     { label: "Cash", value: "Cash", icon: "💵" },
@@ -181,6 +182,11 @@ function TopUp({ customer }) {
     return (
       <TopUpSuccess
         data={successData}
+        customer={{
+          ...customer,
+          sender_id: user._id,
+          receiver_id: customer.user_id,
+        }} // Pass sender_id and receiver_id
         onNewTopUp={() => {
           setTopUpComplete(false);
           setAmount("");

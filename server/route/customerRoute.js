@@ -29,4 +29,8 @@ router.get("/fetch-single-customer-details/:customerId", customerController.getC
 
 router.get("/fetch-single-customer-transaction/:customerId/transactions", customerController.getCustomerTransactions);
 
+//scan qr in the online user 
+router.get("/fetch-customer-details-by-qr", customerController.getCustomerDetailsByQrCode);
+
+
 module.exports = router;

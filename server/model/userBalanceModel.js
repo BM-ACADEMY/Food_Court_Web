@@ -8,7 +8,7 @@ const UserBalanceSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
-    balance: {
+     balance: {
       type: mongoose.Schema.Types.Decimal128, 
       required: true,
       default: "0.00",
@@ -17,7 +17,9 @@ const UserBalanceSchema = new mongoose.Schema(
   },
   {
     timestamps: { createdAt: "created_at", updatedAt: "updated_at" },
+
     toJSON: { getters: true }, // Ensure getters are applied when converting to JSON
+
   }
 );
 
