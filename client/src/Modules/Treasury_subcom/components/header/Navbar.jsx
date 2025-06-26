@@ -20,7 +20,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ChevronsUpDown, LogOut, User, Save } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import axios from "axios";
 
 const UserDashboardHeader = () => {
   const { user, setUser, logout } = useAuth();
@@ -47,6 +46,13 @@ const UserDashboardHeader = () => {
     } catch (err) {
       console.error("Failed to update user:", err);
     }
+  };
+
+  const handleLogout = () => {
+    // Clear sessionStorage flag for dropdown
+    sessionStorage.removeItem("dropdownSubmitted");
+    logout(); // Call AuthContext logout
+    setShowLogoutDialog(false);
   };
 
   if (!user) return null;
@@ -183,7 +189,7 @@ const UserDashboardHeader = () => {
             </Button>
             <Button
               variant="destructive"
-              onClick={logout}
+              onClick={handleLogout}
             >
               <LogOut className="mr-2 h-4 w-4" /> Logout
             </Button>

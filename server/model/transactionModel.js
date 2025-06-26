@@ -41,10 +41,10 @@ const transactionSchema = new mongoose.Schema(
     remarks: {
       type: String,
     },
-    // location_id: {
-    //   type: mongoose.Schema.Types.ObjectId,
-    //   ref: "Location",
-    // },
+    location_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Location",
+    },
     edited_at: {
       type: Date,
     },
