@@ -24,4 +24,7 @@ router.put("/update-customer/:id", customerController.updateCustomer);
 // Delete
 router.delete("/delete-customer/:id", customerController.deleteCustomer);
 
+//scan qr in the online user 
+router.get("/fetch-customer-details-by-qr", customerController.getCustomerDetailsByQrCode);
+
 module.exports = router;

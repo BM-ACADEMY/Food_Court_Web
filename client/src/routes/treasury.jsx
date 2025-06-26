@@ -3,7 +3,7 @@ import { Routes, Route } from "react-router-dom";
 import TreasuryLayout from "./TreasuryLayout";
 import Home from "@/Modules/Treasury_subcom/Pages/Home";
 import RegisterCustomer from "@/Modules/Treasury_subcom/Pages/RegisterCustomer";
-import TopUpOnlineUser from "@/Modules/Treasury_subcom/Pages/TopUpOnlineUser";
+import TopUpOnlineUser from "@/Modules/Treasury_subcom/Pages/QRScanner";
 import CustomerHistory from "@/Modules/Treasury_subcom/Pages/CustomerHistory";
 import RestaurantHistory from "@/Modules/Treasury_subcom/Pages/RestaurantHistory";
 import UserHistory from "@/Modules/Treasury_subcom/Pages/UserHistory";

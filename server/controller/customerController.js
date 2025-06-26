@@ -364,3 +364,47 @@ exports.getCustomerByQrCode = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// Get Customer Details and Balance by QR Code
+exports.getCustomerDetailsByQrCode = async (req, res) => {
+  try {
+    const { qr_code } = req.query;
+
+    // Validate QR code input
+    if (!qr_code) {
+      return res.status(400).json({ success: false, message: "QR code is required" });
+    }
+
+    // Find customer by QR code and populate user_id
+    const customer = await Customer.findOne({ qr_code }).populate("user_id", "name email phone_number");
+    if (!customer) {
+      return res.status(404).json({ success: false, message: "No customer found for this QR code" });
+    }
+
+    // Get user_id from customer
+    const userId = customer.user_id._id;
+
+    // Fetch user details
+    const user = await User.findById(userId).select("name email phone_number");
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // Fetch balance from UserBalance model
+    const userBalance = await UserBalance.findOne({ user_id: userId });
+    const balance = userBalance ? parseFloat(userBalance.balance.toString()) : null;
+
+    // Prepare response
+    const response = {
+      name: user.name,
+      email: user.email,
+      phone_number: user.phone_number,
+      balance: balance !== null ? balance : "Payment not done yet",
+    };
+
+    res.status(200).json({ success: true, data: response });
+  } catch (err) {
+    console.error("Error in getCustomerDetailsByQrCode:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
