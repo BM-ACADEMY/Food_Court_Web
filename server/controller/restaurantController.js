@@ -1,10 +1,12 @@
 
+const Role = require("../model/roleModel");
+const User = require("../model/userModel");
+const Restaurant = require("../model/restaurantModel");
+const UserBalance = require("../model/userBalanceModel");
+const LoginLog = require("../model/loginLogModel");
+const Transaction = require("../model/transactionModel");
 const mongoose = require("mongoose");
-const Role =require('../model/roleModel')
-const User = require('../model/userModel');
-const Restaurant = require('../model/restaurantModel');
-const UserBalance = require('../model/userBalanceModel');
-const LoginLog = require('../model/loginLogModel');
+
 // Create Restaurant
 exports.createRestaurant = async (req, res) => {
   try {
@@ -29,79 +31,95 @@ exports.createRestaurant = async (req, res) => {
   }
 };
 
-// Get All Restaurants
+
+
+
 exports.getRestaurants = async (req, res) => {
   try {
-    const restaurants = await Restaurant.find().populate("user_id", "name email");
+    const restaurants = await Restaurant.find()
+      .populate("user_id", "name email role_id")
+      .select("name restaurant_name restaurant_id qr_code user_id status");
     res.status(200).json({ success: true, data: restaurants });
   } catch (err) {
+    console.error("Fetch all restaurants error:", err.message);
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// Get Restaurant by ID
 exports.getRestaurantById = async (req, res) => {
   try {
-    const restaurant = await Restaurant.findById(req.params.id).populate("user_id");
-    if (!restaurant)
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid restaurant ID format" });
+    }
+    const restaurant = await Restaurant.findById(id)
+      .populate("user_id", "name email role_id")
+      .select("name restaurant_name restaurant_id qr_code user_id status");
+    if (!restaurant) {
       return res.status(404).json({ success: false, message: "Restaurant not found" });
-
+    }
     res.status(200).json({ success: true, data: restaurant });
   } catch (err) {
+    console.error("Fetch restaurant by ID error:", err.message);
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// Get Restaurant by QR Code
 exports.getRestaurantByQrCode = async (req, res) => {
   try {
     const { qr_code } = req.query;
     if (!qr_code) {
       return res.status(400).json({ success: false, message: "QR code is required" });
     }
-
-    const restaurant = await Restaurant.findOne({ qr_code }).populate("user_id", "name email");
+    const restaurant = await Restaurant.findOne({ qr_code })
+      .populate("user_id", "name email role_id")
+      .select("name restaurant_name restaurant_id qr_code user_id status");
     if (!restaurant) {
       return res.status(404).json({ success: false, message: "No restaurant found for this QR code" });
     }
-
     res.status(200).json({ success: true, data: restaurant });
   } catch (err) {
+    console.error("Fetch restaurant by QR code error:", err.message);
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// Update Restaurant
 exports.updateRestaurant = async (req, res) => {
   try {
-    const updated = await Restaurant.findByIdAndUpdate(req.params.id, req.body, {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid restaurant ID format" });
+    }
+    const updated = await Restaurant.findByIdAndUpdate(id, req.body, {
       new: true,
+      runValidators: true,
     });
-
-    if (!updated)
+    if (!updated) {
       return res.status(404).json({ success: false, message: "Restaurant not found" });
-
+    }
     res.status(200).json({ success: true, data: updated });
   } catch (err) {
+    console.error("Update restaurant error:", err.message);
     res.status(400).json({ success: false, message: err.message });
   }
 };
 
-// Delete Restaurant
 exports.deleteRestaurant = async (req, res) => {
   try {
-    const deleted = await Restaurant.findByIdAndDelete(req.params.id);
-
-    if (!deleted)
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid restaurant ID format" });
+    }
+    const deleted = await Restaurant.findByIdAndDelete(id);
+    if (!deleted) {
       return res.status(404).json({ success: false, message: "Restaurant not found" });
-
+    }
     res.status(200).json({ success: true, message: "Restaurant deleted successfully" });
   } catch (err) {
+    console.error("Delete restaurant error:", err.message);
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
-
 
 exports.getAllRestaurantDetails = async (req, res) => {
   try {
@@ -115,13 +133,22 @@ exports.getAllRestaurantDetails = async (req, res) => {
       pageSize = 10,
     } = req.query;
 
-    // Log query parameters for debugging
-    console.log("Query Parameters:", { search, status, lastActive, regDate, sortBy, page, pageSize });
+    const debug =
+      process.env.NODE_ENV !== "production" ? console.log : () => {};
+    debug("Query Parameters:", {
+      search,
+      status,
+      lastActive,
+      regDate,
+      sortBy,
+      page,
+      pageSize,
+    });
 
-    // Find Restaurant role ID
-    const restaurantRole = await Role.findOne({ name: "Restaurant" }).select("_id");
+    const restaurantRole = await Role.findOne({ name: "Restaurant" }).select(
+      "_id"
+    );
     if (!restaurantRole) {
-      console.log("No Restaurant role found");
       return res.json({
         restaurants: [],
         totalRestaurants: 0,
@@ -130,13 +157,9 @@ exports.getAllRestaurantDetails = async (req, res) => {
         totalPages: 0,
       });
     }
-    const restaurantRoleId = restaurantRole._id;
-    console.log("Restaurant Role ID:", restaurantRoleId);
 
-    // Build user query
-    let userQuery = {
-      role_id: restaurantRoleId,
-    };
+    const restaurantRoleId = restaurantRole._id;
+    let userQuery = { role_id: restaurantRoleId };
 
     if (search) {
       const restaurantIds = await Restaurant.find({
@@ -145,12 +168,16 @@ exports.getAllRestaurantDetails = async (req, res) => {
           { restaurant_name: { $regex: search, $options: "i" } },
         ],
       }).select("user_id");
-      const restaurantUserIds = restaurantIds.map((restaurant) => restaurant.user_id);
-      console.log("Restaurant User IDs from search:", restaurantUserIds);
-      userQuery.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { _id: { $in: restaurantUserIds } },
-      ];
+
+      const restaurantUserIds = restaurantIds.map((r) => r.user_id);
+      if (restaurantUserIds.length > 0) {
+        userQuery.$or = [
+          { name: { $regex: search, $options: "i" } },
+          { _id: { $in: restaurantUserIds } },
+        ];
+      } else {
+        userQuery.name = { $regex: search, $options: "i" };
+      }
     }
 
     if (regDate) {
@@ -158,13 +185,9 @@ exports.getAllRestaurantDetails = async (req, res) => {
       const endDate = new Date(startDate);
       endDate.setDate(startDate.getDate() + 1);
       userQuery.created_at = { $gte: startDate, $lt: endDate };
-      console.log("Registration Date Filter:", { startDate, endDate });
     }
 
-    // Handle last active filter
-    let userIds = [];
-    const validLastActiveValues = ["all", "today", "week", "month"];
-    if (validLastActiveValues.includes(lastActive) && lastActive !== "all") {
+    if (["today", "week", "month"].includes(lastActive)) {
       const now = new Date();
       let dateFilter;
       if (lastActive === "today") {
@@ -174,41 +197,14 @@ exports.getAllRestaurantDetails = async (req, res) => {
       } else if (lastActive === "month") {
         dateFilter = new Date(now.setMonth(now.getMonth() - 1));
       }
-      const recentLogs = await LoginLog.find({
+      const recentLogUserIds = await LoginLog.find({
         login_time: { $gte: dateFilter },
       }).distinct("user_id");
-      userIds = recentLogs;
-      console.log("Last Active User IDs:", userIds);
-      if (userIds.length > 0) {
-        userQuery._id = { $in: userIds };
-      }
-    } else {
-      console.log("Skipping lastActive filter due to invalid or 'all' value:", lastActive);
+      userQuery._id =
+        recentLogUserIds.length > 0 ? { $in: recentLogUserIds } : { $in: [] };
     }
 
-    // Status filter
-    if (status !== "all") {
-      const recentLoginThreshold = new Date(Date.now() - 5 * 60 * 1000); // 5 minutes ago
-      const activeUsers = await LoginLog.find({
-        login_time: { $gte: recentLoginThreshold },
-        logout_time: { $exists: false },
-      }).distinct("user_id");
-      userQuery._id = status === "Online" ? { $in: activeUsers } : { $nin: activeUsers };
-      console.log("Active Users for Status Filter:", activeUsers);
-    }
-
-    // Log the final user query
-    console.log("User Query:", JSON.stringify(userQuery, null, 2));
-
-    // Check if users exist in Users collection
-    const usersWithRestaurantRole = await User.find({ role_id: restaurantRoleId }).select("_id name");
-    console.log(
-      "Users with Restaurant Role:",
-      usersWithRestaurantRole.map((u) => ({ _id: u._id.toString(), name: u.name }))
-    );
-
-    // Aggregate to join User, Restaurant, UserBalance
-    let pipeline = [
+    const pipeline = [
       { $match: userQuery },
       {
         $lookup: {
@@ -218,7 +214,7 @@ exports.getAllRestaurantDetails = async (req, res) => {
           as: "restaurant",
         },
       },
-      { $unwind: { path: "$restaurant", preserveNullAndEmptyArrays: false } }, // Strict match
+      { $unwind: { path: "$restaurant", preserveNullAndEmptyArrays: false } },
       {
         $lookup: {
           from: "userbalances",
@@ -238,132 +234,296 @@ exports.getAllRestaurantDetails = async (req, res) => {
       },
       { $unwind: { path: "$location", preserveNullAndEmptyArrays: true } },
       {
+        $lookup: {
+          from: "loginlogs",
+          localField: "_id",
+          foreignField: "user_id",
+          as: "loginLogs",
+        },
+      },
+      {
         $project: {
-          _id: 1,
+          user_id: "$_id", // Rename _id to user_id
           name: 1,
+          is_flagged: 1, // Include this field from User
           restaurant_id: "$restaurant.restaurant_id",
           restaurant_name: "$restaurant.restaurant_name",
-          category: "$location.city", // Map location.city to category, adjust as needed
-          sales: { $toDouble: "$restaurant.treasury_to_customer_refund" }, // Map to sales
+          category: "$location.city",
+          sales: { $toDouble: "$restaurant.treasury_to_customer_refund" },
           created_at: 1,
+          status: {
+            $cond: [
+              { $eq: [{ $max: "$loginLogs.status" }, true] },
+              "Online",
+              "Offline",
+            ],
+          },
+          lastActive: { $max: "$loginLogs.login_time" },
         },
       },
     ];
 
-    // Apply sorting
-    let sortOption = {};
-    if (sortBy === "asc") {
-      sortOption["name"] = 1;
-    } else if (sortBy === "desc") {
-      sortOption["name"] = -1;
-    } else if (sortBy === "recent") {
-      sortOption["created_at"] = -1;
-    }
+    // Sorting
+    const sortOption = {
+      asc: { name: 1 },
+      desc: { name: -1 },
+      recent: { created_at: -1 },
+      "high-balance": { sales: -1 },
+      "low-balance": { sales: 1 },
+    }[sortBy] || { name: 1 };
+    pipeline.push({ $sort: sortOption });
 
-    if (sortBy === "high-balance") {
-      pipeline.push({ $sort: { sales: -1 } });
-    } else if (sortBy === "low-balance") {
-      pipeline.push({ $sort: { sales: 1 } });
-    } else {
-      pipeline.push({ $sort: sortOption });
-    }
-
-    // Apply pagination
-    const skip = (page - 1) * pageSize;
-    const limit = parseInt(pageSize);
-    pipeline.push({ $skip: skip }, { $limit: limit });
+    // Pagination
+    const pageNum = parseInt(page, 10) || 1;
+    const pageSizeNum = parseInt(pageSize, 10) || 10;
+    pipeline.push(
+      { $skip: (pageNum - 1) * pageSizeNum },
+      { $limit: pageSizeNum }
+    );
 
     const restaurants = await User.aggregate(pipeline);
-    console.log("Aggregated Restaurants:", JSON.stringify(restaurants, null, 2));
 
-    // Fetch last active times
-    const restaurantIds = restaurants.map((restaurant) => restaurant._id);
-    const loginLogs = await LoginLog.find({ user_id: { $in: restaurantIds } })
-      .sort({ login_time: -1 })
-      .lean();
-    console.log("Login Logs:", loginLogs);
-
-    const lastActiveMap = {};
-    loginLogs.forEach((log) => {
-      if (!lastActiveMap[log.user_id]) {
-        const loginTime = new Date(log.login_time);
+    // Format data
+    let formattedRestaurants = restaurants.map((r) => {
+      let lastActive = "Unknown";
+      if (r.lastActive) {
+        const lastTime = new Date(r.lastActive);
         const now = new Date();
-        const diff = (now - loginTime) / 1000 / 60;
-        if (diff < 5) {
-          lastActiveMap[log.user_id] = "Just now";
-        } else if (diff < 60) {
-          lastActiveMap[log.user_id] = `${Math.floor(diff)} mins ago`;
-        } else if (diff < 1440) {
-          lastActiveMap[log.user_id] = `${Math.floor(diff / 60)} hours ago`;
-        } else {
-          lastActiveMap[log.user_id] = loginTime.toISOString().split("T")[0];
-        }
+        const diff = (now - lastTime) / 60000;
+
+        if (diff < 5) lastActive = "Just now";
+        else if (diff < 60) lastActive = `${Math.floor(diff)} mins ago`;
+        else if (diff < 1440) lastActive = `${Math.floor(diff / 60)} hours ago`;
+        else lastActive = lastTime.toISOString().split("T")[0];
       }
+
+      return {
+        user_id: r.user_id?.toString(), // renamed from _id
+        id: r.restaurant_id,
+        name: r.restaurant_name,
+        category: r.category || "Unknown",
+        sales: parseFloat(r.sales.toString()),
+        status: r.status,
+        lastActive,
+        is_flagged: r.is_flagged || false,
+      };
     });
 
-    // Determine status
-    const recentLoginThreshold = new Date(Date.now() - 5 * 60 * 1000);
-    const activeUsers = await LoginLog.find({
-      login_time: { $gte: recentLoginThreshold },
-      logout_time: { $exists: false },
-    }).distinct("user_id");
-    console.log("Active Users:", activeUsers);
+    // Apply status filter after formatting
+    if (status !== "all") {
+      formattedRestaurants = formattedRestaurants.filter(
+        (r) => r.status.toLowerCase() === status.toLowerCase()
+      );
+    }
 
-    const formattedRestaurants = restaurants.map((restaurant) => ({
-      id: restaurant.restaurant_id,
-      name: restaurant.restaurant_name,
-      category: restaurant.category || "Unknown",
-      sales: parseFloat(restaurant.sales.toString()),
-      status: activeUsers.includes(restaurant._id.toString()) ? "Online" : "Offline",
-      lastActive: lastActiveMap[restaurant._id.toString()] || "Unknown",
-    }));
-    console.log("Formatted Restaurants:", JSON.stringify(formattedRestaurants, null, 2));
-
-    // Compute statistics
-    const totalRestaurantsPipeline = [
+    // Statistics
+    const statsPipeline = [
       { $match: userQuery },
-      { $lookup: { from: "restaurants", localField: "_id", foreignField: "user_id", as: "restaurant" } },
-      { $unwind: "$restaurant" },
-      { $count: "total" },
-    ];
-    const totalRestaurantsResult = await User.aggregate(totalRestaurantsPipeline);
-    const totalRestaurants = totalRestaurantsResult[0]?.total || 0;
-    console.log("Total Restaurants:", totalRestaurants);
-
-    const onlineCountPipeline = [
-      { $match: { ...userQuery, _id: { $in: activeUsers } } },
-      { $lookup: { from: "restaurants", localField: "_id", foreignField: "user_id", as: "restaurant" } },
-      { $unwind: "$restaurant" },
-      { $count: "total" },
-    ];
-    const onlineCountResult = await User.aggregate(onlineCountPipeline);
-    const onlineCount = onlineCountResult[0]?.total || 0;
-    console.log("Online Count:", onlineCount);
-
-    const totalSalesPipeline = [
-      { $match: userQuery },
-      { $lookup: { from: "restaurants", localField: "_id", foreignField: "user_id", as: "restaurant" } },
+      {
+        $lookup: {
+          from: "restaurants",
+          localField: "_id",
+          foreignField: "user_id",
+          as: "restaurant",
+        },
+      },
       { $unwind: "$restaurant" },
       {
         $group: {
           _id: null,
-          total: { $sum: { $toDouble: "$restaurant.treasury_to_customer_refund" } },
+          totalRestaurants: { $sum: 1 },
+          totalSales: {
+            $sum: { $toDouble: "$restaurant.treasury_to_customer_refund" },
+          },
         },
       },
     ];
-    const totalSalesResult = await User.aggregate(totalSalesPipeline);
-    const totalSales = parseFloat((totalSalesResult[0]?.total || 0).toString());
-    console.log("Total Sales:", totalSales);
+    const statsResult = await User.aggregate(statsPipeline);
+    const { totalRestaurants = 0, totalSales = 0 } = statsResult[0] || {};
+
+    // Online count (from already computed status)
+    const onlineCount = formattedRestaurants.filter(
+      (r) => r.status === "Online"
+    ).length;
 
     res.json({
       restaurants: formattedRestaurants,
       totalRestaurants,
-      totalSales,
+      totalSales: parseFloat(totalSales.toString()),
       onlineCount,
-      totalPages: Math.ceil(totalRestaurants / pageSize),
+      totalPages: Math.ceil(totalRestaurants / pageSizeNum),
     });
   } catch (error) {
     console.error("Error in /api/restaurants:", error);
     res.status(500).json({ error: "Server error", details: error.message });
+  }
+};
+
+exports.getRestaurantDetails = async (req, res) => {
+  try {
+    const { restaurantId } = req.params;
+
+    const restaurant = await Restaurant.aggregate([
+      { $match: { restaurant_id: restaurantId } },
+      {
+        $lookup: {
+          from: "users",
+          localField: "user_id",
+          foreignField: "_id",
+          as: "user",
+        },
+      },
+      { $unwind: "$user" },
+      {
+        $lookup: {
+          from: "userbalances",
+          localField: "user_id",
+          foreignField: "user_id",
+          as: "balance",
+        },
+      },
+      { $unwind: { path: "$balance", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "loginlogs",
+          localField: "user_id",
+          foreignField: "user_id",
+          as: "loginLogs",
+        },
+      },
+      {
+        $lookup: {
+          from: "transactions",
+          let: { userId: "$user_id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $or: [
+                    { $eq: ["$sender_id", "$$userId"] },
+                    { $eq: ["$receiver_id", "$$userId"] },
+                  ],
+                },
+              },
+            },
+            { $count: "totalTransactions" },
+          ],
+          as: "transactionCount",
+        },
+      },
+      {
+        $unwind: {
+          path: "$transactionCount",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $project: {
+          id: "$restaurant_id",
+          user_id: "$user_id",
+          name: "$user.name",
+          phone: "$user.phone_number",
+          email: "$user.email",
+          sales: { $ifNull: [{ $toDouble: "$balance.balance" }, 0.0] },
+          status: {
+            $cond: [
+              { $eq: [{ $max: "$loginLogs.status" }, true] },
+              "Online",
+              "Offline",
+            ],
+          },
+          lastActive: { $max: "$loginLogs.login_time" },
+          registrationDate: "$user.createdAt",
+          totalTransactions: {
+            $ifNull: ["$transactionCount.totalTransactions", 0],
+          },
+        },
+      },
+    ]);
+
+    if (!restaurant.length) {
+      return res.status(404).json({ error: "Restaurant not found" });
+    }
+
+    res.status(200).json(restaurant[0]);
+  } catch (error) {
+    console.error("Error fetching restaurant details:", error);
+    res.status(500).json({ error: "Failed to fetch restaurant details" });
+  }
+};
+// Fetch transactions for a restaurant
+// Fetch transactions for a restaurant with filtering and pagination
+exports.getRestaurantTransactions = async (req, res) => {
+  try {
+    const { restaurantId } = req.params;
+    const { filter = "all", page = 1, pageSize = 5 } = req.query;
+
+    // Validate restaurant
+    const restaurant = await Restaurant.findOne({
+      restaurant_id: restaurantId,
+    }).select("user_id");
+    if (!restaurant) {
+      return res.status(404).json({ error: "Restaurant not found" });
+    }
+
+    // Build query
+    const query = {
+      $or: [
+        { sender_id: restaurant.user_id },
+        { receiver_id: restaurant.user_id },
+      ],
+    };
+
+    // Apply transaction type filter
+    if (filter !== "all") {
+      query.transaction_type = filter.charAt(0).toUpperCase() + filter.slice(1); // Capitalize (e.g., "transfer" → "Transfer")
+    } else {
+      query.transaction_type = {
+        $in: ["Transfer", "TopUp", "Refund", "Credit"],
+      };
+    }
+
+    // Parse pagination parameters
+    const pageNum = parseInt(page, 10);
+    const pageSizeNum = parseInt(pageSize, 10);
+    if (pageNum < 1 || pageSizeNum < 1) {
+      return res.status(400).json({ error: "Invalid page or pageSize" });
+    }
+
+    // Fetch total count for pagination
+    const totalCount = await Transaction.countDocuments(query);
+
+    // Fetch transactions with pagination
+    const transactions = await Transaction.find(query)
+      .populate("sender_id", "name")
+      .populate("receiver_id", "name")
+      .skip((pageNum - 1) * pageSizeNum)
+      .limit(pageSizeNum)
+      .lean();
+
+    // Format transactions
+    const formattedTransactions = transactions.map((tx) => ({
+      id: tx.transaction_id,
+      type: tx.transaction_type.toLowerCase(),
+      amount: parseFloat(tx.amount),
+      date: tx.created_at,
+      description:
+        tx.transaction_type === "Transfer"
+          ? `To ${tx.receiver_id?.name || "Unknown"}`
+          : tx.transaction_type === "Refund"
+          ? `From ${tx.sender_id?.name || "Unknown"}`
+          : tx.remarks || `${tx.transaction_type} transaction`,
+    }));
+
+    // Response
+    res.status(200).json({
+      data: formattedTransactions,
+      total: totalCount,
+      totalPages: Math.ceil(totalCount / pageSizeNum),
+      currentPage: pageNum,
+    });
+  } catch (error) {
+    console.error("Error fetching restaurant transactions:", error);
+    res.status(500).json({ error: "Failed to fetch transactions" });
   }
 };

@@ -86,3 +86,55 @@ exports.deleteLoginLog = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// Update or create last login log
+const mongoose = require("mongoose");
+
+exports.updateLastLoginLog = async (req, res) => {
+  try {
+    const { user_id, location_id, upi_id, login_time } = req.body;
+
+    // Validate required fields
+    if (!user_id || !location_id || !upi_id || !login_time) {
+      return res.status(400).json({ success: false, message: "Missing required fields" });
+    }
+
+    // Validate ObjectIds
+    if (!mongoose.Types.ObjectId.isValid(user_id)) {
+      return res.status(400).json({ success: false, message: "Invalid user ID" });
+    }
+    if (!mongoose.Types.ObjectId.isValid(location_id)) {
+      return res.status(400).json({ success: false, message: "Invalid location ID" });
+    }
+    if (!mongoose.Types.ObjectId.isValid(upi_id)) {
+      return res.status(400).json({ success: false, message: "Invalid UPI ID" });
+    }
+
+    // Find the most recent login log for the user
+    let loginLog = await LoginLog.findOne({ user_id }).sort({ login_time: -1 });
+
+    if (loginLog) {
+      // Update existing login log
+      loginLog.location_id = location_id;
+      loginLog.upi_id = upi_id;
+      loginLog.login_time = login_time;
+      loginLog.status = true;
+      await loginLog.save();
+    } else {
+      // Create a new login log
+      loginLog = new LoginLog({
+        user_id,
+        location_id,
+        upi_id,
+        login_time,
+        status: true,
+      });
+      await loginLog.save();
+    }
+
+    res.status(200).json({ success: true, message: "Login log updated successfully", data: loginLog });
+  } catch (err) {
+    console.error("Error updating login log:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};

@@ -167,7 +167,7 @@ function RegisterCustomer() {
       });
       console.log("User update response:", JSON.stringify(updateResponse.data, null, 2));
 
-      if (!updateResponse.data.success) {
+      if (!updateResponse.data) {
         throw new Error(updateResponse.data.message || "Failed to update user details");
       }
 
@@ -181,6 +181,7 @@ function RegisterCustomer() {
         if (customerResponse.data.success && customerResponse.data.data.length > 0) {
           customerIdForDisplay = customerResponse.data.data.find(c => c.user_id.toString() === userId)?.customer_id || customerId;
         }
+
       } catch (customerErr) {
         console.warn("Error fetching customer_id for display:", customerErr.response?.data || customerErr.message);
         customerIdForDisplay = customerId || "N/A";
@@ -201,10 +202,10 @@ function RegisterCustomer() {
           year: "numeric",
         }),
       });
-
       setIsRegistered(true);
+
     } catch (err) {
-      console.error("Error during registration:", err.response?.data || err.message);
+      console.error("Error during registration:", err);
       const errorMessage = err.response?.status === 400
         ? err.response.data.message || "Invalid user data. Please try again."
         : err.response?.data?.message || "Failed to register user. Please try again.";

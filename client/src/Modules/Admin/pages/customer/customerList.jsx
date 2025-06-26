@@ -55,7 +55,29 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import CustomerDetailsModal from "./CustomersDetailsModel"
+import moment from "moment";
 
+const getRandomColor = () => {
+  const colors = ["#FF6B6B", "#4ECDC4", "#556270", "#C7F464", "#FFA500"];
+  return colors[Math.floor(Math.random() * colors.length)];
+};
+
+const Avatar = ({ name = "" }) => {
+  const initials =
+    name?.split(" ")[0]?.[0]?.toUpperCase() +
+    (name?.split(" ")[1]?.[0]?.toUpperCase() || "");
+  const color = getRandomColor();
+
+  return (
+    <div
+      className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
+      style={{ backgroundColor: color }}
+    >
+      {initials}
+    </div>
+  );
+};
 export default function CustomerList() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
@@ -77,6 +99,8 @@ export default function CustomerList() {
   const [error, setError] = useState(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState("xlsx");
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
 
   // Fetch data from backend
   useEffect(() => {
@@ -187,7 +211,10 @@ export default function CustomerList() {
     }
     setIsExportModalOpen(false);
   };
-
+  const handleViewCustomer = (customer) => {
+    setSelectedCustomer(customer);
+    setIsDetailsModalOpen(true);
+  };
   return (
     <div className="space-y-6">
       <h2 className="text-3xl font-bold text-[#00004D]">Customer Check</h2>
@@ -204,10 +231,10 @@ export default function CustomerList() {
               className="pl-9"
             />
           </div>
-          <Button className="bg-[#00004D] text-white flex items-center gap-2 flex-1/5">
+          {/* <Button className="bg-[#00004D] text-white flex items-center gap-2 flex-1/5">
             <QrCode className="size-4" />
             Scan QR Code
-          </Button>
+          </Button> */}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           {/* Status */}
@@ -353,27 +380,44 @@ export default function CustomerList() {
                 {paginatedCustomers?.map((customer) => (
                   <TableRow key={customer.id}>
                     <TableCell className="font-medium">#{customer.id}</TableCell>
-                    <TableCell>{customer.name}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Avatar name={customer.name} />
+                        <span className="font-medium">{customer.name}</span>
+                      </div>
+                    </TableCell>
+
                     <TableCell>{customer.phone}</TableCell>
-                    <TableCell>₹{customer.balance.toLocaleString()}</TableCell>
+                    <TableCell>
+                      <span
+                        className={`font-semibold ${customer.balance > 0
+                          ? "text-green-600"
+                          : customer.balance < 0
+                            ? "text-red-600"
+                            : "text-gray-500"
+                          }`}
+                      >
+                        ₹{customer.balance.toLocaleString()}
+                      </span>
+                    </TableCell>
+
                     <TableCell>
                       <Badge
                         variant="ghost"
-                        className={`text-white ${
-                          customer.status.toLowerCase() === "online" ? "bg-green-500" : "bg-red-500"
-                        }`}
+                        className={`text-white ${customer.status.toLowerCase() === "online" ? "bg-green-500" : "bg-red-500"
+                          }`}
                       >
                         {customer.status}
                       </Badge>
                     </TableCell>
                     <TableCell>{customer.lastActive}</TableCell>
                     <TableCell className="flex gap-2">
-                      <Button variant="link" className="text-blue-600 p-0 h-auto text-sm">
+                      <Button variant="link" className="text-blue-600 p-0 h-auto text-sm" onClick={() => handleViewCustomer(customer)}>
                         <Eye className="mr-1 h-4 w-4" /> View
                       </Button>
-                      <Button variant="link" className="text-green-600 p-0 h-auto text-sm">
+                      {/* <Button variant="link" className="text-green-600 p-0 h-auto text-sm">
                         <Pencil className="mr-1 h-4 w-4" /> Edit
-                      </Button>
+                      </Button> */}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -382,7 +426,15 @@ export default function CustomerList() {
           </div>
         </div>
       )}
-
+      <div className="w-full max-w-none">
+        {selectedCustomer && (
+          <CustomerDetailsModal
+            customer={selectedCustomer}
+            isOpen={isDetailsModalOpen}
+            onClose={() => setIsDetailsModalOpen(false)}
+          />
+        )}
+      </div>
       {/* Export Modal */}
       <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>
         <DialogContent>

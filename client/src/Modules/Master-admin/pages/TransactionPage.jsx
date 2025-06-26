@@ -589,6 +589,28 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { useAuth } from "@/context/AuthContext"; // Assuming you have an AuthContext
 
+const getRandomColor = () => {
+  const colors = ["#FF6B6B", "#4ECDC4", "#556270", "#C7F464", "#FFA500"];
+  return colors[Math.floor(Math.random() * colors.length)];
+};
+
+const Avatar = ({ name = "" }) => {
+  const initials = name
+    ? name.split(" ").map((word) => word[0]?.toUpperCase()).slice(0, 2).join("")
+    : "U";
+  const color = getRandomColor();
+
+  return (
+    <div
+      className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold"
+      style={{ backgroundColor: color }}
+    >
+      {initials}
+    </div>
+  );
+};
+
+
 export default function TransactionHistory() {
   const { user } = useAuth(); // Get logged-in user from AuthContext
   const [transactionType, setTransactionType] = useState("all");
@@ -725,15 +747,15 @@ export default function TransactionHistory() {
           prev.map((txn) =>
             txn.id === transactionId
               ? {
-                  ...txn,
-                  amount: parseFloat(editFormData.amount),
-                  type: editFormData.transaction_type,
-                  payment_method: editFormData.payment_method,
-                  status: editFormData.status,
-                  remarks: editFormData.remarks,
-                  location_id: editFormData.location_id,
-                  edited_at: new Date(),
-                }
+                ...txn,
+                amount: parseFloat(editFormData.amount),
+                type: editFormData.transaction_type,
+                payment_method: editFormData.payment_method,
+                status: editFormData.status,
+                remarks: editFormData.remarks,
+                location_id: editFormData.location_id,
+                edited_at: new Date(),
+              }
               : txn
           )
         );
@@ -1097,7 +1119,7 @@ export default function TransactionHistory() {
                   <TableHead>User</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead>Location</TableHead>
+                  {/* <TableHead>Location</TableHead> */}
                   <TableHead className="text-right">Amount</TableHead>
                   {/* <TableHead className="text-right">Actions</TableHead> */}
                 </TableRow>
@@ -1108,7 +1130,11 @@ export default function TransactionHistory() {
                     <TableCell>{txn.datetime}</TableCell>
                     <TableCell className="font-semibold">{txn.id}</TableCell>
                     <TableCell>
-                      <div className="font-medium">{txn.user.name}</div>
+                      <div className="flex items-center gap-2">
+                        <Avatar name={txn.user.name} />
+                        <div className="font-medium">{txn.user.name}</div>
+                      </div>
+
                       <div className="text-xs text-muted-foreground">{txn.user.type}</div>
                     </TableCell>
                     <TableCell>
@@ -1131,9 +1157,23 @@ export default function TransactionHistory() {
                           </SelectContent>
                         </Select>
                       ) : (
-                        <span className="capitalize rounded px-2 py-1 text-xs font-medium bg-gray-100">
-                          {txn.type}
+                        <span
+                          className={`capitalize rounded px-2 py-1 text-xs font-medium
+    ${txn.type === "Transfer"
+                              ? "bg-blue-100 text-blue-700"
+                              : txn.type === "TopUp"
+                                ? "bg-purple-100 text-purple-700"
+                                : txn.type === "Refund"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : txn.type === "Credit"
+                                    ? "bg-green-100 text-green-700"
+                                    : "bg-gray-100 text-gray-600"
+                            }
+  `}
+                        >
+                          {txn.type || "N/A"}
                         </span>
+
                       )}
                     </TableCell>
                     <TableCell>
@@ -1149,7 +1189,7 @@ export default function TransactionHistory() {
                         txn.description
                       )}
                     </TableCell>
-                    <TableCell>
+                    {/* <TableCell>
                       {editingTransactionId === txn.id ? (
                         <Select
                           value={editFormData.location_id}
@@ -1171,7 +1211,7 @@ export default function TransactionHistory() {
                       ) : (
                         txn.location
                       )}
-                    </TableCell>
+                    </TableCell> */}
                     <TableCell className="text-right font-semibold">
                       {editingTransactionId === txn.id ? (
                         <Input
@@ -1217,41 +1257,50 @@ export default function TransactionHistory() {
             </Table>
           </div>
 
-          <div className="pt-4 float-end">
-            <Pagination>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    href="#"
-                    onClick={() => setPagination((prev) => ({
-                      ...prev,
-                      page: Math.max(prev.page - 1, 1),
-                    }))}
-                  />
-                </PaginationItem>
-                {Array.from({ length: pagination.totalPages || 1 }, (_, i) => i + 1).map((p) => (
-                  <PaginationItem key={p}>
-                    <PaginationLink
+          <div className="pt-4 w-full overflow-x-auto">
+            <div className="min-w-[300px] whitespace-nowrap flex justify-end">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
                       href="#"
-                      isActive={p === pagination.page}
-                      onClick={() => setPagination((prev) => ({ ...prev, page: p }))}
-                    >
-                      {p}
-                    </PaginationLink>
+                      onClick={() =>
+                        setPagination((prev) => ({
+                          ...prev,
+                          page: Math.max(prev.page - 1, 1),
+                        }))
+                      }
+                    />
                   </PaginationItem>
-                ))}
-                <PaginationItem>
-                  <PaginationNext
-                    href="#"
-                    onClick={() => setPagination((prev) => ({
-                      ...prev,
-                      page: Math.min(prev.page + 1, pagination.totalPages),
-                    }))}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
+
+                  {Array.from({ length: pagination.totalPages || 1 }, (_, i) => i + 1).map((p) => (
+                    <PaginationItem key={p}>
+                      <PaginationLink
+                        href="#"
+                        isActive={p === pagination.page}
+                        onClick={() => setPagination((prev) => ({ ...prev, page: p }))}
+                      >
+                        {p}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      onClick={() =>
+                        setPagination((prev) => ({
+                          ...prev,
+                          page: Math.min(prev.page + 1, pagination.totalPages),
+                        }))
+                      }
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
           </div>
+
         </CardContent>
       </Card>
 

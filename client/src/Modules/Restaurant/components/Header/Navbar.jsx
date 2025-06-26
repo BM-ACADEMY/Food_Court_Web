@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { toast } from 'react-toastify';
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 import Pegasus from "@/assets/pegasus.png";
+
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -25,6 +27,8 @@ import axios from "axios";
 
 const RestaurantNavbar = () => {
   const { user, logout, setUser } = useAuth();
+  const navigate = useNavigate();
+
   const [openAccount, setOpenAccount] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [editData, setEditData] = useState({
@@ -46,56 +50,55 @@ const RestaurantNavbar = () => {
   }, [user]);
 
   const handleSave = async () => {
-  try {
-    if (!editData.name || !editData.email || !editData.phone) {
-      toast.error("All fields are required");
-      return;
+    try {
+      if (!editData.name || !editData.email || !editData.phone) {
+        toast.error("All fields are required");
+        return;
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(editData.email)) {
+        toast.error("Invalid email format");
+        return;
+      }
+
+      const phoneRegex = /^\d{10}$/;
+      if (!phoneRegex.test(editData.phone)) {
+        toast.error("Phone number must be 10 digits");
+        return;
+      }
+
+      const restaurantResponse = await axios.put(
+        `${import.meta.env.VITE_BASE_URL}/restaurants/update-restaurant/${user.r_id}`,
+        { restaurant_name: editData.name },
+        { withCredentials: true }
+      );
+
+      const userResponse = await axios.put(
+        `${import.meta.env.VITE_BASE_URL}/users/update-user/${user._id}`,
+        {
+          name: editData.name,
+          email: editData.email,
+          phone_number: editData.phone,
+        },
+        { withCredentials: true }
+      );
+
+      setUser({
+        ...user,
+        name: userResponse.data.data.name,
+        email: userResponse.data.data.email,
+        phone_number: userResponse.data.data.phone_number,
+        restaurant_id: restaurantResponse.data.data.restaurant_id,
+      });
+
+      setOpenAccount(false);
+      toast.success("Details updated successfully!");
+    } catch (err) {
+      console.error("Update failed:", err.response?.data || err);
+      toast.error("Update failed. Please try again.");
     }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(editData.email)) {
-      toast.error("Invalid email format");
-      return;
-    }
-
-    const phoneRegex = /^\d{10}$/;
-    if (!phoneRegex.test(editData.phone)) {
-      toast.error("Phone number must be 10 digits");
-      return;
-    }
-
-    const restaurantResponse = await axios.put(
-      `${import.meta.env.VITE_BASE_URL}/restaurants/update-restaurant/${user.r_id}`,
-      { restaurant_name: editData.name },
-      { withCredentials: true }
-    );
-
-    const userResponse = await axios.put(
-      `${import.meta.env.VITE_BASE_URL}/users/update-user/${user._id}`,
-      {
-        name: editData.name,
-        email: editData.email,
-        phone_number: editData.phone,
-      },
-      { withCredentials: true }
-    );
-
-    setUser({
-      ...user,
-      name: userResponse.data.data.name,
-      email: userResponse.data.data.email,
-      phone_number: userResponse.data.data.phone_number,
-      restaurant_id: restaurantResponse.data.data.restaurant_id,
-    });
-
-    setOpenAccount(false);
-    toast.success("Details updated successfully!");
-  } catch (err) {
-    console.error("Update failed:", err.response?.data || err);
-    toast.error("Update failed. Please try again.");
-  }
-};
-
+  };
 
   if (!user) {
     return <div className="text-white bg-[#000052] p-4">Loading...</div>;
@@ -104,8 +107,11 @@ const RestaurantNavbar = () => {
   return (
     <>
       <header className="w-full bg-[#000052] text-white px-6 py-4 flex items-center justify-between shadow-md">
+        {/* Left section: Logo & Name */}
         <div className="flex items-center gap-3">
-          <img src={Pegasus} alt="Pegasus Logo" className="w-10 h-10" />
+          <button onClick={() => navigate("/restaurant")} className="focus:outline-none">
+            <img src={Pegasus} alt="Pegasus Logo" className="w-10 h-10" />
+          </button>
           <div>
             <h1 className="text-base md:text-base font-bold tracking-wide">
               PEGASUS 2K25
@@ -141,6 +147,7 @@ const RestaurantNavbar = () => {
           </div>
         </div>
 
+        {/* Right section: Balance */}
         <div className="text-right">
           <p className="text-xs sm:text-sm md:text-sm lg:text-base font-medium text-white/70">
             Your Balance
@@ -155,6 +162,7 @@ const RestaurantNavbar = () => {
         </div>
       </header>
 
+      {/* Account Dialog */}
       <Dialog open={openAccount} onOpenChange={setOpenAccount}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -208,6 +216,7 @@ const RestaurantNavbar = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Logout Confirmation Dialog */}
       <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

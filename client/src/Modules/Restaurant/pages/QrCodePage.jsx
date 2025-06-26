@@ -1,35 +1,35 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
-import QRCode from "qrcode"; // Import qrcode package
-import { useAuth } from "@/context/AuthContext"; // Import AuthContext
+import QRCode from "qrcode";
+import { useAuth } from "@/context/AuthContext";
 import axios from "axios";
+import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
 
 const QrCodePage = () => {
-  const { user, loading } = useAuth(); // Get user and loading state from AuthContext
-  const [qrCodeImage, setQrCodeImage] = useState(null); // State for QR code image
-  const [error, setError] = useState(null); // State for error handling
+  const { user, loading } = useAuth();
+  const [qrCodeImage, setQrCodeImage] = useState(null);
+  const [error, setError] = useState(null);
+  const qrImageRef = useRef(null); // QR image reference
 
   useEffect(() => {
     if (!loading && user) {
-      // Fetch restaurant data for the logged-in user
       const fetchRestaurantQrCode = async () => {
         try {
-          // Fetch restaurant data using user_id
           const res = await axios.get(
             `${import.meta.env.VITE_BASE_URL}/restaurants/fetch-restaurant-by-id/${user.r_id}`,
             { withCredentials: true }
           );
 
-          const qrCodeData = res.data.data.qr_code; // Get qr_code from restaurant
+          const qrCodeData = res.data.data.qr_code;
           if (qrCodeData) {
-            // Generate QR code image from qr_code string
             const qrCodeUrl = await QRCode.toDataURL(qrCodeData, {
               width: 200,
               margin: 2,
             });
-            setQrCodeImage(qrCodeUrl); // Set the QR code image
+            setQrCodeImage(qrCodeUrl);
           } else {
             setError("No QR code found for this restaurant.");
           }
@@ -40,13 +40,23 @@ const QrCodePage = () => {
       };
 
       if (user.r_id) {
-        // Only fetch if user has a restaurant ID
         fetchRestaurantQrCode();
       } else {
         setError("No restaurant associated with this user.");
       }
     }
   }, [user, loading]);
+
+  const handleDownload = () => {
+    if (qrCodeImage) {
+      const link = document.createElement("a");
+      link.href = qrCodeImage;
+      link.download = "restaurant-qr-code.png";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
 
   if (loading) {
     return <div>Loading...</div>;
@@ -60,15 +70,24 @@ const QrCodePage = () => {
           {error ? (
             <p className="text-sm text-red-500">{error}</p>
           ) : qrCodeImage ? (
-            <img
-              src={qrCodeImage}
-              alt="Restaurant QR Code"
-              className="mx-auto mb-4"
-            />
+            <>
+              <img
+                ref={qrImageRef}
+                src={qrCodeImage}
+                alt="Restaurant QR Code"
+                className="mx-auto mb-4"
+              />
+              <Button onClick={handleDownload} variant="outline" className="gap-2 mt-2 cursor-pointer">
+                <Download className="h-4 w-4" />
+                Download QR Code
+              </Button>
+            </>
           ) : (
             <p className="text-sm text-gray-500">Generating QR code...</p>
           )}
-          <p className="text-sm text-gray-500">Scan this QR code to pay or view menu</p>
+          <p className="text-sm text-gray-500 mt-2">
+            Scan this QR code to pay or view menu
+          </p>
         </CardContent>
       </Card>
     </div>

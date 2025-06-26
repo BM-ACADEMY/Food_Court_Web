@@ -79,7 +79,7 @@ export default function RecentTransactions() {
                 <TableHead>AMOUNT</TableHead>
                 <TableHead>STATUS</TableHead>
                 <TableHead>PAYMENT METHOD</TableHead>
-                <TableHead>LOCATION</TableHead>
+                {/* <TableHead>LOCATION</TableHead> */}
                 <TableHead>ACTIONS</TableHead>
               </TableRow>
             </TableHeader>
@@ -87,7 +87,7 @@ export default function RecentTransactions() {
               {visibleTransactions.map((tx, index) => {
                 const member = tx.receiver_id?.name || "N/A";
                 const transactionId = tx.transaction_id;
-                const amount = `₹${parseFloat(tx.amount?.$numberDecimal || 0).toFixed(2)}`;
+                const amount = `₹${parseFloat(tx.amount || 0).toFixed(2)}`;
                 const status = tx.status;
                 const upi = tx.receiver_id?.phone_number || "—";
                 const location = tx.location_id?.name || "—";
@@ -107,9 +107,25 @@ export default function RecentTransactions() {
                       </span>
                     </TableCell>
                     <TableCell>{amount}</TableCell>
-                    <TableCell className="text-green-600">{status}</TableCell>
+                    <TableCell>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium
+      ${tx.status === "Success"
+                            ? "bg-green-100 text-green-700"
+                            : tx.status === "Pending"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : tx.status === "Failed"
+                                ? "bg-red-100 text-red-700"
+                                : "bg-gray-100 text-gray-600"
+                          }
+    `}
+                      >
+                        {status || "N/A"}
+                      </span>
+                    </TableCell>
+
                     <TableCell>{tx.payment_method || "—"}</TableCell>
-                    <TableCell>{location}</TableCell>
+                    {/* <TableCell>{location}</TableCell> */}
                     <TableCell>
                       <Button size="sm" variant="ghost" className="flex items-center gap-1">
                         <Eye className="w-4 h-4" /> View

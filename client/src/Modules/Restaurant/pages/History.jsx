@@ -27,7 +27,8 @@ import {
   Clock,
   FileText,
   FileSpreadsheet,
-  FileSignature
+  FileSignature,
+  Filter,
 } from "lucide-react";
 import {
   Dialog,
@@ -48,78 +49,140 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-
+import { useAuth } from "@/context/AuthContext";
 
 const PER_PAGE = 15;
 
-export default function TransactionDashboard() {
+export default function History() {
+  const { user } = useAuth();
   const [transactions, setTransactions] = useState([]);
+  const [currentBalance, setCurrentBalance] = useState("0.00");
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
-
+  const [error, setError] = useState(null);
   const [openDialog, setOpenDialog] = useState(false);
   const [exportFormat, setExportFormat] = useState("csv");
   const [dateFilter, setDateFilter] = useState("All Time");
+  const [typeFilter, setTypeFilter] = useState("All");
 
-  useEffect(() => {
-    const loadTransactions = async () => {
-      setIsLoading(true);
-      try {
-        const res = await axios.get("/data/transactions.json");
-        setTransactions(res.data);
-      } catch (error) {
-        console.error("Failed to load transactions:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    loadTransactions();
-  }, []);
+  // Fetch balance and transactions
+  const loadData = async () => {
+    if (!user) return;
 
-  const parseDate = (dateStr) => {
-    const [day, month, year] = dateStr.split("/").map(Number);
-    return new Date(year, month - 1, day);
+    setIsLoading(true);
+    setError(null);
+    try {
+      // Fetch balance
+      const balanceRes = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/user-balance/fetch-balance-by-id/${user._id}`,
+        { withCredentials: true }
+      );
+      setCurrentBalance(balanceRes.data.data.balance || "0.00");
+
+      // Fetch transactions
+      const txRes = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/transactions/fetch-all-transaction`,
+        { withCredentials: true }
+      );
+      const allTransactions = txRes.data.data;
+
+      // Log transactions to debug customer_id
+      console.log("Fetched transactions:", allTransactions);
+
+      // Filter transactions where user is sender or receiver
+      const userTransactions = allTransactions.filter(
+        (tx) =>
+          (tx.sender_id?._id.toString() === user._id.toString() ||
+            tx.receiver_id?._id.toString() === user._id.toString()) &&
+          tx.customer_id !== undefined // Ensure customer_id is present
+      );
+
+      console.log("Filtered user transactions:", userTransactions);
+      userTransactions.forEach((tx) =>
+        console.log(`Transaction ${tx.transaction_id}: customer_id=${tx.customer_id}`)
+      );
+
+      setTransactions(userTransactions);
+    } catch (error) {
+      console.error("Failed to load data:", error);
+      setError(error.response?.data?.message || "Failed to load transactions or balance.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
+  useEffect(() => {
+    loadData();
+  }, [user]);
+
+  // Date filtering logic
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
-  const startOfWeek = new Date(today);
-  startOfWeek.setDate(today.getDate() - today.getDay());
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
   const dateFiltered = transactions.filter((txn) => {
-    const txnDate = parseDate(txn.date);
-    if (dateFilter === "Today") return txnDate.getTime() === today.getTime();
-    if (dateFilter === "Yesterday") return txnDate.getTime() === yesterday.getTime();
-    if (dateFilter === "This Week") return txnDate >= startOfWeek && txnDate <= today;
-    if (dateFilter === "This Month") return txnDate >= startOfMonth && txnDate <= today;
+    const txnDate = new Date(txn.created_at);
+    const txnDateOnly = new Date(txnDate.getFullYear(), txnDate.getMonth(), txnDate.getDate());
+    if (dateFilter === "Today") return txnDateOnly.getTime() === today.getTime();
+    if (dateFilter === "Yesterday") return txnDateOnly.getTime() === yesterday.getTime();
     return true; // All Time
   });
 
-  const filtered = dateFiltered.filter((txn) =>
-    txn.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    txn.customerId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    txn.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    txn.amount.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    txn.status.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Type filtering logic
+  const typeFiltered = dateFiltered.filter((txn) => {
+    if (typeFilter === "All") return true;
+    return txn.transaction_type === typeFilter;
+  });
+
+  // Search filtering logic
+  const filtered = typeFiltered.filter((txn) => {
+    const customerName =
+      txn.sender_id?._id.toString() === user._id.toString()
+        ? txn.receiver_id?.name
+        : txn.sender_id?.name;
+    const customerId = txn.customer_id || "N/A";
+    return (
+      (customerName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      customerId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (txn.transaction_id || txn._id || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (txn.amount || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (txn.status || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (txn.transaction_type || "").toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  });
 
   const totalPages = Math.ceil(filtered.length / PER_PAGE);
   const paginated = filtered.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
 
+  // Export data
   const exportData = () => {
-    const data = filtered.map(({ id, customer, customerId, amount, date, time, status }) => ({
-      "Transaction ID": id,
-      Customer: customer,
-      "Customer ID": customerId,
-      Amount: amount,
-      Date: date,
-      Time: time,
-      Status: status,
-    }));
+    const data = filtered.map((txn) => {
+      const customerName =
+        txn.sender_id?._id.toString() === user._id.toString()
+          ? txn.receiver_id?.name
+          : txn.sender_id?.name;
+      const customerId = txn.customer_id || "N/A";
+      const amountPrefix = txn.sender_id?._id.toString() === user._id.toString() ? "-" : "+";
+      const dateTime = new Date(txn.created_at).toLocaleString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "numeric",
+        hour12: true,
+      });
+      return {
+        "Transaction ID": txn.transaction_id || txn._id,
+        Customer: customerName || "Unknown",
+        "Customer ID": customerId,
+        Amount: `${amountPrefix}${txn.amount}`,
+        "Date & Time": dateTime,
+        Status: txn.status,
+        Type: txn.transaction_type,
+      };
+    });
 
     if (exportFormat === "csv" || exportFormat === "excel") {
       const worksheet = XLSX.utils.json_to_sheet(data);
@@ -133,20 +196,44 @@ export default function TransactionDashboard() {
             ? "text/csv;charset=utf-8;"
             : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
-      saveAs(blob, `transactions.${fileType}`);
+      saveAs(blob, `transaction_history.${fileType}`);
     } else if (exportFormat === "pdf") {
       const doc = new jsPDF();
-      doc.text("Transaction Report", 14, 10);
+      doc.text("Transaction History Report", 14, 10);
       autoTable(doc, {
         startY: 20,
-        head: [["Transaction ID", "Customer", "Customer ID", "Amount", "Date", "Time", "Status"]],
+        head: [
+          ["Transaction ID", "Customer", "Customer ID", "Amount", "Date & Time", "Status", "Type"],
+        ],
         body: data.map((txn) => Object.values(txn)),
       });
-      doc.save("transactions.pdf");
+      doc.save("transaction_history.pdf");
     }
 
     setOpenDialog(false);
   };
+
+  // Calculate today's transactions
+  const todaysTransactions = transactions.filter((txn) => {
+    const txnDate = new Date(txn.created_at);
+    const txnDateOnly = new Date(txnDate.getFullYear(), txnDate.getMonth(), txnDate.getDate());
+    return txnDateOnly.getTime() === today.getTime();
+  }).length;
+
+  if (!user) {
+    return <div className="text-center py-8">Please log in to view your transaction history.</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-8">
+        {error}{" "}
+        <Button onClick={loadData} className="ml-2">
+          Retry
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen p-4 md:p-8 max-w-7xl mx-auto">
@@ -156,7 +243,7 @@ export default function TransactionDashboard() {
           <CardContent className="py-4 flex items-center justify-between">
             <div>
               <p className="text-gray-500 text-sm">Current Balance</p>
-              <p className="text-2xl font-semibold text-blue-900">₹10,000</p>
+              <p className="text-2xl font-semibold text-blue-900">₹{parseFloat(currentBalance).toFixed(2)}</p>
             </div>
             <div className="p-2 bg-blue-100 rounded-full">
               <Wallet className="text-blue-700" size={24} />
@@ -180,9 +267,7 @@ export default function TransactionDashboard() {
           <CardContent className="py-4 flex items-center justify-between">
             <div>
               <p className="text-gray-500 text-sm">Today's Transactions</p>
-              <p className="text-2xl font-semibold text-purple-900">
-                {transactions.filter(txn => parseDate(txn.date).getTime() === today.getTime()).length}
-              </p>
+              <p className="text-2xl font-semibold text-purple-900">{todaysTransactions}</p>
             </div>
             <div className="p-2 bg-purple-100 rounded-full">
               <Clock className="text-purple-700" size={24} />
@@ -203,9 +288,20 @@ export default function TransactionDashboard() {
             <DropdownMenuContent>
               <DropdownMenuItem onClick={() => setDateFilter("Today")}>Today</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setDateFilter("Yesterday")}>Yesterday</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setDateFilter("This Week")}>This Week</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setDateFilter("This Month")}>This Month</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setDateFilter("All Time")}>All Time</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <Filter size={16} /> Type: {typeFilter}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => setTypeFilter("All")}>All</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTypeFilter("Transfer")}>Transfer</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTypeFilter("Refund")}>Refund</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -217,7 +313,7 @@ export default function TransactionDashboard() {
                 setSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              placeholder="Search by name, ID, amount..."
+              placeholder="Search by name, customer ID, amount, type..."
               className="pl-8 text-sm"
             />
           </div>
@@ -235,31 +331,49 @@ export default function TransactionDashboard() {
             <tr>
               <th className="p-4 font-medium">Transaction ID</th>
               <th className="p-4 font-medium">Customer</th>
+              <th className="p-4 font-medium">Customer ID</th>
               <th className="p-4 font-medium">Amount</th>
               <th className="p-4 font-medium">Date & Time</th>
               <th className="p-4 font-medium">Status</th>
+              <th className="p-4 font-medium">Type</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
-              <tr><td colSpan={5} className="p-4 text-center">Loading...</td></tr>
+              <tr><td colSpan={7} className="p-4 text-center">Loading...</td></tr>
             ) : paginated.length > 0 ? (
-              paginated.map((txn, index) => (
-                <tr key={index} className="border-t hover:bg-gray-50">
-                  <td className="p-4">{txn.id}</td>
-                  <td className="p-4">
-                    <div className="font-medium">{txn.customer}</div>
-                    <div className="text-xs text-gray-500">{txn.customerId}</div>
-                  </td>
-                  <td className={`p-4 font-semibold ${txn.amount.startsWith("+") ? "text-green-600" : "text-red-600"}`}>
-                    ₹{txn.amount.replace("+", "")}
-                  </td>
-                  <td className="p-4">{txn.date} {txn.time}</td>
-                  <td className="p-4 text-green-600 font-medium">Completed</td>
-                </tr>
-              ))
+              paginated.map((txn) => {
+                const customerName =
+                  txn.sender_id?._id.toString() === user._id.toString()
+                    ? txn.receiver_id?.name || "Unknown"
+                    : txn.sender_id?.name || "Unknown";
+                const customerId = txn.customer_id || "N/A";
+                const amountPrefix = txn.sender_id?._id.toString() === user._id.toString() ? "-" : "+";
+                return (
+                  <tr key={txn._id} className="border-t hover:bg-gray-50">
+                    <td className="p-4">{txn.transaction_id || txn._id}</td>
+                    <td className="p-4">{customerName}</td>
+                    <td className="p-4 text-gray-500">{customerId}</td>
+                    <td className={`p-4 font-semibold ${amountPrefix === "+" ? "text-green-600" : "text-red-600"}`}>
+                      ₹{parseFloat(txn.amount || "0.00").toFixed(2)}
+                    </td>
+                    <td className="p-4">
+                      {new Date(txn.created_at).toLocaleString("en-US", {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "numeric",
+                        hour12: true,
+                      })}
+                    </td>
+                    <td className="p-4 text-green-600 font-medium">{txn.status || "Unknown"}</td>
+                    <td className="p-4">{txn.transaction_type || "Unknown"}</td>
+                  </tr>
+                );
+              })
             ) : (
-              <tr><td colSpan={5} className="p-4 text-center text-gray-400">No results found.</td></tr>
+              <tr><td colSpan={7} className="p-4 text-center text-gray-400">No results found.</td></tr>
             )}
           </tbody>
         </table>
@@ -278,20 +392,23 @@ export default function TransactionDashboard() {
             />
           </PaginationItem>
 
-          {Array.from({ length: totalPages }).map((_, i) => (
-            <PaginationItem key={i}>
-              <PaginationLink
-                href="#"
-                isActive={currentPage === i + 1}
-                onClick={(e) => {
-                  e.preventDefault();
-                  setCurrentPage(i + 1);
-                }}
-              >
-                {i + 1}
-              </PaginationLink>
-            </PaginationItem>
-          ))}
+          {Array.from({ length: Math.min(totalPages, 5) }).map((_, i) => {
+            const page = i + 1;
+            return (
+              <PaginationItem key={i}>
+                <PaginationLink
+                  href="#"
+                  isActive={currentPage === page}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setCurrentPage(page);
+                  }}
+                >
+                  {page}
+                </PaginationLink>
+              </PaginationItem>
+            );
+          })}
 
           {totalPages > 5 && (
             <PaginationItem>
@@ -310,13 +427,12 @@ export default function TransactionDashboard() {
           </PaginationItem>
         </PaginationContent>
       </Pagination>
-              
 
       {/* Export Dialog */}
       <Dialog open={openDialog} onOpenChange={setOpenDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-lg font-semibold">Export Transactions</DialogTitle>
+            <DialogTitle className="text-lg font-semibold">Export Transaction History</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-3">
@@ -350,7 +466,6 @@ export default function TransactionDashboard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
     </div>
   );
 }

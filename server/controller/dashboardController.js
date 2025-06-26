@@ -11,9 +11,14 @@ const { startOfDay, endOfDay, subDays } = require("date-fns");
 
 // Helper to calculate percentage difference
 const calculatePercentageDiff = (today, yesterday) => {
-  if (yesterday === 0) return today > 0 ? 100 : 0;
-  return ((today - yesterday) / yesterday) * 100;
+  if (yesterday === 0) return today > 0 ? "+100%" : "0%";
+  const diff = ((today - yesterday) / yesterday) * 100;
+  const rounded = diff.toFixed(2);
+  const sign = diff > 0 ? "+" : diff < 0 ? "-" : "";
+  return `${sign}${Math.abs(rounded)}%`;
 };
+
+
 
 exports.getDashboardStats = async (req, res) => {
   try {
