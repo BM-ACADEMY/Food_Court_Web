@@ -59,7 +59,26 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 const API_BASE_URL = import.meta.env.VITE_BASE_URL || "http://localhost:3000/api";
+const getRandomColor = () => {
+  const colors = ["#FF6B6B", "#4ECDC4", "#556270", "#C7F464", "#FFA500"];
+  return colors[Math.floor(Math.random() * colors.length)];
+};
 
+const Avatar = ({ name = "" }) => {
+  const initials =
+    name?.split(" ")[0]?.[0]?.toUpperCase() +
+    (name?.split(" ")[1]?.[0]?.toUpperCase() || "");
+  const color = getRandomColor();
+
+  return (
+    <div
+      className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
+      style={{ backgroundColor: color }}
+    >
+      {initials}
+    </div>
+  );
+};
 export default function Dashboard() {
   const [stats, setStats] = useState([]);
   const [transactions, setTransactions] = useState([]);
@@ -167,7 +186,7 @@ export default function Dashboard() {
 
   const fetchExportData = async (type) => {
     try {
-      const params= {};
+      const params = {};
       if (type === "userType" && userType !== "all") {
         params.userType = userType;
       } else if (type === "range" && startDate && endDate) {
@@ -456,11 +475,73 @@ export default function Dashboard() {
                   <TableRow key={tx.id}>
                     <TableCell>{tx.time || "N/A"}</TableCell>
                     <TableCell>#{tx.id || "N/A"}</TableCell>
-                    <TableCell>{tx.type || "N/A"}</TableCell>
-                    <TableCell>{tx.from || "Unknown"}</TableCell>
-                    <TableCell>{tx.to || "Unknown"}</TableCell>
-                    <TableCell>{tx.amount || "₹0"}</TableCell>
-                    <TableCell>{tx.status || "N/A"}</TableCell>
+                    <TableCell>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium
+      ${tx.type === "Transfer"
+                            ? "bg-blue-100 text-blue-700"
+                            : tx.type === "TopUp"
+                              ? "bg-purple-100 text-purple-700"
+                              : tx.type === "Refund"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : tx.type === "Credit"
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-gray-100 text-gray-600"
+                          }
+    `}
+                      >
+                        {tx.type || "N/A"}
+                      </span>
+                    </TableCell>
+
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Avatar name={tx.from} />
+                        <span>{tx.from || "Unknown"}</span>
+                      </div>
+                    </TableCell>
+
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Avatar name={tx.to} />
+                        <span>{tx.to || "Unknown"}</span>
+                      </div>
+                    </TableCell>
+
+                    <TableCell>
+                      <span
+                        className={`font-semibold ${tx.type === "Credit"
+                            ? "text-green-600"
+                            : tx.type === "TopUp"
+                              ? "text-purple-600"
+                              : tx.type === "Refund"
+                                ? "text-yellow-600"
+                                : tx.type === "Transfer"
+                                  ? "text-blue-600"
+                                  : "text-gray-600"
+                          }`}
+                      >
+                        {tx.amount || "₹0"}
+                      </span>
+                    </TableCell>
+
+                    <TableCell>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium
+      ${tx.status === "Success"
+                            ? "bg-green-100 text-green-700"
+                            : tx.status === "Pending"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : tx.status === "Failed"
+                                ? "bg-red-100 text-red-700"
+                                : "bg-gray-100 text-gray-600"
+                          }
+    `}
+                      >
+                        {tx.status || "N/A"}
+                      </span>
+                    </TableCell>
+
                   </TableRow>
                 ))}
               </TableBody>

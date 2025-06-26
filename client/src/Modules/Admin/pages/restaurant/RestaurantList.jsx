@@ -60,6 +60,29 @@ import autoTable from "jspdf-autotable";
 import RestaurantDetailsModal from "./RestaurantDetailsModel";
 import { toast, Bounce } from "react-toastify";
 
+
+
+const getRandomColor = () => {
+  const colors = ["#FF6B6B", "#4ECDC4", "#556270", "#C7F464", "#FFA500"];
+  return colors[Math.floor(Math.random() * colors.length)];
+};
+
+const Avatar = ({ name = "" }) => {
+  const initials = name
+    ? name.split(" ").map((word) => word[0]?.toUpperCase()).slice(0, 2).join("")
+    : "R";
+  const color = getRandomColor();
+
+  return (
+    <div
+      className="w-9 h-9 min-w-[2.25rem] rounded-full flex items-center justify-center text-white font-semibold text-sm"
+      style={{ backgroundColor: color }}
+    >
+      {initials}
+    </div>
+  );
+};
+
 export default function RestaurantList() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
@@ -224,7 +247,7 @@ export default function RestaurantList() {
       {/* Filters */}
       <div className="bg-white p-4 rounded-lg shadow-sm space-y-4">
         <div className="flex flex-col md:flex-row md:items-center gap-4">
-          <div className="relative flex flex-1/3">
+          <div className="relative flex flex-1/2">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground size-4" />
             <Input
               placeholder="Search by name or ID..."
@@ -233,10 +256,10 @@ export default function RestaurantList() {
               className="pl-9"
             />
           </div>
-          <Button className="bg-[#00004D] text-white flex items-center gap-2 flex-1/5">
+          {/* <Button className="bg-[#00004D] text-white flex items-center gap-2 flex-1/5">
             <QrCode className="size-4" />
             Scan QR Code
-          </Button>
+          </Button> */}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           {/* Status */}
@@ -403,9 +426,27 @@ export default function RestaurantList() {
                       <TableCell className="font-medium">
                         #{restaurant.id}
                       </TableCell>
-                      <TableCell>{restaurant.name}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Avatar name={restaurant.name} />
+                          <span>{restaurant.name}</span>
+                        </div>
+                      </TableCell>
+
                       {/* <TableCell>{restaurant.category}</TableCell> */}
-                      <TableCell>₹{restaurant.sales.toLocaleString()}</TableCell>
+                      <TableCell>
+                        <span
+                          className={`font-medium ${restaurant.sales > 100000
+                              ? "text-green-600"
+                              : restaurant.sales > 50000
+                                ? "text-yellow-600"
+                                : "text-red-600"
+                            }`}
+                        >
+                          ₹{restaurant.sales.toLocaleString()}
+                        </span>
+                      </TableCell>
+
                       <TableCell>
                         <Badge
                           variant="ghost"

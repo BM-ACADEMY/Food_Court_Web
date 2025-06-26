@@ -123,7 +123,7 @@ exports.getAllTransactions = async (req, res) => {
         select: "name email phone_number role_id",
         populate: { path: "role_id", select: "_id role_id name" },
       })
-      .populate("location_id", "location_name")
+      // .populate("location_id", "location_name")
       .lean();
 
     // Enrich transactions with customer_id

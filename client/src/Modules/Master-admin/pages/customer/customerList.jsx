@@ -56,7 +56,28 @@ import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import CustomerDetailsModal from "./CustomerDetailsModel"
+import moment from "moment";
 
+const getRandomColor = () => {
+  const colors = ["#FF6B6B", "#4ECDC4", "#556270", "#C7F464", "#FFA500"];
+  return colors[Math.floor(Math.random() * colors.length)];
+};
+
+const Avatar = ({ name = "" }) => {
+  const initials =
+    name?.split(" ")[0]?.[0]?.toUpperCase() +
+    (name?.split(" ")[1]?.[0]?.toUpperCase() || "");
+  const color = getRandomColor();
+
+  return (
+    <div
+      className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
+      style={{ backgroundColor: color }}
+    >
+      {initials}
+    </div>
+  );
+};
 export default function CustomerList() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
@@ -80,6 +101,7 @@ export default function CustomerList() {
   const [exportFormat, setExportFormat] = useState("xlsx");
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+
   // Fetch data from backend
   useEffect(() => {
     const fetchCustomers = async () => {
@@ -209,10 +231,10 @@ export default function CustomerList() {
               className="pl-9"
             />
           </div>
-          <Button className="bg-[#00004D] text-white flex items-center gap-2 flex-1/5">
+          {/* <Button className="bg-[#00004D] text-white flex items-center gap-2 flex-1/5">
             <QrCode className="size-4" />
             Scan QR Code
-          </Button>
+          </Button> */}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           {/* Status */}
@@ -358,9 +380,27 @@ export default function CustomerList() {
                 {paginatedCustomers?.map((customer) => (
                   <TableRow key={customer.id}>
                     <TableCell className="font-medium">#{customer.id}</TableCell>
-                    <TableCell>{customer.name}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Avatar name={customer.name} />
+                        <span className="font-medium">{customer.name}</span>
+                      </div>
+                    </TableCell>
+
                     <TableCell>{customer.phone}</TableCell>
-                    <TableCell>₹{customer.balance.toLocaleString()}</TableCell>
+                    <TableCell>
+                      <span
+                        className={`font-semibold ${customer.balance > 0
+                          ? "text-green-600"
+                          : customer.balance < 0
+                            ? "text-red-600"
+                            : "text-gray-500"
+                          }`}
+                      >
+                        ₹{customer.balance.toLocaleString()}
+                      </span>
+                    </TableCell>
+
                     <TableCell>
                       <Badge
                         variant="ghost"

@@ -81,6 +81,28 @@ export default function TreasurySubcomList() {
   const [selectedSubcom, setSelectedSubcom] = useState(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
 
+
+  const getRandomColor = () => {
+    const colors = ["#FF6B6B", "#4ECDC4", "#556270", "#C7F464", "#FFA500"];
+    return colors[Math.floor(Math.random() * colors.length)];
+  };
+
+  const Avatar = ({ name = "" }) => {
+    const initials = name
+      ? name.split(" ").map((word) => word[0]?.toUpperCase()).slice(0, 2).join("")
+      : "U";
+    const color = getRandomColor();
+
+    return (
+      <div
+        className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold"
+        style={{ backgroundColor: color }}
+      >
+        {initials}
+      </div>
+    );
+  };
+
   // Fetch data from backend
   useEffect(() => {
     const fetchTreasurySubcoms = async () => {
@@ -230,10 +252,10 @@ export default function TreasurySubcomList() {
               className="pl-9"
             />
           </div>
-          <Button className="bg-[#00004D] text-white flex items-center gap-2 flex-1/5">
+          {/* <Button className="bg-[#00004D] text-white flex items-center gap-2 flex-1/5">
             <QrCode className="size-4" />
             Scan QR Code
-          </Button>
+          </Button> */}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           <div className="flex flex-col gap-1">
@@ -376,17 +398,34 @@ export default function TreasurySubcomList() {
                   paginatedTreasurySubcoms.map((subcom) => (
                     <TableRow key={subcom.id}>
                       <TableCell className="font-medium">#{subcom.id}</TableCell>
-                      <TableCell>{subcom.name}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Avatar name={subcom.name} />
+                          <span>{subcom.name}</span>
+                        </div>
+                      </TableCell>
+
                       <TableCell>{subcom.phone}</TableCell>
-                      <TableCell>₹{subcom.balance.toLocaleString()}</TableCell>
+                      <TableCell>
+                        <span
+                          className={`font-medium ${subcom.balance > 10000
+                              ? "text-green-600"
+                              : subcom.balance > 0
+                                ? "text-yellow-600"
+                                : "text-red-600"
+                            }`}
+                        >
+                          ₹{subcom.balance.toLocaleString()}
+                        </span>
+                      </TableCell>
+
                       <TableCell>
                         <Badge
                           variant="ghost"
-                          className={`text-white ${
-                            subcom.status.toLowerCase() === "online"
-                              ? "bg-green-500"
-                              : "bg-red-500"
-                          }`}
+                          className={`text-white ${subcom.status.toLowerCase() === "online"
+                            ? "bg-green-500"
+                            : "bg-red-500"
+                            }`}
                         >
                           {subcom.status}
                         </Badge>
