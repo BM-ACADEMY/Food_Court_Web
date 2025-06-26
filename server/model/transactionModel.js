@@ -6,6 +6,8 @@ const transactionSchema = new mongoose.Schema(
     transaction_id: {
       type: String,
       unique: true,
+      index: true,
+
     },
     sender_id: {
       type: mongoose.Schema.Types.ObjectId,
@@ -18,7 +20,7 @@ const transactionSchema = new mongoose.Schema(
       required: true,
     },
     amount: {
-      type: mongoose.Schema.Types.Decimal128,
+      type: String,
       required: true,
     },
     transaction_type: {
@@ -39,10 +41,10 @@ const transactionSchema = new mongoose.Schema(
     remarks: {
       type: String,
     },
-    location_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Location",
-    },
+    // location_id: {
+    //   type: mongoose.Schema.Types.ObjectId,
+    //   ref: "Location",
+    // },
     edited_at: {
       type: Date,
     },
@@ -52,32 +54,28 @@ const transactionSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: {
-      createdAt: "created_at",
-      updatedAt: false,
-    },
+    timestamps: { createdAt: "created_at", updatedAt: false },
   }
 );
 
-// Auto-generate transaction_id like TRANX001
+
+
+// Pre-save hook to generate unique transaction_id
 transactionSchema.pre("save", async function (next) {
-  if (this.transaction_id) return next();
-
-  try {
-    const counter = await Counter.findOneAndUpdate(
-      { _id: "transaction_id" }, // ✅ fix here
-      { $inc: { seq: 1 } },
-      { new: true, upsert: true }
-    );
-
-    const paddedSeq = String(counter.seq).padStart(3, "0");
-    this.transaction_id = `TRANX${paddedSeq}`;
-    next();
-  } catch (err) {
-    next(err);
+  if (!this.transaction_id) {
+    try {
+      const counter = await Counter.findByIdAndUpdate(
+        { _id: "transaction_id" },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true }
+      );
+      this.transaction_id = `TXN${counter.seq.toString().padStart(6, "0")}`; // e.g., TXN000001
+    } catch (err) {
+      return next(err);
+    }
   }
+  next();
 });
-
 
 module.exports = mongoose.model("Transaction", transactionSchema);
 

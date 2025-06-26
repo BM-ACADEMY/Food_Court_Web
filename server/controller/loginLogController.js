@@ -3,14 +3,14 @@ const LoginLog = require("../model/loginLogModel");
 // Create login log
 exports.createLoginLog = async (req, res) => {
   try {
-    const { user_id, login_time, logout_time, location_id, device_info } = req.body;
+    const { user_id, login_time, logout_time, location_id, upi_id } = req.body;
 
     const newLog = new LoginLog({
       user_id,
       login_time,
       logout_time,
       location_id,
-      device_info,
+      upi_id,
     });
 
     await newLog.save();

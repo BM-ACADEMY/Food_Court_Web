@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import Pegasus from "@/assets/pegasus.png";
+import { toast } from 'react-toastify';
+
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -46,24 +48,29 @@ const UserDashboardHeader = () => {
   }, [user]);
 
   // Handle save for updating user details
-  const handleSave = async () => {
-    try {
-      const response = await axios.put(
-        `${import.meta.env.VITE_BASE_URL}/users/update-user/${user._id}`,
-        {
-          name: editData.name,
-          email: editData.email,
-          phone_number: editData.phone,
-        },
-        { withCredentials: true }
-      );
-      setUser(response.data.data); // Update user in AuthContext
-      setOpenAccount(false);
-      console.log("Updated user:", response.data.data);
-    } catch (err) {
-      console.error("Update failed:", err);
-    }
-  };
+const handleSave = async () => {
+  try {
+    const response = await axios.put(
+      `${import.meta.env.VITE_BASE_URL}/users/update-user/${user._id}`,
+      {
+        name: editData.name,
+        email: editData.email,
+        phone_number: editData.phone,
+      },
+      { withCredentials: true }
+    );
+
+    setUser(response.data.data); // Update user in context
+    setOpenAccount(false);
+    toast.success("Profile updated successfully!"); // ✅ Show success toast
+  } catch (err) {
+    console.error("Update failed:", err);
+    toast.error(
+      err.response?.data?.message || "Failed to update profile."
+    ); // ✅ Show error toast
+  }
+};
+
 
   // Show loading if user is not logged in
   if (!user) {
@@ -118,10 +125,7 @@ const UserDashboardHeader = () => {
           </p>
           <p className="text-base sm:text-lg md:text-lg lg:text-2xl font-semibold">
             ₹{" "}
-            {user.balance?.toLocaleString("en-IN", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            }) || "0.00"}
+            {user.balance}
           </p>
         </div>
       </header>

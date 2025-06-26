@@ -13,7 +13,19 @@ const loginLogSchema = new mongoose.Schema(
     },
     logout_time: {
       type: Date,
-    }
+    },
+    status:{
+      type:Boolean,
+      default:false,
+    },
+    location_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Location",
+    },
+    upi_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Upi",
+    },
   },
   {
     timestamps: {

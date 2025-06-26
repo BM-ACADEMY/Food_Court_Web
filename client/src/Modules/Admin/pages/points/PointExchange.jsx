@@ -1,4 +1,4 @@
-import React, { useState, useEffect,useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
     Select,
     SelectTrigger,
@@ -31,7 +31,7 @@ import AddPointForm from "./AddPointForm";
 import axios from "axios";
 import RecentTransactions from "./RecentTransactions";
 import { useAuth } from "@/context/AuthContext";
-import AddFundModalForm from "./AddFundsForm";
+import AddFundModalForm from "./AddFundForm";
 import DashboardCards from "./DashboardCards";
 
 
@@ -106,11 +106,11 @@ const PointExchange = () => {
     const [page, setPage] = useState(1);
     const [selectedReceiver, setSelectedReceiver] = useState(null);
     const [openModal, setOpenModal] = useState(false);
-      const transactionRef = useRef(null);
+    const transactionRef = useRef(null);
 
-  const scrollToTransactions = () => {
-    transactionRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+    const scrollToTransactions = () => {
+        transactionRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
     const loadMore = () => {
         setVisibleTransactions(transactions);
     };
@@ -183,9 +183,9 @@ const PointExchange = () => {
                 </div>
                 <div className="flex gap-2">
 
-                    <Button variant="secondary" className="cursor-pointer" onClick={() => setOpen(true)}>
+                    {/* <Button variant="secondary" className="cursor-pointer" onClick={() => setOpen(true)}>
                         <PiggyBank className="w-4 h-4 mr-2" /> Credit Master admin Point
-                    </Button>
+                    </Button> */}
 
                     <Button variant="outline" className="cursor-pointer" onClick={scrollToTransactions}>
                         <History className="w-4 h-4 mr-2" /> Transaction History
@@ -201,7 +201,7 @@ const PointExchange = () => {
                             </DialogHeader>
 
                             {/* You can use your form component or inline form */}
-                            <AddPointForm onSuccess={() => setOpen(false)} />
+                            {/* <AddPointForm onSuccess={() => setOpen(false)} /> */}
                         </DialogContent>
                     </Dialog>
                 </div>
@@ -209,7 +209,7 @@ const PointExchange = () => {
 
             {/* Cards */}
             <div >
-               <DashboardCards />
+                <DashboardCards />
             </div>
 
             {/* Search and Filters */}
@@ -243,13 +243,16 @@ const PointExchange = () => {
                             <SelectValue placeholder="Select Role" />
                         </SelectTrigger>
                         <SelectContent>
-                            {roles.map((role) => (
-                                <SelectItem key={role._id} value={role.role_id}>
-                                    {role.name}
-                                </SelectItem>
-                            ))}
+                            {roles
+                                .filter((role) => role.role_id === "role-3" || role.role_id === "role-2") // ✅ Only include Treasury Subcom
+                                .map((role) => (
+                                    <SelectItem key={role._id} value={role.role_id}>
+                                        {role.name}
+                                    </SelectItem>
+                                ))}
                         </SelectContent>
                     </Select>
+
 
                     <Select onValueChange={setSortBy}>
                         <SelectTrigger className="min-w-[180px]">

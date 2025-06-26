@@ -2,6 +2,7 @@ const UserBalance = require("../model/userBalanceModel");
 const Transaction = require("../model/transactionModel");
 const User=require('../model/userModel')
 const MasterAdmin=require('../model/masterAdminModel')
+const mongoose = require("mongoose");
 
 // Create or Initialize Balance for a User
 // exports.createOrUpdateBalance = async (req, res) => {
@@ -201,6 +202,7 @@ exports.createOrUpdateBalance = async (req, res) => {
   } = req.body;
 
   try {
+
     if (!user_id || isNaN(balance) || Number(balance) <= 0) {
       return res.status(400).json({ message: "Invalid data provided" });
     }
@@ -255,20 +257,29 @@ exports.createOrUpdateBalance = async (req, res) => {
       success: false,
       message: "Internal server error",
     });
-  }
 };
-
+}
 // Get Balance by User ID
 exports.getBalanceByUserId = async (req, res) => {
   const { user_id } = req.params;
 
   try {
+    if (!mongoose.isValidObjectId(user_id)) {
+      return res.status(400).json({ success: false, message: "Invalid user_id" });
+    }
+
     const balance = await UserBalance.findOne({ user_id });
 
     if (!balance) {
       return res
         .status(404)
         .json({ success: false, message: "Balance not found" });
+
+      return res.status(200).json({
+        success: true,
+        data: { user_id, balance: "0.00" },
+      });
+
     }
 
     res.status(200).json({ success: true, data: balance });
@@ -296,9 +307,13 @@ exports.deleteBalance = async (req, res) => {
   try {
     const result = await UserBalance.findByIdAndDelete(id);
     if (!result) {
+
       return res
         .status(404)
         .json({ success: false, message: "Record not found" });
+
+      return res.status(404).json({ success: false, message: "Record not found" });
+
     }
 
     res.status(200).json({ success: true, message: "User balance deleted" });
