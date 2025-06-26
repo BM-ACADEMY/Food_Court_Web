@@ -3,10 +3,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { Button } from "@/components/ui/button";
-import { QrCode, Play, Square, ScanLine } from "lucide-react";
+import { QrCode, Play, Square, ScanLine, CheckCircle2, XCircle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -16,7 +17,7 @@ import { Card } from "@/components/ui/card";
 import FoodStalls from "@/Modules/User/pages/UserDasboardpage/Foodstallsection";
 import { useAuth } from "@/context/AuthContext";
 import axios from "axios";
-import { toast } from "react-toastify";
+import { useNavigate } from "react-router-dom";
 
 const QrScanner = () => {
   const qrRef = useRef(null);
@@ -25,12 +26,34 @@ const QrScanner = () => {
   const [result, setResult] = useState("");
   const [parsedData, setParsedData] = useState({ name: "", store: "", restaurant_id: "" });
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [showResultDialog, setShowResultDialog] = useState(false);
+  const [resultMessage, setResultMessage] = useState("");
+  const [isSuccess, setIsSuccess] = useState(true);
   const [amount, setAmount] = useState("");
   const [manualQrCode, setManualQrCode] = useState("");
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    console.log("Current user:", user);
+    if (!loading && !user) {
+      setResultMessage("Please log in to make payments.");
+      setIsSuccess(false);
+      setShowResultDialog(true);
+      navigate("/login");
+    }
+  }, [user, loading, navigate]);
+
+  const isCustomer = user && user.role && user.role.role_id === "role-5";
 
   const startScanner = async () => {
+    if (!isCustomer) {
+      setResultMessage(user ? "Only customers can make payments." : "Please log in to make payments.");
+      setIsSuccess(false);
+      setShowResultDialog(true);
+      return;
+    }
+
     const html5QrCode = new Html5Qrcode("qr-reader");
     html5QrCodeRef.current = html5QrCode;
 
@@ -49,7 +72,9 @@ const QrScanner = () => {
       setScanning(true);
     } catch (err) {
       console.error("Camera start failed:", err);
-      toast.error("Failed to start camera");
+      setResultMessage("Failed to start camera.");
+      setIsSuccess(false);
+      setShowResultDialog(true);
     }
   };
 
@@ -80,36 +105,54 @@ const QrScanner = () => {
       });
       setShowPaymentDialog(true);
     } catch (err) {
-      toast.error(err.response?.data?.message || "Invalid QR code or restaurant not found");
+      setResultMessage(err.response?.data?.message || "Invalid QR code or restaurant not found.");
+      setIsSuccess(false);
+      setShowResultDialog(true);
     }
   };
 
   const handleManualQrSubmit = async () => {
+    if (!isCustomer) {
+      setResultMessage(user ? "Only customers can make payments." : "Please log in to make payments.");
+      setIsSuccess(false);
+      setShowResultDialog(true);
+      return;
+    }
+
     if (manualQrCode.trim()) {
       await validateQrCode(manualQrCode);
     } else {
-      toast.error("Please enter a QR code");
+      setResultMessage("Please enter a valid QR code.");
+      setIsSuccess(false);
+      setShowResultDialog(true);
     }
   };
 
   const handlePaymentSubmit = async () => {
-    if (!user || !user._id) {
-      toast.error("Please log in to make a payment");
+    console.log("handlePaymentSubmit - user:", user, "sender_id:", user?._id);
+    if (!isCustomer || !user?._id) {
+      setResultMessage(user ? "Only customers can make payments." : "Please log in to make payments.");
+      setIsSuccess(false);
+      setShowResultDialog(true);
+      navigate("/login");
       return;
     }
 
     if (amount.trim() === "" || parseFloat(amount) <= 0) {
-      toast.error("Please enter a valid amount");
+      setResultMessage("Please enter a valid amount greater than 0.");
+      setIsSuccess(false);
+      setShowResultDialog(true);
       return;
     }
 
     if (!parsedData.restaurant_id) {
-      toast.error("Invalid restaurant selected");
+      setResultMessage("Invalid restaurant selected.");
+      setIsSuccess(false);
+      setShowResultDialog(true);
       return;
     }
 
     try {
-      // Check customer balance
       const balanceResponse = await axios.get(
         `${import.meta.env.VITE_BASE_URL}/user-balance/fetch-balance-by-id/${user._id}`,
         { withCredentials: true }
@@ -117,17 +160,18 @@ const QrScanner = () => {
       const currentBalance = parseFloat(balanceResponse.data.data.balance || "0.00");
       const paymentAmount = parseFloat(amount);
       if (currentBalance < paymentAmount) {
-        toast.error("Insufficient balance");
+        setResultMessage(`Insufficient balance. Current balance: ₹${currentBalance.toFixed(2)}`);
+        setIsSuccess(false);
+        setShowResultDialog(true);
         return;
       }
 
-      // Create transaction
       const transactionResponse = await axios.post(
         `${import.meta.env.VITE_BASE_URL}/transactions/create-transaction`,
         {
           sender_id: user._id,
           receiver_id: parsedData.restaurant_id,
-          amount: paymentAmount.toFixed(2), // String with two decimal places
+          amount: paymentAmount.toFixed(2),
           transaction_type: "Transfer",
           payment_method: "Gpay",
           status: "Success",
@@ -136,7 +180,6 @@ const QrScanner = () => {
         { withCredentials: true }
       );
 
-      // Update customer balance
       await axios.post(
         `${import.meta.env.VITE_BASE_URL}/user-balance/create-or-update-balance`,
         {
@@ -146,7 +189,6 @@ const QrScanner = () => {
         { withCredentials: true }
       );
 
-      // Update restaurant balance
       const restaurantBalanceResponse = await axios.get(
         `${import.meta.env.VITE_BASE_URL}/user-balance/fetch-balance-by-id/${parsedData.restaurant_id}`,
         { withCredentials: true }
@@ -162,17 +204,28 @@ const QrScanner = () => {
       );
 
       setShowPaymentDialog(false);
-      setShowSuccessDialog(true);
+      setResultMessage(`Payment of ₹${paymentAmount.toFixed(2)} to ${parsedData.store} completed successfully!`);
+      setIsSuccess(true);
+      setShowResultDialog(true);
       setManualQrCode("");
       setAmount("");
-      toast.success("Payment completed successfully!");
     } catch (err) {
       console.error("Payment failed:", err.response?.data || err.message);
-      toast.error(err.response?.data?.message || "Payment failed. Please try again.");
+      setResultMessage(err.response?.data?.message || "Payment failed. Please try again.");
+      setIsSuccess(false);
+      setShowResultDialog(true);
     }
   };
 
   const handleManualPayNow = ({ name, store, result, restaurant_id }) => {
+    if (!isCustomer) {
+      setResultMessage(user ? "Only customers can make payments." : "Please log in to make payments.");
+      setIsSuccess(false);
+      setShowResultDialog(true);
+      navigate("/login");
+      return;
+    }
+
     setParsedData({ name, store, restaurant_id });
     setResult(result);
     setShowPaymentDialog(true);
@@ -181,6 +234,10 @@ const QrScanner = () => {
   useEffect(() => {
     return () => stopScanner();
   }, []);
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <>
@@ -212,10 +269,12 @@ const QrScanner = () => {
                   onChange={(e) => setManualQrCode(e.target.value)}
                   placeholder="Enter QR Code"
                   className="text-sm mb-2"
+                  disabled={!isCustomer}
                 />
                 <Button
                   onClick={handleManualQrSubmit}
                   className="w-full bg-[#000066] hover:bg-[#000080] text-white text-sm"
+                  disabled={!isCustomer}
                 >
                   Validate QR Code
                 </Button>
@@ -227,6 +286,7 @@ const QrScanner = () => {
                 <Button
                   onClick={startScanner}
                   className="bg-[#000066] hover:bg-[#000080] text-white text-sm flex items-center gap-2"
+                  disabled={!isCustomer}
                 >
                   <Play className="w-4 h-4" />
                   Start Scanner
@@ -269,14 +329,16 @@ const QrScanner = () => {
           </div>
         </div>
 
-        {/* Payment Dialog */}
         <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
-          <DialogContent>
+          <DialogContent className="max-w-[90vw] sm:max-w-lg md:max-w-xl lg:max-w-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Complete Payment</DialogTitle>
+              <DialogTitle className="text-lg sm:text-xl md:text-2xl">Complete Payment</DialogTitle>
+              <DialogDescription className="text-sm sm:text-base">
+                Enter the payment amount and confirm details.
+              </DialogDescription>
             </DialogHeader>
 
-            <div className="bg-[#f4f6ff] border text-sm text-gray-700 px-4 py-2 rounded mb-4 space-y-1">
+            <div className="bg-[#f4f6ff] border text-sm sm:text-base text-gray-700 px-4 py-2 rounded mb-4 space-y-1">
               {parsedData.name && (
                 <p>
                   <span className="font-medium text-[#00004d]">Name:</span>{" "}
@@ -296,21 +358,29 @@ const QrScanner = () => {
             </div>
 
             <div className="flex flex-col gap-4">
-              <label className="text-sm text-gray-600">Amount (₹)</label>
+              <label className="text-sm sm:text-base text-gray-600">Amount (₹)</label>
               <Input
                 type="number"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                placeholder="₹ Enter amount"
+                placeholder="amount"
                 step="0.01"
                 min="0.01"
+                className="text-sm sm:text-base"
               />
             </div>
 
-            <DialogFooter className="mt-4 flex justify-end">
+            <DialogFooter>
+              <Button
+                onClick={() => setShowPaymentDialog(false)}
+                className="bg-gray-500 hover:bg-gray-600 text-sm sm:text-base"
+              >
+                Cancel
+              </Button>
               <Button
                 onClick={handlePaymentSubmit}
-                className="bg-[#000066] text-white"
+                className="bg-[#000066] hover:bg-[#000080] text-white text-sm sm:text-base"
+                disabled={!isCustomer || !amount}
               >
                 Pay Now
               </Button>
@@ -318,42 +388,50 @@ const QrScanner = () => {
           </DialogContent>
         </Dialog>
 
-        {/* Success Dialog */}
-        <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
-          <DialogContent>
+        <Dialog open={showResultDialog} onOpenChange={setShowResultDialog}>
+          <DialogContent className="max-w-[90vw] sm:max-w-lg md:max-w-md lg:max-w-lg max-h-[80vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Payment Successful</DialogTitle>
+              <div className={`flex items-center gap-3 ${isSuccess ? 'text-green-600' : 'text-red-600'}`}>
+                {isSuccess ? (
+                  <CheckCircle2 className="w-6 h-6" />
+                ) : (
+                  <XCircle className="w-6 h-6" />
+                )}
+                <DialogTitle className="text-lg sm:text-xl md:text-2xl">
+                  {isSuccess ? "Payment Successful" : "Payment Failed"}
+                </DialogTitle>
+              </div>
+              <DialogDescription className="text-sm sm:text-base">
+                {isSuccess ? "Your transaction was completed successfully." : "Please try again or contact support."}
+              </DialogDescription>
             </DialogHeader>
-
-            <div className="bg-[#e6ffef] border text-sm text-green-700 px-4 py-2 rounded mb-3 space-y-1">
-              {parsedData.name && (
-                <p>
-                  <span className="font-medium text-green-900">Name:</span>{" "}
-                  {parsedData.name}
-                </p>
+            <div className="flex flex-col items-center text-center gap-4 py-4">
+              {isSuccess ? (
+                <>
+                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                    <CheckCircle2 className="w-10 h-10 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-gray-700 font-medium text-sm sm:text-base">{resultMessage}</p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+                    <XCircle className="w-10 h-10 text-red-600" />
+                  </div>
+                  <div>
+                    <p className="text-gray-700 font-medium text-sm sm:text-base">{resultMessage}</p>
+                  </div>
+                </>
               )}
-              {parsedData.store && (
-                <p>
-                  <span className="font-medium text-green-900">Store:</span>{" "}
-                  {parsedData.store}
-                </p>
-              )}
-              <p>
-                <span className="font-medium text-green-900">QR Code:</span>{" "}
-                {result.length > 50 ? result.slice(0, 50) + "..." : result}
-              </p>
             </div>
-
-            <p className="text-green-600 text-center font-semibold">
-              ₹{amount} paid successfully!
-            </p>
-
-            <DialogFooter className="mt-4 flex justify-end">
+            <DialogFooter>
               <Button
-                onClick={() => setShowSuccessDialog(false)}
-                variant="outline"
+                onClick={() => setShowResultDialog(false)}
+                className={`w-full ${isSuccess ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'} text-sm sm:text-base`}
               >
-                Done
+                {isSuccess ? 'Continue' : 'Close'}
               </Button>
             </DialogFooter>
           </DialogContent>

@@ -9,13 +9,15 @@ const UserBalanceSchema = new mongoose.Schema(
       unique: true,
     },
     balance: {
-      type: String,
+      type: mongoose.Schema.Types.Decimal128, 
       required: true,
       default: "0.00",
+      get: (v) => parseFloat(v).toFixed(2),
     },
   },
   {
     timestamps: { createdAt: "created_at", updatedAt: "updated_at" },
+    toJSON: { getters: true }, // Ensure getters are applied when converting to JSON
   }
 );
 

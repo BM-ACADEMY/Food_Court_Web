@@ -1,9 +1,9 @@
 const Transaction = require("../model/transactionModel");
 const User = require("../model/userModel");
-const Customer = require("../model/customerModel");
+const UserBalance = require("../model/userBalanceModel");
 const mongoose = require("mongoose");
+const Customer = require("../model/customerModel");
 
-// Create Transaction
 exports.createTransaction = async (req, res) => {
   try {
     const {
@@ -17,7 +17,7 @@ exports.createTransaction = async (req, res) => {
       location_id,
     } = req.body;
 
-    console.log("Create Transaction Request:", req.body);
+    console.log("createTransaction - Request body:", req.body);
 
     // Validate ObjectIds
     if (!mongoose.Types.ObjectId.isValid(sender_id)) {
@@ -38,8 +38,9 @@ exports.createTransaction = async (req, res) => {
     }
 
     // Validate roles based on transaction type
-    const senderRoleId = sender.role_id?._id.toString();
-    const receiverRoleId = receiver.role_id?._id.toString();
+    const senderRoleId = sender.role_id?.role_id;
+    const receiverRoleId = receiver.role_id?.role_id;
+    console.log("createTransaction - senderRoleId:", senderRoleId, "receiverRoleId:", receiverRoleId);
     if (transaction_type === "Transfer") {
       if (senderRoleId !== "role-5") {
         return res.status(400).json({ success: false, message: "Sender must be a customer (role-5)" });
@@ -91,7 +92,6 @@ exports.createTransaction = async (req, res) => {
       status,
       remarks,
       location_id,
-      transaction_id: `TXN-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
     });
 
     await transaction.save();
@@ -103,156 +103,196 @@ exports.createTransaction = async (req, res) => {
   }
 };
 
-// Get all transactions
 exports.getAllTransactions = async (req, res) => {
   try {
-    // Fetch all transactions with populated fields
-    let transactions = await Transaction.find()
+    const transactions = await Transaction.find()
+     .sort({ created_at: -1 }) 
       .populate({
         path: "sender_id",
-        select: "name phone_number role_id",
-        populate: { path: "role_id", select: "_id role_id" },
+        select: "name email phone_number role_id",
+        populate: { path: "role_id", select: "_id role_id name" },
       })
       .populate({
         path: "receiver_id",
-        select: "name phone_number role_id",
-        populate: { path: "role_id", select: "_id role_id" },
+        select: "name email phone_number role_id",
+        populate: { path: "role_id", select: "_id role_id name" },
       })
-      .populate("location_id", "name")
-      .populate("edited_by_id", "name");
+      .populate("location_id", "location_name")
+      .lean();
 
-    // Fetch all customers to map user_id to customer_id
-    const customers = await Customer.find().select("user_id customer_id");
-    const customerMap = new Map(customers.map((c) => [c.user_id.toString(), c.customer_id]));
-
-    // Filter out invalid transactions and add customer_id
-    transactions = transactions
-      .filter((txn) => {
-        if (!txn.sender_id || !txn.receiver_id) {
-          console.warn(`Transaction ${txn._id} has invalid sender_id or receiver_id`);
-          return false;
-        }
-        return true;
-      })
-      .map((txn) => {
+    // Enrich transactions with customer_id
+    const enrichedTransactions = await Promise.all(
+      transactions.map(async (transaction) => {
         let customer_id = null;
         let customerUserId = null;
 
-        // Determine customer (role-5) user
-        const senderRoleId = txn.sender_id.role_id?.role_id;
-        const receiverRoleId = txn.receiver_id.role_id?.role_id;
-        if (senderRoleId === "role-5") {
-          customerUserId = txn.sender_id._id.toString();
-        } else if (receiverRoleId === "role-5") {
-          customerUserId = txn.receiver_id._id.toString();
+        const senderRole = transaction.sender_id?.role_id?.role_id;
+        const receiverRole = transaction.receiver_id?.role_id?.role_id;
+
+        console.log(
+          `Transaction ${transaction.transaction_id}: senderRole=${senderRole}, receiverRole=${receiverRole}`
+        );
+
+        if (senderRole === "role-5") {
+          customerUserId = transaction.sender_id._id;
+        } else if (receiverRole === "role-5") {
+          customerUserId = transaction.receiver_id._id;
         }
 
-        // Get customer_id from map
         if (customerUserId) {
-          customer_id = customerMap.get(customerUserId) || null;
-          if (!customer_id) {
-            console.warn(`No customer_id found for user ${customerUserId} in transaction ${txn._id}`);
-          }
+          const customer = await Customer.findOne({ user_id: customerUserId }).select("customer_id").lean();
+          customer_id = customer?.customer_id || "N/A";
+          console.log(
+            `Transaction ${transaction.transaction_id}: customerUserId=${customerUserId}, customer_id=${customer_id}`
+          );
+        } else {
+          console.log(`Transaction ${transaction.transaction_id}: No customer involved`);
+          customer_id = "N/A";
         }
 
         return {
-          ...txn.toObject(),
+          ...transaction,
           customer_id,
         };
-      });
+      })
+    );
 
-    res.status(200).json({ success: true, data: transactions });
+    console.log("Enriched transactions count:", enrichedTransactions.length);
+    res.status(200).json({ success: true, data: enrichedTransactions });
   } catch (err) {
-    console.error("Error fetching transactions:", err.message, err.stack);
-    res.status(500).json({ success: false, message: "Failed to fetch transactions" });
+    console.error("Fetch all transactions error:", err.message, err.stack);
+    res.status(400).json({ success: false, message: err.message || "Failed to fetch transactions" });
   }
 };
 
-// Get transaction by ID
 exports.getTransactionById = async (req, res) => {
   try {
-    const transaction = await Transaction.findById(req.params.id)
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid transaction ID format" });
+    }
+    const transaction = await Transaction.findById(id)
       .populate({
         path: "sender_id",
         select: "name phone_number role_id",
-        populate: { path: "role_id", select: "_id role_id" },
+        populate: { path: "role_id", select: "_id role_id name" },
       })
       .populate({
         path: "receiver_id",
         select: "name phone_number role_id",
-        populate: { path: "role_id", select: "_id role_id" },
+        populate: { path: "role_id", select: "_id role_id name" },
       })
-      .populate("location_id", "name")
-      .populate("edited_by_id", "name");
+      .populate("location_id", "location_name")
+      .populate("edited_by_id", "name")
+      .lean();
 
     if (!transaction) {
       return res.status(404).json({ success: false, message: "Transaction not found" });
     }
 
-    // Fetch customer_id
     let customer_id = null;
-    const customers = await Customer.find().select("user_id customer_id");
-    const customerMap = new Map(customers.map((c) => [c.user_id.toString(), c.customer_id]));
-    if (transaction.sender_id && transaction.receiver_id) {
-      const senderRoleId = transaction.sender_id.role_id?.role_id;
-      const receiverRoleId = transaction.receiver_id.role_id?.role_id;
-      let customerUserId = null;
-      if (senderRoleId === "role-5") {
-        customerUserId = transaction.sender_id._id.toString();
-      } else if (receiverRoleId === "role-5") {
-        customerUserId = transaction.receiver_id._id.toString();
-      }
-      if (customerUserId) {
-        customer_id = customerMap.get(customerUserId) || null;
-        if (!customer_id) {
-          console.warn(`No customer_id found for user ${customerUserId} in transaction ${transaction._id}`);
-        }
-      }
+    let customerUserId = null;
+
+    const senderRole = transaction.sender_id?.role_id?.role_id;
+    const receiverRole = transaction.receiver_id?.role_id?.role_id;
+
+    if (senderRole === "role-5") {
+      customerUserId = transaction.sender_id._id;
+    } else if (receiverRole === "role-5") {
+      customerUserId = transaction.receiver_id._id;
     }
 
-    res.status(200).json({ success: true, data: { ...transaction.toObject(), customer_id } });
+    if (customerUserId) {
+      const customer = await Customer.findOne({ user_id: customerUserId }).select("customer_id").lean();
+      customer_id = customer?.customer_id || "N/A";
+    } else {
+      customer_id = "N/A";
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        ...transaction,
+        customer_id,
+      },
+    });
   } catch (err) {
-    console.error("Error fetching transaction:", err.message, err.stack);
-    res.status(500).json({ success: false, message: "Failed to fetch transaction" });
+    console.error("Fetch transaction by ID error:", err.message, err.stack);
+    res.status(400).json({ success: false, message: err.message || "Failed to fetch transaction" });
   }
 };
 
-// Update transaction
 exports.updateTransaction = async (req, res) => {
   try {
-    const updateData = {
-      ...req.body,
-      edited_at: new Date(),
-    };
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid transaction ID format" });
+    }
+    const updates = req.body;
+    const validUpdates = ["amount", "transaction_type", "payment_method", "status", "remarks", "location_id"];
+    const isValidUpdate = Object.keys(updates).every((update) => validUpdates.includes(update));
+    if (!isValidUpdate) {
+      return res.status(400).json({ success: false, message: "Invalid update fields" });
+    }
 
-    const updated = await Transaction.findByIdAndUpdate(req.params.id, updateData, {
+    const transaction = await Transaction.findByIdAndUpdate(id, updates, {
       new: true,
-    });
+      runValidators: true,
+    })
+      .populate("sender_id", "name email phone_number")
+      .populate("receiver_id", "name email phone_number")
+      .populate("location_id", "location_name")
+      .lean();
 
-    if (!updated) {
+    if (!transaction) {
       return res.status(404).json({ success: false, message: "Transaction not found" });
     }
 
-    console.log(`Transaction updated: ${updated._id} - ${updated.transaction_id}`);
-    res.status(200).json({ success: true, data: updated });
+    let customer_id = null;
+    let customerUserId = null;
+
+    const senderRole = transaction.sender_id?.role_id?.role_id;
+    const receiverRole = transaction.receiver_id?.role_id?.role_id;
+
+    if (senderRole === "role-5") {
+      customerUserId = transaction.sender_id._id;
+    } else if (receiverRole === "role-5") {
+      customerUserId = transaction.receiver_id._id;
+    }
+
+    if (customerUserId) {
+      const customer = await Customer.findOne({ user_id: customerUserId }).select("customer_id").lean();
+      customer_id = customer?.customer_id || "N/A";
+    } else {
+      customer_id = "N/A";
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        ...transaction,
+        customer_id,
+      },
+    });
   } catch (err) {
-    console.error("Error updating transaction:", err.message, err.stack);
-    res.status(400).json({ success: false, message: "Failed to update transaction" });
+    console.error("Update transaction error:", err.message, err.stack);
+    res.status(400).json({ success: false, message: err.message || "Failed to update transaction" });
   }
 };
 
-// Delete transaction
 exports.deleteTransaction = async (req, res) => {
   try {
-    const deleted = await Transaction.findByIdAndDelete(req.params.id);
-    if (!deleted) {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid transaction ID format" });
+    }
+    const transaction = await Transaction.findByIdAndDelete(id);
+    if (!transaction) {
       return res.status(404).json({ success: false, message: "Transaction not found" });
     }
-
-    console.log(`Transaction deleted: ${req.params.id}`);
     res.status(200).json({ success: true, message: "Transaction deleted successfully" });
   } catch (err) {
-    console.error("Error deleting transaction:", err.message, err.stack);
-    res.status(500).json({ success: false, message: "Failed to delete transaction" });
+    console.error("Delete transaction error:", err.message, err.stack);
+    res.status(400).json({ success: false, message: err.message || "Failed to delete transaction" });
   }
 };

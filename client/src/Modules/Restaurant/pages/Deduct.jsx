@@ -269,21 +269,21 @@ export default function Deduct() {
             </div>
 
             <div className="mt-4 w-full max-w-sm">
-              <Label htmlFor="manualQrCode" className="text-sm">
+              <Label htmlFor="manualQrCode" className="text-sm sm:text-base">
                 Enter QR Code Manually
               </Label>
               <div className="flex items-center gap-2">
                 <Input
                   id="manualQrCode"
                   type="text"
-                  className="h-8 px-3 text-sm"
+                  className="h-8 px-3 text-sm sm:text-base"
                   placeholder="Enter customer QR code"
                   value={manualQrCode}
                   onChange={e => setManualQrCode(e.target.value)}
                 />
                 <Button
                   onClick={handleManualQrSubmit}
-                  className="bg-[#000052] hover:bg-[#000052cb] text-white text-sm"
+                  className="bg-[#000052] hover:bg-[#000052cb] text-white text-sm sm:text-base"
                 >
                   Submit QR
                 </Button>
@@ -294,7 +294,7 @@ export default function Deduct() {
               {!scanning ? (
                 <Button
                   onClick={startScanner}
-                  className="bg-[#000052] hover:bg-[#000052cb] text-white text-sm flex items-center gap-2"
+                  className="bg-[#000052] hover:bg-[#000052cb] text-white text-sm sm:text-base flex items-center gap-2"
                 >
                   <Play className="w-4 h-4" />
                   Start Scanner
@@ -302,7 +302,7 @@ export default function Deduct() {
               ) : (
                 <Button
                   onClick={stopScanner}
-                  className="bg-red-600 hover:bg-red-700 text-white text-sm flex items-center gap-2"
+                  className="bg-red-600 hover:bg-red-700 text-white text-sm sm:text-base flex items-center gap-2"
                 >
                   <Square className="w-4 h-4" />
                   Stop Scanner
@@ -314,41 +314,41 @@ export default function Deduct() {
           <div className="flex-1">
             <Card className="h-full">
               <CardHeader>
-                <CardTitle>Customer Details</CardTitle>
-                <CardDescription>
+                <CardTitle className="text-lg sm:text-xl md:text-2xl">Customer Details</CardTitle>
+                <CardDescription className="text-sm sm:text-base">
                   Scan or enter QR to fetch customer details and deduct points.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="mb-6 flex justify-between items-center">
                   <div>
-                    <p className="font-semibold text-lg">
+                    <p className="font-semibold text-lg sm:text-xl [color:#000052]">
                       Name: {customer.name || "Not scanned"}
                     </p>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm sm:text-base text-gray-500">
                       Customer ID: {customer.customer_id || "Not scanned"}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm text-gray-500">Balance</p>
-                    <p className="text-xl font-bold text-blue-700">
+                    <p className="text-sm sm:text-base text-gray-500">Balance</p>
+                    <p className="text-xl sm:text-2xl font-bold text-blue-700">
                       ₹{customer.balance.toFixed(2)}
                     </p>
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="deductAmount" className="text-sm">
+                  <Label htmlFor="deductAmount" className="text-sm sm:text-base">
                     Deduct Points
                   </Label>
                   <div className="flex items-center gap-2">
-                    <span className="text-base pt-1">₹</span>
+                    <span className="text-base sm:text-lg pt-1">₹</span>
                     <Input
                       id="deductAmount"
                       type="number"
                       min="0"
                       step="0.01"
-                      className="h-8 px-3 text-sm"
+                      className="h-8 px-3 text-sm sm:text-base"
                       placeholder="Amount to deduct"
                       value={amount}
                       onChange={e => setAmount(e.target.value)}
@@ -358,7 +358,7 @@ export default function Deduct() {
                   <Button
                     onClick={handleDeduct}
                     disabled={!customer.id || !amount}
-                    className="w-full mt-2 h-8 px-3 py-1 text-xs bg-[#1a2f87] text-white"
+                    className="w-full mt-2 h-8 px-3 py-1 text-xs sm:text-sm bg-[#1a2f87] text-white"
                   >
                     Deduct Points
                   </Button>
@@ -370,7 +370,7 @@ export default function Deduct() {
       </Card>
 
       <Dialog open={showResultDialog} onOpenChange={setShowResultDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-[90vw] sm:max-w-lg md:max-w-md lg:max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <div className={`flex items-center gap-3 ${isSuccess ? 'text-green-600' : 'text-red-600'}`}>
               {isSuccess ? (
@@ -378,7 +378,7 @@ export default function Deduct() {
               ) : (
                 <XCircle className="w-6 h-6" />
               )}
-              <DialogTitle className="text-lg">
+              <DialogTitle className="text-lg sm:text-xl md:text-2xl">
                 {isSuccess ? "Payment Successful" : "Payment Failed"}
               </DialogTitle>
             </div>
@@ -390,8 +390,8 @@ export default function Deduct() {
                   <CheckCircle2 className="w-10 h-10 text-green-600" />
                 </div>
                 <div>
-                  <p className="text-gray-700 font-medium">{resultMessage}</p>
-                  <p className="text-sm text-gray-500 mt-2">
+                  <p className="text-gray-700 font-medium text-sm sm:text-base">{resultMessage}</p>
+                  <p className="text-sm sm:text-base text-gray-500 mt-2">
                     Transaction completed successfully
                   </p>
                 </div>
@@ -402,8 +402,8 @@ export default function Deduct() {
                   <AlertCircle className="w-10 h-10 text-red-600" />
                 </div>
                 <div>
-                  <p className="text-gray-700 font-medium">{resultMessage}</p>
-                  <p className="text-sm text-gray-500 mt-2">
+                  <p className="text-gray-700 font-medium text-sm sm:text-base">{resultMessage}</p>
+                  <p className="text-sm sm:text-base text-gray-500 mt-2">
                     Please try again or contact support
                   </p>
                 </div>
@@ -413,7 +413,7 @@ export default function Deduct() {
           <DialogFooter>
             <Button
               onClick={() => setShowResultDialog(false)}
-              className={`w-full ${isSuccess ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
+              className={`w-full ${isSuccess ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'} text-sm sm:text-base`}
             >
               {isSuccess ? 'Continue' : 'Try Again'}
             </Button>

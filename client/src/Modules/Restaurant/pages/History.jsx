@@ -53,7 +53,7 @@ import { useAuth } from "@/context/AuthContext";
 
 const PER_PAGE = 15;
 
-export default function TransactionDashboard() {
+export default function History() {
   const { user } = useAuth();
   const [transactions, setTransactions] = useState([]);
   const [currentBalance, setCurrentBalance] = useState("0.00");
@@ -87,11 +87,21 @@ export default function TransactionDashboard() {
       );
       const allTransactions = txRes.data.data;
 
+      // Log transactions to debug customer_id
+      console.log("Fetched transactions:", allTransactions);
+
       // Filter transactions where user is sender or receiver
       const userTransactions = allTransactions.filter(
-        (tx) => tx.sender_id?._id === user._id || tx.receiver_id?._id === user._id
+        (tx) =>
+          (tx.sender_id?._id.toString() === user._id.toString() ||
+            tx.receiver_id?._id.toString() === user._id.toString()) &&
+          tx.customer_id !== undefined // Ensure customer_id is present
       );
-      console.log("User Transactions:", userTransactions);
+
+      console.log("Filtered user transactions:", userTransactions);
+      userTransactions.forEach((tx) =>
+        console.log(`Transaction ${tx.transaction_id}: customer_id=${tx.customer_id}`)
+      );
 
       setTransactions(userTransactions);
     } catch (error) {
@@ -111,9 +121,6 @@ export default function TransactionDashboard() {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
-  const startOfWeek = new Date(today);
-  startOfWeek.setDate(today.getDate() - today.getDay());
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
   const dateFiltered = transactions.filter((txn) => {
     const txnDate = new Date(txn.created_at);
@@ -132,12 +139,14 @@ export default function TransactionDashboard() {
   // Search filtering logic
   const filtered = typeFiltered.filter((txn) => {
     const customerName =
-      txn.sender_id?._id === user._id ? txn.receiver_id?.name : txn.sender_id?.name;
-    const customerId = txn.customer_id || "";
+      txn.sender_id?._id.toString() === user._id.toString()
+        ? txn.receiver_id?.name
+        : txn.sender_id?.name;
+    const customerId = txn.customer_id || "N/A";
     return (
       (customerName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       customerId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (txn.transaction_id || txn._id).toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (txn.transaction_id || txn._id || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (txn.amount || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (txn.status || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (txn.transaction_type || "").toLowerCase().includes(searchQuery.toLowerCase())
@@ -151,9 +160,11 @@ export default function TransactionDashboard() {
   const exportData = () => {
     const data = filtered.map((txn) => {
       const customerName =
-        txn.sender_id?._id === user._id ? txn.receiver_id?.name : txn.sender_id?.name;
+        txn.sender_id?._id.toString() === user._id.toString()
+          ? txn.receiver_id?.name
+          : txn.sender_id?.name;
       const customerId = txn.customer_id || "N/A";
-      const amountPrefix = txn.sender_id?._id === user._id ? "-" : "+";
+      const amountPrefix = txn.sender_id?._id.toString() === user._id.toString() ? "-" : "+";
       const dateTime = new Date(txn.created_at).toLocaleString("en-US", {
         year: "numeric",
         month: "short",
@@ -185,10 +196,10 @@ export default function TransactionDashboard() {
             ? "text/csv;charset=utf-8;"
             : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
-      saveAs(blob, `transactions.${fileType}`);
+      saveAs(blob, `transaction_history.${fileType}`);
     } else if (exportFormat === "pdf") {
       const doc = new jsPDF();
-      doc.text("Transaction Report", 14, 10);
+      doc.text("Transaction History Report", 14, 10);
       autoTable(doc, {
         startY: 20,
         head: [
@@ -196,7 +207,7 @@ export default function TransactionDashboard() {
         ],
         body: data.map((txn) => Object.values(txn)),
       });
-      doc.save("transactions.pdf");
+      doc.save("transaction_history.pdf");
     }
 
     setOpenDialog(false);
@@ -210,7 +221,7 @@ export default function TransactionDashboard() {
   }).length;
 
   if (!user) {
-    return <div className="text-center py-8">Please log in to view your transaction dashboard.</div>;
+    return <div className="text-center py-8">Please log in to view your transaction history.</div>;
   }
 
   if (error) {
@@ -290,7 +301,6 @@ export default function TransactionDashboard() {
             <DropdownMenuContent>
               <DropdownMenuItem onClick={() => setTypeFilter("All")}>All</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setTypeFilter("Transfer")}>Transfer</DropdownMenuItem>
-              {/* <DropdownMenuItem onClick={() => setTypeFilter("TopUp")}>TopUp</DropdownMenuItem> */}
               <DropdownMenuItem onClick={() => setTypeFilter("Refund")}>Refund</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -303,7 +313,7 @@ export default function TransactionDashboard() {
                 setSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              placeholder="Search by name, ID, amount, type..."
+              placeholder="Search by name, customer ID, amount, type..."
               className="pl-8 text-sm"
             />
           </div>
@@ -321,6 +331,7 @@ export default function TransactionDashboard() {
             <tr>
               <th className="p-4 font-medium">Transaction ID</th>
               <th className="p-4 font-medium">Customer</th>
+              <th className="p-4 font-medium">Customer ID</th>
               <th className="p-4 font-medium">Amount</th>
               <th className="p-4 font-medium">Date & Time</th>
               <th className="p-4 font-medium">Status</th>
@@ -329,20 +340,20 @@ export default function TransactionDashboard() {
           </thead>
           <tbody>
             {isLoading ? (
-              <tr><td colSpan={6} className="p-4 text-center">Loading...</td></tr>
+              <tr><td colSpan={7} className="p-4 text-center">Loading...</td></tr>
             ) : paginated.length > 0 ? (
               paginated.map((txn) => {
                 const customerName =
-                  txn.sender_id?._id === user._id ? txn.receiver_id?.name : txn.sender_id?.name;
+                  txn.sender_id?._id.toString() === user._id.toString()
+                    ? txn.receiver_id?.name || "Unknown"
+                    : txn.sender_id?.name || "Unknown";
                 const customerId = txn.customer_id || "N/A";
-                const amountPrefix = txn.sender_id?._id === user._id ? "-" : "+";
+                const amountPrefix = txn.sender_id?._id.toString() === user._id.toString() ? "-" : "+";
                 return (
                   <tr key={txn._id} className="border-t hover:bg-gray-50">
                     <td className="p-4">{txn.transaction_id || txn._id}</td>
-                    <td className="p-4">
-                      <div className="font-medium">{customerName || "Unknown"}</div>
-                      <div className="text-xs text-gray-500">{customerId}</div>
-                    </td>
+                    <td className="p-4">{customerName}</td>
+                    <td className="p-4 text-gray-500">{customerId}</td>
                     <td className={`p-4 font-semibold ${amountPrefix === "+" ? "text-green-600" : "text-red-600"}`}>
                       ₹{parseFloat(txn.amount || "0.00").toFixed(2)}
                     </td>
@@ -362,7 +373,7 @@ export default function TransactionDashboard() {
                 );
               })
             ) : (
-              <tr><td colSpan={6} className="p-4 text-center text-gray-400">No results found.</td></tr>
+              <tr><td colSpan={7} className="p-4 text-center text-gray-400">No results found.</td></tr>
             )}
           </tbody>
         </table>
@@ -421,7 +432,7 @@ export default function TransactionDashboard() {
       <Dialog open={openDialog} onOpenChange={setOpenDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-lg font-semibold">Export Transactions</DialogTitle>
+            <DialogTitle className="text-lg font-semibold">Export Transaction History</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-3">
