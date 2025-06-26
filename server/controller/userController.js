@@ -18,7 +18,7 @@ const Role = require("../model/roleModel");
 const Transaction = require("../model/transactionModel");
 
 
-//login function
+// Login function
 exports.loginUser = async (req, res) => {
   const { emailOrPhone, password } = req.body;
 
@@ -67,6 +67,7 @@ exports.loginUser = async (req, res) => {
   }
 };
 
+// Get current user
 exports.getMe = async (req, res) => {
   const token = req.cookies.token;
 
@@ -84,9 +85,7 @@ exports.getMe = async (req, res) => {
 
     // Fetch balance
     const userBalance = await UserBalance.findOne({ user_id: user._id });
-const balance = userBalance
-  ? parseFloat(userBalance.balance.toString())
-  : 0.0;
+    const balance = userBalance ? parseFloat(userBalance.balance.toString()) : 0.0;
 
     // Fetch customer data
     const customer = await Customer.findOne({ user_id: user._id }).lean();
@@ -120,7 +119,7 @@ const balance = userBalance
   }
 };
 
-//logout function
+// Logout function
 exports.logoutUser = async (req, res) => {
   try {
     // Get user ID from middleware
@@ -162,6 +161,7 @@ exports.logoutUser = async (req, res) => {
   }
 };
 
+// Get session history
 exports.getSessionHistory = async (req, res) => {
   try {
     const { userId, startDate, endDate } = req.query;
@@ -201,8 +201,7 @@ function generateOtp() {
 // Create User
 exports.createUser = async (req, res) => {
   try {
-    const { role_id, name, email, phone_number, password, confirm_password } =
-      req.body;
+    const { role_id, name, email, phone_number, password, confirm_password } = req.body;
 
     if (!password || !confirm_password) {
       return res.status(400).json({
@@ -237,7 +236,7 @@ exports.createUser = async (req, res) => {
     }
 
     // Generate OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = generateOtp().toString();
     const otpExpiry = new Date(Date.now() + 5 * 60 * 1000); // 5 mins
 
     // Hash password
@@ -256,6 +255,18 @@ exports.createUser = async (req, res) => {
     });
 
     await newUser.save();
+
+    // Create customer record for role-5 users
+    if (role_id.toString() === "role-5") {
+      const customer = new Customer({
+        user_id: newUser._id,
+        customer_id: `CUST-${newUser._id.toString().slice(-6)}`,
+        registration_type: "Standard",
+        registration_fee_paid: false,
+        status: "Active",
+      });
+      await customer.save();
+    }
 
     // Populate role
     const populatedUser = await User.findById(newUser._id).populate("role_id");
@@ -277,7 +288,7 @@ exports.createUser = async (req, res) => {
   }
 };
 
-// POST /users/verify-otp
+// Verify OTP
 exports.verifyOtp = async (req, res) => {
   try {
     const { phone_number, otp } = req.body;
@@ -292,15 +303,11 @@ exports.verifyOtp = async (req, res) => {
     const user = await User.findOne({ phone_number });
 
     if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
+      return res.status(404).json({ success: false, message: "User not found" });
     }
 
     if (user.number_verified) {
-      return res
-        .status(200)
-        .json({ success: true, message: "Number already verified" });
+      return res.status(200).json({ success: true, message: "Number already verified" });
     }
 
     // Check if OTP is correct and not expired
@@ -330,6 +337,7 @@ exports.verifyOtp = async (req, res) => {
       message: "Phone number verified successfully",
     });
   } catch (err) {
+    console.error("Verify OTP error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
@@ -355,9 +363,7 @@ exports.getUsers = async (req, res) => {
     // Filter by role ObjectId
     if (role) {
       if (!mongoose.Types.ObjectId.isValid(role)) {
-        return res
-          .status(400)
-          .json({ success: false, message: "Invalid role ID" });
+        return res.status(400).json({ success: false, message: "Invalid role ID" });
       }
       query.role_id = role;
     }
@@ -387,10 +393,7 @@ exports.getUsers = async (req, res) => {
 
         switch (roleKey) {
           case "role-1": {
-            // Master Admin
-            const master = await MasterAdmin.findOne({
-              user_id: user._id,
-            }).lean();
+            const master = await MasterAdmin.findOne({ user_id: user._id }).lean();
             if (master) {
               enriched.master_admin_id = master.master_admin_id;
               enriched.m_id = master._id;
@@ -399,26 +402,18 @@ exports.getUsers = async (req, res) => {
             }
             break;
           }
-
           case "role-2": {
-            // Admin
             const admin = await Admin.findOne({ user_id: user._id }).lean();
             if (admin) {
               enriched.admin_id = admin.admin_id;
               enriched.a_id = admin._id;
-              enriched.admin_to_admin_transfer_limit =
-                admin.admin_to_admin_transfer_limit;
-              enriched.admin_to_subcom_transfer_limit =
-                admin.admin_to_subcom_transfer_limit;
+              enriched.admin_to_admin_transfer_limit = admin.admin_to_admin_transfer_limit;
+              enriched.admin_to_subcom_transfer_limit = admin.admin_to_subcom_transfer_limit;
             }
             break;
           }
-
           case "role-3": {
-            // Treasury Subcom
-            const subcom = await TreasurySubcom.findOne({
-              user_id: user._id,
-            }).lean();
+            const subcom = await TreasurySubcom.findOne({ user_id: user._id }).lean();
             if (subcom) {
               enriched.treasury_subcom_id = subcom.treasury_subcom_id;
               enriched.t_id = subcom._id;
@@ -426,9 +421,7 @@ exports.getUsers = async (req, res) => {
             }
             break;
           }
-
           case "role-4": {
-            // Restaurant
             const restaurant = await Restaurant.findOne({ user_id: user._id })
               .populate("location", "name")
               .lean();
@@ -439,17 +432,12 @@ exports.getUsers = async (req, res) => {
               enriched.location = restaurant.location?.name || "-";
               enriched.qr_code = restaurant.qr_code;
               enriched.status = restaurant.status;
-              enriched.treasury_to_customer_refund =
-                restaurant.treasury_to_customer_refund;
+              enriched.treasury_to_customer_refund = restaurant.treasury_to_customer_refund;
             }
             break;
           }
-
           case "role-5": {
-            // Customer
-            const customer = await Customer.findOne({
-              user_id: user._id,
-            }).lean();
+            const customer = await Customer.findOne({ user_id: user._id }).lean();
             if (customer) {
               enriched.customer_id = customer.customer_id;
               enriched.c_id = customer._id;
@@ -460,7 +448,6 @@ exports.getUsers = async (req, res) => {
             }
             break;
           }
-
           default:
             break;
         }
@@ -483,6 +470,7 @@ exports.getUsers = async (req, res) => {
   }
 };
 
+// Get all users for history (with customer_id for role-5)
 exports.getAllUsersforHistory = async (req, res) => {
   try {
     const requestingUserId = req.user?.id;
@@ -621,13 +609,30 @@ exports.getAllUsersforHistory = async (req, res) => {
 // Get user by ID
 exports.getUserById = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).populate("role_id", "name");
-    if (!user)
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
-    res.status(200).json({ success: true, data: user });
+    const user = await User.findById(req.params.id)
+      .populate("role_id", "name role_id")
+      .select("-password_hash")
+      .lean();
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const enriched = {
+      ...user,
+      role_id: user.role_id?._id,
+      role_name: user.role_id?.name,
+      role_key: user.role_id?.role_id,
+    };
+
+    if (user.role_id?.role_id === "role-5") {
+      const customer = await Customer.findOne({ user_id: user._id }).lean();
+      enriched.customer_id = customer ? customer.customer_id : "N/A";
+    }
+
+    res.status(200).json({ success: true, data: enriched });
   } catch (err) {
+    console.error("Get user by ID error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
@@ -670,9 +675,7 @@ exports.updateUser = async (req, res) => {
 
     // Fetch balance
     const userBalance = await UserBalance.findOne({ user_id: updatedUser._id });
-    const balance = userBalance
-      ? parseFloat(userBalance.balance.toString())
-      : 0.0;
+    const balance = userBalance ? parseFloat(userBalance.balance.toString()) : 0.0;
 
     // Fetch customer data
     const customer = await Customer.findOne({ user_id: updatedUser._id }).lean();
@@ -691,11 +694,13 @@ exports.updateUser = async (req, res) => {
       number_verified: updatedUser.number_verified,
       createdAt: updatedUser.createdAt,
       updatedAt: updatedUser.updatedAt,
-      role: updatedUser.role_id, // Populated role object
-      balance, // User's balance
-      customer_id: customer ? customer.customer_id : "N/A", // Customer ID
-      restaurant_id: restaurant ? restaurant.restaurant_id : "N/A", // Restaurant ID
-      r_id: restaurant ? restaurant._id : null, // Mongo ID for restaurant
+      role: updatedUser.role_id,
+      role_key: updatedUser.role_id?.role_id,
+      role_name: updatedUser.role_id?.name,
+      balance,
+      customer_id: customer ? customer.customer_id : "N/A",
+      restaurant_id: restaurant ? restaurant.restaurant_id : "N/A",
+      r_id: restaurant ? restaurant._id : null,
     };
 
     res.json({ data: userObj, message: "User updated successfully" });
@@ -709,13 +714,12 @@ exports.updateUser = async (req, res) => {
 exports.deleteUser = async (req, res) => {
   try {
     const user = await User.findByIdAndDelete(req.params.id);
-    if (!user)
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
-    res
-      .status(200).json({ success: true, message: "User deleted successfully" });
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+    res.status(200).json({ success: true, message: "User deleted successfully" });
   } catch (err) {
+    console.error("Delete user error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 

@@ -12,8 +12,10 @@ export const AuthProvider = ({ children }) => {
       const res = await axios.get(`${import.meta.env.VITE_BASE_URL}/users/me`, {
         withCredentials: true,
       });
+      console.log("fetchUser response:", res.data);
       setUser(res.data.user);
     } catch (err) {
+      console.error("fetchUser error:", err.response?.data || err.message);
       setUser(null);
     } finally {
       setLoading(false);
@@ -21,13 +23,18 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login = async (emailOrPhone, password) => {
-    const res = await axios.post(
-      `${import.meta.env.VITE_BASE_URL}/users/login`,
-      { emailOrPhone, password },
-      { withCredentials: true }
-    );
-    await fetchUser();
-    return res;
+    try {
+      const res = await axios.post(
+        `${import.meta.env.VITE_BASE_URL}/users/login`,
+        { emailOrPhone, password },
+        { withCredentials: true }
+      );
+      await fetchUser();
+      return res;
+    } catch (err) {
+      console.error("Login failed:", err.response?.data || err.message);
+      throw err;
+    }
   };
 
   const logout = async () => {
@@ -39,7 +46,7 @@ export const AuthProvider = ({ children }) => {
       );
       setUser(null);
     } catch (err) {
-      console.error("Logout failed", err);
+      console.error("Logout failed:", err.response?.data || err.message);
     }
   };
 
@@ -54,7 +61,7 @@ export const AuthProvider = ({ children }) => {
       );
       return res.data.data;
     } catch (err) {
-      console.error("Fetch session history failed:", err);
+      console.error("Fetch session history failed:", err.response?.data || err.message);
       throw err;
     }
   };
