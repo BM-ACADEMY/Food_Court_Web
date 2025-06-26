@@ -274,12 +274,6 @@ exports.getBalanceByUserId = async (req, res) => {
       return res
         .status(404)
         .json({ success: false, message: "Balance not found" });
-
-      return res.status(200).json({
-        success: true,
-        data: { user_id, balance: "0.00" },
-      });
-
     }
 
     res.status(200).json({ success: true, data: balance });

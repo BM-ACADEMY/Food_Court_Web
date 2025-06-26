@@ -286,10 +286,20 @@ exports.transferFunds = async (req, res) => {
       { upsert: true }
     );
 
-    await Transaction.create({
+    // await Transaction.create({
+    //   sender_id,
+    //   receiver_id,
+    //   amount: amt.toFixed(2),
+    //   transaction_type,
+    //   payment_method,
+    //   remarks,
+    //   status: "Success",
+      
+    // });
+        const transaction = await Transaction.create({
       sender_id,
       receiver_id,
-      amount: amt.toFixed(2),
+      amount,
       transaction_type,
       payment_method,
       remarks,
@@ -297,7 +307,8 @@ exports.transferFunds = async (req, res) => {
       created_at: new Date(),
     });
 
-    res.json({ success: true, message: "Funds transferred successfully" });
+
+    res.json({ success: true, message: "Funds transferred successfully",transaction });
   } catch (error) {
     console.error("Error in transferFunds:", error);
     res.status(500).json({ message: "Server error", details: error.message });
@@ -408,7 +419,7 @@ exports.getTransactionById = async (req, res) => {
         select: "name phone_number role_id",
         populate: { path: "role_id", select: "_id role_id name" },
       })
-      .populate("location_id", "location_name")
+      // .populate("location_id", "location_name")
       .populate("edited_by_id", "name")
       .lean();
 

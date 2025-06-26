@@ -44,19 +44,19 @@ function RegistrationSuccess({ registrationData }) {
             <div className="bg-gray-100 p-4 rounded-md text-left max-w-md mx-auto space-y-3 text-gray-800 text-sm sm:text-base">
               <p className="flex flex-wrap items-center gap-2">
                 <User className="w-5 h-5 text-[#040442]" />
-                <strong className="min-w-[100px]">Name:</strong> {registrationData.name}
+                <strong className="min-w-[100px]">Name:</strong> {registrationData?.name}
               </p>
               <p className="flex flex-wrap items-center gap-2">
                 <Phone className="w-5 h-5 text-[#040442]" />
-                <strong className="min-w-[100px]">Phone:</strong> {registrationData.phone}
+                <strong className="min-w-[100px]">Phone:</strong> {registrationData?.phone}
               </p>
               <p className="flex flex-wrap items-center gap-2">
                 <IdCard className="w-5 h-5 text-[#040442]" />
-                <strong className="min-w-[100px]">Customer ID:</strong> {registrationData.customerId}
+                <strong className="min-w-[100px]">Customer ID:</strong> {registrationData?.customerId}
               </p>
               <p className="flex flex-wrap items-center gap-2">
                 <Clock className="w-5 h-5 text-[#040442]" />
-                <strong className="min-w-[100px]">Registration Time:</strong> {registrationData.registrationTime}
+                <strong className="min-w-[100px]">Registration Time:</strong> {registrationData?.registrationTime}
               </p>
             </div>
             <div className="flex justify-center mt-6">
