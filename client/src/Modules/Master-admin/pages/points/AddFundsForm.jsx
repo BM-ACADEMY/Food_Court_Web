@@ -34,7 +34,7 @@ export default function AddFundModalForm({ senderId, receiver, onClose }) {
       await axios.post(`${import.meta.env.VITE_BASE_URL}/transactions/transfer`, {
         sender_id: senderId,
         receiver_id: receiver.user_id,
-        amount: Number(amount),
+        amount: amount,
         transaction_type: transactionType,
         payment_method: paymentMethod,
         remarks,

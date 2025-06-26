@@ -79,7 +79,7 @@ export default function RecentTransactions() {
                 <TableHead>AMOUNT</TableHead>
                 <TableHead>STATUS</TableHead>
                 <TableHead>PAYMENT METHOD</TableHead>
-                <TableHead>LOCATION</TableHead>
+                {/* <TableHead>LOCATION</TableHead> */}
                 <TableHead>ACTIONS</TableHead>
               </TableRow>
             </TableHeader>
@@ -87,7 +87,7 @@ export default function RecentTransactions() {
               {visibleTransactions.map((tx, index) => {
                 const member = tx.receiver_id?.name || "N/A";
                 const transactionId = tx.transaction_id;
-                const amount = `₹${parseFloat(tx.amount?.$numberDecimal || 0).toFixed(2)}`;
+                const amount = `₹${parseFloat(tx.amount || 0).toFixed(2)}`;
                 const status = tx.status;
                 const upi = tx.receiver_id?.phone_number || "—";
                 const location = tx.location_id?.name || "—";
@@ -109,7 +109,7 @@ export default function RecentTransactions() {
                     <TableCell>{amount}</TableCell>
                     <TableCell className="text-green-600">{status}</TableCell>
                     <TableCell>{tx.payment_method || "—"}</TableCell>
-                    <TableCell>{location}</TableCell>
+                    {/* <TableCell>{location}</TableCell> */}
                     <TableCell>
                       <Button size="sm" variant="ghost" className="flex items-center gap-1">
                         <Eye className="w-4 h-4" /> View

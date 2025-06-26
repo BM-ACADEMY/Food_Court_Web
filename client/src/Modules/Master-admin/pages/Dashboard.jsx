@@ -333,7 +333,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-sm text-green-600">+{stat.diff}% from yesterday</p>
+              <p className="text-sm text-green-600">+{stat.diff} from yesterday</p>
             </CardContent>
           </Card>
         ))}

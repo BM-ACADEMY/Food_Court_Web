@@ -55,6 +55,7 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import AdminDetailsModal from "./AdminDetailsModel"; // Import the modal
 
 export default function AdminList() {
   const [search, setSearch] = useState("");
@@ -74,7 +75,23 @@ export default function AdminList() {
   const [error, setError] = useState(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState("xlsx");
-  const pageSize = 10;
+  const [selectedAdmin, setSelectedAdmin] = useState(null);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [pageSize] = useState(10);
+
+  const handleView = (admin) => {
+    setSelectedAdmin(admin);
+    setIsDetailsModalOpen(true);
+  };
+
+  const handleEdit = (admin) => {
+    setSelectedAdmin(admin);
+    setIsDetailsModalOpen(true);
+  };
+   const handleTransactionEdit = (admin) => {
+    console.log(admin,"transaction");
+    
+  };
 
   useEffect(() => {
     const fetchAdmins = async () => {
@@ -369,15 +386,17 @@ export default function AdminList() {
                         <Button
                           variant="link"
                           className="text-blue-600 p-0 h-auto text-sm"
+                          onClick={() => handleView(admin)}
                         >
                           <Eye className="mr-1 h-4 w-4" /> View
                         </Button>
-                        <Button
+                        {/* <Button
                           variant="link"
                           className="text-green-600 p-0 h-auto text-sm"
+                          onClick={() => handleTransactionEdit(admin)}
                         >
                           <Pencil className="mr-1 h-4 w-4" /> Edit
-                        </Button>
+                        </Button> */}
                       </TableCell>
                     </TableRow>
                   ))
@@ -387,6 +406,16 @@ export default function AdminList() {
           </div>
         </div>
       )}
+
+      {/* Admin Details Modal */}
+      <AdminDetailsModal
+        admin={selectedAdmin}
+        isOpen={isDetailsModalOpen}
+        onClose={() => {
+          setIsDetailsModalOpen(false);
+          setSelectedAdmin(null);
+        }}
+      />
 
       {/* Export Modal */}
       <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>

@@ -486,30 +486,135 @@ exports.getUsers = async (req, res) => {
 exports.getAllUsersforHistory = async (req, res) => {
   try {
     const requestingUserId = req.user?.id;
-    const requestingUser = await User.findById(requestingUserId).populate(
-      "role_id"
-    );
+    const { userId, startDate, endDate } = req.query;
 
+    // Validate requesting user
+    const requestingUser = await User.findById(requestingUserId).populate("role_id");
     if (!requestingUser) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Requesting user not found" });
+      return res.status(404).json({ error: "Requesting user not found" });
     }
 
     const roleName = requestingUser.role_id?.name || "";
     if (!["Master-Admin", "Admin"].includes(roleName)) {
-      return res
-        .status(403)
-        .json({ success: false, message: "Unauthorized to view users" });
+      return res.status(403).json({ error: "Unauthorized to view user history" });
     }
 
-    const users = await User.find()
-      .populate("role_id", "name")
-      .select("name email role_id");
+    // Build match query for users
+    let matchQuery = {};
+    if (userId) {
+      try {
+        matchQuery._id = mongoose.Types.ObjectId(userId);
+      } catch (err) {
+        return res.status(400).json({ error: "Invalid userId format" });
+      }
+    }
+
+    // Build session match query for date filtering
+    let sessionMatch = {};
+    if (startDate) {
+      sessionMatch.login_time = { $gte: new Date(startDate) };
+    }
+    if (endDate) {
+      sessionMatch.login_time = {
+        ...sessionMatch.login_time,
+        $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999)),
+      };
+    }
+
+    // Aggregate users, sessions, and transactions
+    const users = await User.aggregate([
+      { $match: matchQuery },
+      {
+        $lookup: {
+          from: "roles",
+          localField: "role_id",
+          foreignField: "_id",
+          as: "role",
+        },
+      },
+      { $unwind: { path: "$role", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "loginlogs",
+          let: { user_id: "$_id" },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$user_id", "$$user_id"] }, ...sessionMatch } },
+            { $sort: { login_time: -1 } },
+            { $limit: 1 },
+          ],
+          as: "latestSession",
+        },
+      },
+      { $unwind: { path: "$latestSession", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "transactions",
+          let: {
+            user_id: "$_id",
+            session_start: "$latestSession.login_time",
+            session_end: { $ifNull: ["$latestSession.logout_time", new Date()] },
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    {
+                      $or: [
+                        { $eq: ["$sender_id", "$$user_id"] },
+                        { $eq: ["$receiver_id", "$$user_id"] },
+                      ],
+                    },
+                    { $gte: ["$created_at", "$$session_start"] },
+                    { $lte: ["$created_at", "$$session_end"] },
+                  ],
+                },
+              },
+            },
+            {
+              $project: {
+                transaction_id: 1,
+                sender_id: 1,
+                receiver_id: 1,
+                amount: 1,
+                transaction_type: 1,
+                payment_method: 1,
+                status: 1,
+                remarks: 1,
+                created_at: 1,
+              },
+            },
+          ],
+          as: "actions",
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+          name: 1,
+          email: 1,
+          phone_number: 1,
+          role: "$role.name",
+          session: {
+            login_time: "$latestSession.login_time",
+            logout_time: "$latestSession.logout_time",
+            status: {
+              $cond: {
+                if: { $eq: ["$latestSession.status", true] },
+                then: "Online",
+                else: "Offline",
+              },
+            },
+          },
+          actions: 1,
+        },
+      },
+    ]);
+
     res.status(200).json({ success: true, data: users });
   } catch (error) {
-    console.error("Get users error:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    console.error("Get users history error:", error);
+    res.status(500).json({ error: "Server error", details: error.message });
   }
 };
 
@@ -531,17 +636,17 @@ exports.getUserById = async (req, res) => {
 exports.updateUser = async (req, res) => {
   try {
     const userId = req.params.id;
-    const { name, email, phone_number } = req.body;
+    const { name, email, phone_number ,is_flagged } = req.body;
 
     // Validate input
-    if (!name || !email || !phone_number) {
-      return res.status(400).json({ message: "All fields are required" });
-    }
+    // if (!name || !email || !phone_number) {
+    //   return res.status(400).json({ message: "All fields are required" });
+    // }
 
     // Update user
     const updatedUser = await User.findByIdAndUpdate(
       userId,
-      { name, email, phone_number, updatedAt: Date.now() },
+      { name, email, phone_number,is_flagged, updatedAt: Date.now() },
       { new: true, runValidators: true }
     )
       .select("-password_hash")
@@ -777,5 +882,75 @@ exports.getUsersWithBalanceByRole = async (req, res) => {
   }
 };
 
+
+
+
+
+
+exports.getTransactionDetails = async (req, res) => {
+  try {
+    const { transactionId } = req.params;
+    const requestingUserId = req.user?.id;
+
+    // Validate requesting user
+    const requestingUser = await User.findById(requestingUserId).populate("role_id");
+    if (!requestingUser) {
+      return res.status(404).json({ error: "Requesting user not found" });
+    }
+
+    const roleName = requestingUser.role_id?.name || "";
+    if (!["Master-Admin", "Admin"].includes(roleName)) {
+      return res.status(403).json({ error: "Unauthorized to view transaction details" });
+    }
+
+    // Find transaction and populate sender/receiver details
+    const transaction = await Transaction.findOne({ transaction_id: transactionId })
+      .populate({
+        path: "sender_id",
+        select: "name email phone_number role_id",
+        populate: { path: "role_id", select: "name" },
+      })
+      .populate({
+        path: "receiver_id",
+        select: "name email phone_number role_id",
+        populate: { path: "role_id", select: "name" },
+      })
+      .lean();
+
+    if (!transaction) {
+      return res.status(404).json({ error: "Transaction not found" });
+    }
+
+    // Format response
+    const formattedTransaction = {
+      transaction_id: transaction.transaction_id,
+      amount: transaction.amount,
+      transaction_type: transaction.transaction_type,
+      payment_method: transaction.payment_method || "N/A",
+      status: transaction.status,
+      remarks: transaction.remarks || "N/A",
+      created_at: transaction.created_at,
+      sender: {
+        _id: transaction.sender_id._id,
+        name: transaction.sender_id.name,
+        email: transaction.sender_id.email || "N/A",
+        phone_number: transaction.sender_id.phone_number,
+        role: transaction.sender_id.role_id?.name || "Unknown",
+      },
+      receiver: {
+        _id: transaction.receiver_id._id,
+        name: transaction.receiver_id.name,
+        email: transaction.receiver_id.email || "N/A",
+        phone_number: transaction.receiver_id.phone_number,
+        role: transaction.receiver_id.role_id?.name || "Unknown",
+      },
+    };
+
+    res.status(200).json({ success: true, data: formattedTransaction });
+  } catch (error) {
+    console.error("Get transaction details error:", error);
+    res.status(500).json({ error: "Server error", details: error.message });
+  }
+};
 
 

@@ -15,7 +15,9 @@ router.post("/logout", authMiddleware, userController.logoutUser);
 //get the token
 router.get("/me", userController.getMe);
 
-router.get("/fetch-users-for-history", userController.getAllUsersforHistory);
+router.get("/fetch-users-for-history",authMiddleware, userController.getAllUsersforHistory);
+
+router.get("/fetch-users-for-transaction",authMiddleware, userController.getTransactionDetails);
 
 router.get("/sessions", authMiddleware,userController.getSessionHistory);
 

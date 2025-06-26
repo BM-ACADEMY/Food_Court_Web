@@ -725,15 +725,15 @@ export default function TransactionHistory() {
           prev.map((txn) =>
             txn.id === transactionId
               ? {
-                  ...txn,
-                  amount: parseFloat(editFormData.amount),
-                  type: editFormData.transaction_type,
-                  payment_method: editFormData.payment_method,
-                  status: editFormData.status,
-                  remarks: editFormData.remarks,
-                  location_id: editFormData.location_id,
-                  edited_at: new Date(),
-                }
+                ...txn,
+                amount: parseFloat(editFormData.amount),
+                type: editFormData.transaction_type,
+                payment_method: editFormData.payment_method,
+                status: editFormData.status,
+                remarks: editFormData.remarks,
+                location_id: editFormData.location_id,
+                edited_at: new Date(),
+              }
               : txn
           )
         );
@@ -1217,41 +1217,50 @@ export default function TransactionHistory() {
             </Table>
           </div>
 
-          <div className="pt-4 float-end">
-            <Pagination>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    href="#"
-                    onClick={() => setPagination((prev) => ({
-                      ...prev,
-                      page: Math.max(prev.page - 1, 1),
-                    }))}
-                  />
-                </PaginationItem>
-                {Array.from({ length: pagination.totalPages || 1 }, (_, i) => i + 1).map((p) => (
-                  <PaginationItem key={p}>
-                    <PaginationLink
+          <div className="pt-4 w-full overflow-x-auto">
+            <div className="min-w-[300px] whitespace-nowrap flex justify-end">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
                       href="#"
-                      isActive={p === pagination.page}
-                      onClick={() => setPagination((prev) => ({ ...prev, page: p }))}
-                    >
-                      {p}
-                    </PaginationLink>
+                      onClick={() =>
+                        setPagination((prev) => ({
+                          ...prev,
+                          page: Math.max(prev.page - 1, 1),
+                        }))
+                      }
+                    />
                   </PaginationItem>
-                ))}
-                <PaginationItem>
-                  <PaginationNext
-                    href="#"
-                    onClick={() => setPagination((prev) => ({
-                      ...prev,
-                      page: Math.min(prev.page + 1, pagination.totalPages),
-                    }))}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
+
+                  {Array.from({ length: pagination.totalPages || 1 }, (_, i) => i + 1).map((p) => (
+                    <PaginationItem key={p}>
+                      <PaginationLink
+                        href="#"
+                        isActive={p === pagination.page}
+                        onClick={() => setPagination((prev) => ({ ...prev, page: p }))}
+                      >
+                        {p}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      onClick={() =>
+                        setPagination((prev) => ({
+                          ...prev,
+                          page: Math.min(prev.page + 1, pagination.totalPages),
+                        }))
+                      }
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
           </div>
+
         </CardContent>
       </Card>
 

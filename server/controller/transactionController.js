@@ -102,11 +102,11 @@ exports.getAllTransactions = async (req, res) => {
 exports.getAllRecentTransaction = async (req, res) => {
   try {
     const transactions = await Transaction.find()
-      .sort({ created_at: -1 }) // ⬅️ Sort by newest
-      .limit(5)                 // ⬅️ Limit to last 5
-      .populate("sender_id", "name phone_number")   // ⬅️ From User
-      .populate("receiver_id", "name phone_number") // ⬅️ From User
-      .populate("location_id", "name")
+      .sort({ created_at: -1 }) 
+      .limit(5)              
+      .populate("sender_id", "name phone_number")   
+      .populate("receiver_id", "name phone_number") 
+      // .populate("location_id", "name")
       .populate("edited_by_id", "name");
 
     res.status(200).json({ success: true, data: transactions });
@@ -123,11 +123,10 @@ exports.transferFunds = async (req, res) => {
     transaction_type,
     payment_method,
     remarks,
-    mode = "normal", // Default to "normal"
+    mode = "normal",
   } = req.body;
 
   try {
-    // Validate required fields
     if (!sender_id || !receiver_id || !amount) {
       return res.status(400).json({ message: "Missing required fields" });
     }
@@ -137,13 +136,11 @@ exports.transferFunds = async (req, res) => {
       return res.status(400).json({ message: "Invalid amount" });
     }
 
-    // ✅ Check balance
     const senderBalance = await UserBalance.findOne({ user_id: sender_id });
-    if (!senderBalance || parseFloat(senderBalance.balance.toString()) < amt) {
+    if (!senderBalance || parseFloat(senderBalance.balance) < amt) {
       return res.status(400).json({ message: "Insufficient funds" });
     }
 
-    // ✅ Get users and their roles
     const [sender, receiver] = await Promise.all([
       User.findById(sender_id).populate("role_id"),
       User.findById(receiver_id).populate("role_id"),
@@ -153,16 +150,13 @@ exports.transferFunds = async (req, res) => {
       return res.status(404).json({ message: "Sender or Receiver not found" });
     }
 
-    // ✅ Only enforce limit check in NORMAL mode
     if (mode === "normal") {
       const senderRole = sender.role_id?.name;
       const receiverRole = receiver.role_id?.name;
 
-      // Check if sender is Master-Admin and receiver is Admin
       if (senderRole === "Master-Admin" && receiverRole === "Admin") {
         const masterAdminData = await MasterAdmin.findOne({ user_id: sender_id });
-        const transferLimit = parseFloat(masterAdminData?.master_admin_to_admin?.toString() || "0");
-
+        const transferLimit = parseFloat(masterAdminData?.master_admin_to_admin || "0");
         if (amt > transferLimit) {
           return res.status(400).json({
             message: `Transfer exceeds Master Admin's per-transaction limit of ₹${transferLimit}`,
@@ -170,72 +164,73 @@ exports.transferFunds = async (req, res) => {
         }
       }
 
-      // Check if sender is Admin and receiver is Admin
       if (senderRole === "Admin" && receiverRole === "Admin") {
         const adminData = await Admin.findOne({ user_id: sender_id });
-        const transferLimit = parseFloat(adminData?.admin_to_admin_transfer_limit?.toString() || "0");
-
+        const transferLimit = parseFloat(adminData?.admin_to_admin_transfer_limit || "0");
         if (amt > transferLimit) {
           return res.status(400).json({
-            message: `Transfer exceeds Admin to Admin per-transaction limit of ₹${transferLimit}`,
+            message: `Transfer exceeds Admin to Admin limit of ₹${transferLimit}`,
           });
         }
       }
 
-      // Check if sender is Admin and receiver is Treasury-Subcom
       if (senderRole === "Admin" && receiverRole === "Treasury-Subcom") {
         const adminData = await Admin.findOne({ user_id: sender_id });
-        const transferLimit = parseFloat(adminData?.admin_to_subcom_transfer_limit?.toString() || "0");
-
+        const transferLimit = parseFloat(adminData?.admin_to_subcom_transfer_limit || "0");
         if (amt > transferLimit) {
           return res.status(400).json({
-            message: `Transfer exceeds Admin to Treasury Subcom per-transaction limit of ₹${transferLimit}`,
+            message: `Transfer exceeds Admin to Subcom limit of ₹${transferLimit}`,
           });
         }
       }
 
-      // Check if sender is Treasury-Subcom and receiver is Admin
       if (senderRole === "Treasury-Subcom" && receiverRole === "Admin") {
         const subcomData = await TreasurySubcom.findOne({ user_id: sender_id });
-        const transferLimit = parseFloat(subcomData?.subcom_to_admin_transfer_limit?.toString() || "0");
-
+        const transferLimit = parseFloat(subcomData?.subcom_to_admin_transfer_limit || "0");
         if (amt > transferLimit) {
           return res.status(400).json({
-            message: `Transfer exceeds Treasury Subcom to Admin per-transaction limit of ₹${transferLimit}`,
+            message: `Transfer exceeds Subcom to Admin limit of ₹${transferLimit}`,
           });
         }
       }
     }
 
-    // ✅ Proceed with the transaction
+    // Convert string balance to number, perform arithmetic, and format back to string
+    const senderNewBalance = (parseFloat(senderBalance.balance) - amt).toFixed(2);
     await UserBalance.updateOne(
       { user_id: sender_id },
-      { $inc: { balance: -amt } }
+      { $set: { balance: senderNewBalance } }
     );
+
+    // For receiver, fetch existing balance or use 0 if not found
+    const receiverBalance = await UserBalance.findOne({ user_id: receiver_id });
+    const receiverNewBalance = (
+      parseFloat(receiverBalance?.balance || "0") + amt
+    ).toFixed(2);
     await UserBalance.updateOne(
       { user_id: receiver_id },
-      { $inc: { balance: amt } },
+      { $set: { balance: receiverNewBalance } },
       { upsert: true }
     );
 
-    // Create transaction record
     await Transaction.create({
       sender_id,
       receiver_id,
-      amount: amt,
+      amount: amt.toFixed(2),
       transaction_type,
       payment_method,
       remarks,
-      status: 'completed',
+      status: "Success",
       created_at: new Date(),
     });
 
     res.json({ success: true, message: "Funds transferred successfully" });
   } catch (error) {
-    console.error('Error in transferFunds:', error);
+    console.error("Error in transferFunds:", error);
     res.status(500).json({ message: "Server error", details: error.message });
   }
 };
+
 
 // exports.transferFunds = async (req, res) => {
 //   const {
@@ -494,7 +489,7 @@ exports.getTransactionHistory = async (req, res) => {
         select: "name phone_number role_id",
         populate: { path: "role_id", select: "name" },
       })
-      .populate("location_id", "name")
+      // .populate("location_id", "name")
       .skip(skip)
       .limit(parseInt(limit))
       .lean();

@@ -17,6 +17,8 @@ import {
   Download,
   Eye,
   Pencil,
+  Unlock,
+  Lock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
@@ -55,6 +57,8 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import RestaurantDetailsModal from "./RestaurantDetailsModel";
+import { toast, Bounce } from "react-toastify";
 
 export default function RestaurantList() {
   const [search, setSearch] = useState("");
@@ -77,38 +81,40 @@ export default function RestaurantList() {
   const [error, setError] = useState(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState("xlsx");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedRestaurant, setSelectedRestaurant] = useState(null);
 
   // Fetch data from backend
   useEffect(() => {
-    const fetchRestaurants = async () => {
-      setLoading(true);
-      try {
-        const response = await axios.get(
-          `${import.meta.env.VITE_BASE_URL}/restaurants/fetch-all-restaurant-details`,
-          {
-            params: {
-              search,
-              status,
-              lastActive,
-              regDate: regDate ? format(new Date(regDate), "yyyy-MM-dd") : "",
-              sortBy,
-              page,
-              pageSize,
-            },
-          }
-        );
-        setData(response.data);
-        setError(null);
-      } catch (err) {
-        console.error("Error fetching restaurants:", err);
-        setError("Failed to load data. Please try again.");
-      } finally {
-        setLoading(false);
-      }
-    };
+
     fetchRestaurants();
   }, [search, status, lastActive, regDate, sortBy, page, pageSize]);
-
+  const fetchRestaurants = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/restaurants/fetch-all-restaurant-details`,
+        {
+          params: {
+            search,
+            status,
+            lastActive,
+            regDate: regDate ? format(new Date(regDate), "yyyy-MM-dd") : "",
+            sortBy,
+            page,
+            pageSize,
+          },
+        }
+      );
+      setData(response.data);
+      setError(null);
+    } catch (err) {
+      console.error("Error fetching restaurants:", err);
+      setError("Failed to load data. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
   const { restaurants, totalRestaurants, totalSales, onlineCount, totalPages } = data;
 
   // Memoized paginated data
@@ -191,6 +197,24 @@ export default function RestaurantList() {
         console.error("Invalid export format");
     }
     setIsExportModalOpen(false);
+  };
+
+  const handleToggleRestrict = async (user) => {
+    console.log(user, 'res');
+
+    try {
+      const updated = await axios.put(`${import.meta.env.VITE_BASE_URL}/users/update-user/${user.user_id}`, {
+        is_flagged: !user.is_flagged,
+      });
+
+      if (updated.data) {
+        toast.success(`User ${!user.is_flagged ? "restricted" : "unrestricted"} successfully`);
+        fetchRestaurants(); // Refresh list
+      }
+    } catch (err) {
+      console.error("Failed to toggle restriction", err);
+      toast.error("Failed to update restriction");
+    }
   };
 
   return (
@@ -359,7 +383,7 @@ export default function RestaurantList() {
                 <TableRow>
                   <TableHead>Restaurant ID</TableHead>
                   <TableHead>Name</TableHead>
-                  <TableHead>Category</TableHead>
+                  {/* <TableHead>Category</TableHead> */}
                   <TableHead>Sales</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Last Active</TableHead>
@@ -380,16 +404,15 @@ export default function RestaurantList() {
                         #{restaurant.id}
                       </TableCell>
                       <TableCell>{restaurant.name}</TableCell>
-                      <TableCell>{restaurant.category}</TableCell>
+                      {/* <TableCell>{restaurant.category}</TableCell> */}
                       <TableCell>₹{restaurant.sales.toLocaleString()}</TableCell>
                       <TableCell>
                         <Badge
                           variant="ghost"
-                          className={`text-white ${
-                            restaurant.status.toLowerCase() === "online"
-                              ? "bg-green-500"
-                              : "bg-red-500"
-                          }`}
+                          className={`text-white ${restaurant.status.toLowerCase() === "online"
+                            ? "bg-green-500"
+                            : "bg-red-500"
+                            }`}
                         >
                           {restaurant.status}
                         </Badge>
@@ -399,16 +422,28 @@ export default function RestaurantList() {
                         <Button
                           variant="link"
                           className="text-blue-600 p-0 h-auto text-sm"
+                          onClick={() => {
+                            setSelectedRestaurant(restaurant);
+                            setIsModalOpen(true);
+                          }}
                         >
                           <Eye className="mr-1 h-4 w-4" /> View
                         </Button>
                         <Button
-                          variant="link"
-                          className="text-green-600 p-0 h-auto text-sm"
+                          size="icon"
+                          variant="ghost"
+                          className="cursor-pointer"
+                          onClick={() => handleToggleRestrict(restaurant)}
+                          title={restaurant.is_flagged ? "Unrestrict User" : "Restrict User"}
                         >
-                          <Pencil className="mr-1 h-4 w-4" /> Edit
+                          {restaurant.is_flagged ? (
+                            <Lock className="w-4 h-4 text-red-600" />
+                          ) : (
+                            <Unlock className="w-4 h-4 text-green-600" />
+                          )}
                         </Button>
                       </TableCell>
+
                     </TableRow>
                   ))
                 )}
@@ -417,6 +452,15 @@ export default function RestaurantList() {
           </div>
         </div>
       )}
+
+      {/* Restaurant Details Modal */}
+      <div className="w-full max-w-none">
+        <RestaurantDetailsModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          restaurant={selectedRestaurant}
+        />
+      </div>
 
       {/* Export Modal */}
       <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>

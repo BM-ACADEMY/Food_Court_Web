@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const customerController = require("../controller/customerController");
+const authMiddleware=require('../middleware/authMiddleware')
 
 // Base: /api/customers
 
@@ -23,5 +24,9 @@ router.put("/update-customer/:id", customerController.updateCustomer);
 
 // Delete
 router.delete("/delete-customer/:id", customerController.deleteCustomer);
+
+router.get("/fetch-single-customer-details/:customerId", customerController.getCustomerDetails);
+
+router.get("/fetch-single-customer-transaction/:customerId/transactions", customerController.getCustomerTransactions);
 
 module.exports = router;

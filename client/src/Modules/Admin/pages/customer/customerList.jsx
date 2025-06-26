@@ -55,6 +55,7 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import CustomerDetailsModal from "./CustomersDetailsModel"
 
 export default function CustomerList() {
   const [search, setSearch] = useState("");
@@ -77,7 +78,8 @@ export default function CustomerList() {
   const [error, setError] = useState(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState("xlsx");
-
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
   // Fetch data from backend
   useEffect(() => {
     const fetchCustomers = async () => {
@@ -187,7 +189,10 @@ export default function CustomerList() {
     }
     setIsExportModalOpen(false);
   };
-
+  const handleViewCustomer = (customer) => {
+    setSelectedCustomer(customer);
+    setIsDetailsModalOpen(true);
+  };
   return (
     <div className="space-y-6">
       <h2 className="text-3xl font-bold text-[#00004D]">Customer Check</h2>
@@ -359,21 +364,20 @@ export default function CustomerList() {
                     <TableCell>
                       <Badge
                         variant="ghost"
-                        className={`text-white ${
-                          customer.status.toLowerCase() === "online" ? "bg-green-500" : "bg-red-500"
-                        }`}
+                        className={`text-white ${customer.status.toLowerCase() === "online" ? "bg-green-500" : "bg-red-500"
+                          }`}
                       >
                         {customer.status}
                       </Badge>
                     </TableCell>
                     <TableCell>{customer.lastActive}</TableCell>
                     <TableCell className="flex gap-2">
-                      <Button variant="link" className="text-blue-600 p-0 h-auto text-sm">
+                      <Button variant="link" className="text-blue-600 p-0 h-auto text-sm" onClick={() => handleViewCustomer(customer)}>
                         <Eye className="mr-1 h-4 w-4" /> View
                       </Button>
-                      <Button variant="link" className="text-green-600 p-0 h-auto text-sm">
+                      {/* <Button variant="link" className="text-green-600 p-0 h-auto text-sm">
                         <Pencil className="mr-1 h-4 w-4" /> Edit
-                      </Button>
+                      </Button> */}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -382,7 +386,15 @@ export default function CustomerList() {
           </div>
         </div>
       )}
-
+      <div className="w-full max-w-none">
+        {selectedCustomer && (
+          <CustomerDetailsModal
+            customer={selectedCustomer}
+            isOpen={isDetailsModalOpen}
+            onClose={() => setIsDetailsModalOpen(false)}
+          />
+        )}
+      </div>
       {/* Export Modal */}
       <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>
         <DialogContent>
