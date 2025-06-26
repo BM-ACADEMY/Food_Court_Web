@@ -29,8 +29,7 @@ function TopUpSuccess({ data, onNewTopUp, customer }) {
         senderId: customer.sender_id,
         receiverId: customer.receiver_id,
       });
-
-      // Fetch customer data using receiver_id
+      
       const customerResponse = await axios.get(
         `${import.meta.env.VITE_BASE_URL}/customers/fetch-all-customer-details`,
         {
