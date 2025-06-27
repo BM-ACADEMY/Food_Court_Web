@@ -72,7 +72,7 @@ export default function Deduct() {
           backCamera.deviceId,
           {
             fps: 10,
-            qrbox: { width: 300, height: 150 },
+            qrbox: { width: 300, height: 350 },
           },
           decodedText => handleScanSuccess(decodedText),
           error => console.warn("QR scan error:", error)
@@ -83,7 +83,7 @@ export default function Deduct() {
           { facingMode: "environment" },
           {
             fps: 10,
-            qrbox: { width: 300, height: 150 },
+            qrbox: { width: 300, height: 350 },
           },
           decodedText => handleScanSuccess(decodedText),
           error => console.warn("QR scan error:", error)
