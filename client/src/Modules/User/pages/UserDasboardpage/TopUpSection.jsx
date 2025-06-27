@@ -9,7 +9,7 @@ import axios from "axios";
 const TopUpSection = () => {
   const { user } = useAuth();
   const [qrDataUrl, setQrDataUrl] = useState("");
-  const canvasRef = useRef(null);
+
 
   useEffect(() => {
     const generateQrCode = async () => {
