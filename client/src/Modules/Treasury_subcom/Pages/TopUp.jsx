@@ -17,8 +17,8 @@ function TopUp({ customer }) {
   // Debug: Log user and customer data
   console.log("TopUp - Logged-in user:", user);
   console.log("TopUp - Customer:", customer);
-  console.log("Customer user_id:", customer.user_id);
-  console.log("Sender ID vs Receiver ID:", { senderId: user?._id, receiverId: customer.user_id });
+  console.log("TopUp - Customer user_id:", customer.user_id);
+  console.log("TopUp - Sender ID vs Receiver ID:", { senderId: user?._id, receiverId: customer.user_id });
 
   const paymentMethods = [
     { label: "Cash", value: "Cash", icon: "💵" },
@@ -27,7 +27,7 @@ function TopUp({ customer }) {
   ];
 
   const formatAmount = (value) => {
-    console.log("formatAmount input:", value);
+    console.log("TopUp - formatAmount input:", value);
     if (!value) return "";
     const num = parseFloat(value);
     return isNaN(num) ? "" : num.toFixed(2);
@@ -42,35 +42,33 @@ function TopUp({ customer }) {
 
   const fetchBalance = async (userId) => {
     try {
+      if (!/^[0-9a-fA-F]{24}$/.test(userId)) {
+        throw new Error("Invalid userId format");
+      }
       const response = await axios.get(
         `${import.meta.env.VITE_BASE_URL}/user-balance/fetch-balance-by-id/${userId}`,
         { withCredentials: true }
       );
-      console.log("Balance fetch response:", response.data);
+      console.log("TopUp - Balance fetch response:", response.data);
 
       if (!response.data.success || !response.data.data) {
         throw new Error("Failed to fetch balance data");
       }
 
-      // Extract balance and handle Decimal128
       const balance = response.data.data.balance;
       if (balance === undefined || balance === null) {
         throw new Error("Balance field is missing in response");
       }
 
-      let balanceValue;
-      if (typeof balance === "string") {
-        balanceValue = balance;
-      } else if (balance.$numberDecimal) {
-        balanceValue = balance.$numberDecimal; // Extract the string value from Decimal128
-      } else {
-        balanceValue = balance.toString(); // Fallback for other cases
-      }
-      console.log("Extracted balance value:", balanceValue);
-
+      const balanceValue = parseFloat(balance).toFixed(2);
+      console.log("TopUp - Extracted balance value:", balanceValue);
       return balanceValue;
     } catch (err) {
-      console.error("Balance fetch error:", err);
+      console.error("TopUp - Balance fetch error:", {
+        message: err.message,
+        response: err.response?.data,
+        userId,
+      });
       throw err;
     }
   };
@@ -103,23 +101,28 @@ function TopUp({ customer }) {
       return;
     }
 
+    const formattedAmount = parsedAmount.toFixed(2);
+    if (!/^\d+\.\d{2}$/.test(formattedAmount)) {
+      setError("Amount must be a valid number with exactly two decimal places (e.g., 100.00).");
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     try {
-      const formattedAmount = parsedAmount.toFixed(2);
-
       const transferData = {
         sender_id: user._id,
         receiver_id: customer.user_id,
-        amount: formattedAmount,
+        amount: formattedAmount, // String like "100.00"
         transaction_type: "TopUp",
         payment_method: selectedMethod,
         remarks: remarks || undefined,
+        status: "Pending", // Valid enum value
       };
 
-      console.log("Sending transfer data:", transferData);
-      console.log("API URL:", `${import.meta.env.VITE_BASE_URL}/transactions/transfer`);
+      console.log("TopUp - Sending transfer data:", transferData);
+      console.log("TopUp - API URL:", `${import.meta.env.VITE_BASE_URL}/transactions/transfer`);
 
       const transferResponse = await axios.post(
         `${import.meta.env.VITE_BASE_URL}/transactions/transfer`,
@@ -127,15 +130,17 @@ function TopUp({ customer }) {
         { withCredentials: true }
       );
 
-      console.log("Transfer response:", transferResponse.data);
+      console.log("TopUp - Transfer response:", transferResponse.data);
 
       if (!transferResponse.data.success) {
         throw new Error(transferResponse.data.message || "Failed to process top-up");
       }
 
       const transaction = transferResponse.data.transaction;
-      if (!transaction.transaction_id) {
-        throw new Error("Transaction ID missing in response");
+      if (!transaction || !transaction.transaction_id) {
+        throw new Error(
+          "Transaction ID missing in response. The backend may have failed to create the transaction due to a validation error or database issue."
+        );
       }
 
       // Fetch the receiver's updated balance
@@ -145,23 +150,29 @@ function TopUp({ customer }) {
       setNewBalance(balanceValue);
       setTopUpComplete(true);
     } catch (err) {
-      console.error("Top-up error:", {
+      console.error("TopUp - Top-up error:", {
         status: err.response?.status,
         data: err.response?.data,
         message: err.message,
         fullError: err,
       });
       const errorMessage =
-        err.response?.status === 400 && err.response?.data?.message.includes("Insufficient balance")
+        err.response?.status === 400 && err.response?.data?.message.includes("Insufficient")
           ? "Sender has insufficient balance to complete the top-up."
-          : err.response?.status === 400 && err.response?.data?.message.includes("Invalid data")
+          : err.response?.status === 400 && err.response?.data?.message.includes("Invalid")
           ? "Invalid data provided. Please check your inputs."
           : err.response?.status === 400 && err.response?.data?.message.includes("limit")
           ? err.response.data.message
           : err.response?.status === 404
           ? "User or balance not found. Please check the server configuration."
+          : err.response?.status === 500 && err.response?.data?.details?.includes("Cannot increment with non-numeric argument")
+          ? "Server error: The balance data in the database is stored incorrectly (as text instead of a number). Please contact support to update the UserBalance collection to use a numeric type (e.g., Decimal128) for the balance field, or manually convert the balance using: db.userbalances.updateMany({}, [{ $set: { balance: { $toDecimal: '$balance' } } }])."
+          : err.response?.status === 500 && err.response?.data?.details?.includes("is not a valid enum value for path `status`")
+          ? "Server error: The transaction status is incorrectly set to 'completed' in the backend, which is invalid. Please contact support to update the transaction creation logic to use a valid status (Pending, Success, or Failed). As a temporary workaround, you can manually create a transaction in the database with status 'Success' using: db.transactions.insertOne({ transaction_id: 'TXN999999', sender_id: ObjectId('senderObjectId'), receiver_id: ObjectId('receiverObjectId'), amount: '100.00', transaction_type: 'TopUp', payment_method: 'Cash', status: 'Success', created_at: new Date() })."
+          : err.message.includes("Transaction ID missing in response")
+          ? "Server error: The backend failed to return a valid transaction ID. This may be due to a validation error (e.g., invalid status) or a database issue with the Counter collection. Please contact support to fix the transaction creation logic or check the Counter collection. As a workaround, manually create a transaction using: db.transactions.insertOne({ transaction_id: 'TXN999999', sender_id: ObjectId('senderObjectId'), receiver_id: ObjectId('receiverObjectId'), amount: '100.00', transaction_type: 'TopUp', payment_method: 'Cash', status: 'Success', created_at: new Date() }) and ensure the Counter collection has a valid entry for 'transaction_id'."
           : err.response?.status === 500
-          ? err.response?.data?.message || "Server error occurred. Please try again or contact support."
+          ? err.response?.data?.details || err.response?.data?.message || "Server error occurred. Please try again or contact support."
           : err.message || "An error occurred during top-up.";
       setError(errorMessage);
     } finally {
@@ -177,7 +188,7 @@ function TopUp({ customer }) {
       newBalance: formatAmount(newBalance),
       transactionId: transactionId,
     };
-    console.log("Success data passed to TopUpSuccess:", successData);
+    console.log("TopUp - Success data passed to TopUpSuccess:", successData);
 
     return (
       <TopUpSuccess
@@ -186,7 +197,7 @@ function TopUp({ customer }) {
           ...customer,
           sender_id: user._id,
           receiver_id: customer.user_id,
-        }} // Pass sender_id and receiver_id
+        }}
         onNewTopUp={() => {
           setTopUpComplete(false);
           setAmount("");

@@ -31,6 +31,7 @@ const QrScanner = () => {
   const [isSuccess, setIsSuccess] = useState(true);
   const [amount, setAmount] = useState("");
   const [manualQrCode, setManualQrCode] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { user, loading } = useAuth();
   const navigate = useNavigate();
 
@@ -129,7 +130,6 @@ const QrScanner = () => {
   };
 
   const handlePaymentSubmit = async () => {
-    console.log("handlePaymentSubmit - user:", user, "sender_id:", user?._id);
     if (!isCustomer || !user?._id) {
       setResultMessage(user ? "Only customers can make payments." : "Please log in to make payments.");
       setIsSuccess(false);
@@ -152,26 +152,19 @@ const QrScanner = () => {
       return;
     }
 
-    try {
-      const balanceResponse = await axios.get(
-        `${import.meta.env.VITE_BASE_URL}/user-balance/fetch-balance-by-id/${user._id}`,
-        { withCredentials: true }
-      );
-      const currentBalance = parseFloat(balanceResponse.data.data.balance || "0.00");
-      const paymentAmount = parseFloat(amount);
-      if (currentBalance < paymentAmount) {
-        setResultMessage(`Insufficient balance. Current balance: ₹${currentBalance.toFixed(2)}`);
-        setIsSuccess(false);
-        setShowResultDialog(true);
-        return;
-      }
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
-      const transactionResponse = await axios.post(
-        `${import.meta.env.VITE_BASE_URL}/transactions/create-transaction`,
+    try {
+      const paymentAmount = parseFloat(amount).toFixed(2);
+      console.log("Initiating payment:", { amount: paymentAmount, sender_id: user._id, receiver_id: parsedData.restaurant_id });
+
+      const response = await axios.post(
+        `${import.meta.env.VITE_BASE_URL}/transactions/process-payment`,
         {
           sender_id: user._id,
           receiver_id: parsedData.restaurant_id,
-          amount: paymentAmount.toFixed(2),
+          amount: paymentAmount,
           transaction_type: "Transfer",
           payment_method: "Gpay",
           status: "Success",
@@ -180,40 +173,28 @@ const QrScanner = () => {
         { withCredentials: true }
       );
 
-      await axios.post(
-        `${import.meta.env.VITE_BASE_URL}/user-balance/create-or-update-balance`,
-        {
-          user_id: user._id,
-          balance: (currentBalance - paymentAmount).toFixed(2),
-        },
-        { withCredentials: true }
-      );
-
-      const restaurantBalanceResponse = await axios.get(
-        `${import.meta.env.VITE_BASE_URL}/user-balance/fetch-balance-by-id/${parsedData.restaurant_id}`,
-        { withCredentials: true }
-      );
-      const restaurantCurrentBalance = parseFloat(restaurantBalanceResponse.data.data.balance || "0.00");
-      await axios.post(
-        `${import.meta.env.VITE_BASE_URL}/user-balance/create-or-update-balance`,
-        {
-          user_id: parsedData.restaurant_id,
-          balance: (restaurantCurrentBalance + paymentAmount).toFixed(2),
-        },
-        { withCredentials: true }
-      );
-
+      console.log("Payment response:", response.data);
       setShowPaymentDialog(false);
-      setResultMessage(`Payment of ₹${paymentAmount.toFixed(2)} to ${parsedData.store} completed successfully!`);
+      // Always include the payment amount and store name in the success message
+      setResultMessage(
+        `You have successfully sent ₹${paymentAmount} to ${parsedData.store}. ${
+          response.data.message.includes("New customer balance")
+            ? response.data.message
+            : ""
+        }`
+      );
       setIsSuccess(true);
       setShowResultDialog(true);
       setManualQrCode("");
       setAmount("");
     } catch (err) {
+      consolefrancais
       console.error("Payment failed:", err.response?.data || err.message);
       setResultMessage(err.response?.data?.message || "Payment failed. Please try again.");
       setIsSuccess(false);
       setShowResultDialog(true);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -328,115 +309,115 @@ const QrScanner = () => {
             </ul>
           </div>
         </div>
-
-        <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
-          <DialogContent className="max-w-[90vw] sm:max-w-lg md:max-w-xl lg:max-w-2xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="text-lg sm:text-xl md:text-2xl">Complete Payment</DialogTitle>
-              <DialogDescription className="text-sm sm:text-base">
-                Enter the payment amount and confirm details.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="bg-[#f4f6ff] border text-sm sm:text-base text-gray-700 px-4 py-2 rounded mb-4 space-y-1">
-              {parsedData.name && (
-                <p>
-                  <span className="font-medium text-[#00004d]">Name:</span>{" "}
-                  {parsedData.name}
-                </p>
-              )}
-              {parsedData.store && (
-                <p>
-                  <span className="font-medium text-[#00004d]">Store:</span>{" "}
-                  {parsedData.store}
-                </p>
-              )}
-              <p>
-                <span className="font-medium text-[#00004d]">QR Code:</span>{" "}
-                {result.length > 50 ? result.slice(0, 50) + "..." : result}
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-4">
-              <label className="text-sm sm:text-base text-gray-600">Amount (₹)</label>
-              <Input
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="amount"
-                step="0.01"
-                min="0.01"
-                className="text-sm sm:text-base"
-              />
-            </div>
-
-            <DialogFooter>
-              <Button
-                onClick={() => setShowPaymentDialog(false)}
-                className="bg-gray-500 hover:bg-gray-600 text-sm sm:text-base"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handlePaymentSubmit}
-                className="bg-[#000066] hover:bg-[#000080] text-white text-sm sm:text-base"
-                disabled={!isCustomer || !amount}
-              >
-                Pay Now
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={showResultDialog} onOpenChange={setShowResultDialog}>
-          <DialogContent className="max-w-[90vw] sm:max-w-lg md:max-w-md lg:max-w-lg max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <div className={`flex items-center gap-3 ${isSuccess ? 'text-green-600' : 'text-red-600'}`}>
-                {isSuccess ? (
-                  <CheckCircle2 className="w-6 h-6" />
-                ) : (
-                  <XCircle className="w-6 h-6" />
-                )}
-                <DialogTitle className="text-lg sm:text-xl md:text-2xl">
-                  {isSuccess ? "Payment Successful" : "Payment Failed"}
-                </DialogTitle>
-              </div>
-              <DialogDescription className="text-sm sm:text-base">
-                {isSuccess ? "Your transaction was completed successfully." : "Please try again or contact support."}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex flex-col items-center text-center gap-4 py-4">
-              {isSuccess ? (
-                <>
-                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-                    <CheckCircle2 className="w-10 h-10 text-green-600" />
-                  </div>
-                  <div>
-                    <p className="text-gray-700 font-medium text-sm sm:text-base">{resultMessage}</p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
-                    <XCircle className="w-10 h-10 text-red-600" />
-                  </div>
-                  <div>
-                    <p className="text-gray-700 font-medium text-sm sm:text-base">{resultMessage}</p>
-                  </div>
-                </>
-              )}
-            </div>
-            <DialogFooter>
-              <Button
-                onClick={() => setShowResultDialog(false)}
-                className={`w-full ${isSuccess ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'} text-sm sm:text-base`}
-              >
-                {isSuccess ? 'Continue' : 'Close'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </Card>
+
+      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
+        <DialogContent className="max-w-[90vw] sm:max-w-lg md:max-w-xl lg:max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-lg sm:text-xl md:text-2xl">Complete Payment</DialogTitle>
+            <DialogDescription className="text-sm sm:text-base">
+              Enter the payment amount and confirm details.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="bg-[#f4f6ff] border text-sm sm:text-base text-gray-700 px-4 py-2 rounded mb-4 space-y-1">
+            {parsedData.name && (
+              <p>
+                <span className="font-medium text-[#00004d]">Name:</span>{" "}
+                {parsedData.name}
+              </p>
+            )}
+            {parsedData.store && (
+              <p>
+                <span className="font-medium text-[#00004d]">Store:</span>{" "}
+                {parsedData.store}
+              </p>
+            )}
+            <p>
+              <span className="font-medium text-[#00004d]">QR Code:</span>{" "}
+              {result.length > 50 ? result.slice(0, 50) + "..." : result}
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-4">
+            <label className="text-sm sm:text-base text-gray-600">Amount (₹)</label>
+            <Input
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="amount"
+              step="0.01"
+              min="0.01"
+              className="text-sm sm:text-base"
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              onClick={() => setShowPaymentDialog(false)}
+              className="bg-gray-500 hover:bg-gray-600 text-sm sm:text-base"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handlePaymentSubmit}
+              className="bg-[#000066] hover:bg-[#000080] text-white text-sm sm:text-base"
+              disabled={!isCustomer || !amount || isSubmitting}
+            >
+              Pay Now
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showResultDialog} onOpenChange={setShowResultDialog}>
+        <DialogContent className="max-w-[90vw] sm:max-w-lg md:max-w-md lg:max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <div className={`flex items-center gap-3 ${isSuccess ? 'text-green-600' : 'text-red-600'}`}>
+              {isSuccess ? (
+                <CheckCircle2 className="w-6 h-6" />
+              ) : (
+                <XCircle className="w-6 h-6" />
+              )}
+              <DialogTitle className="text-lg sm:text-xl md:text-2xl">
+                {isSuccess ? "Payment Successful" : "Payment Failed"}
+              </DialogTitle>
+            </div>
+            <DialogDescription className="text-sm sm:text-base">
+              {isSuccess ? "Your transaction was completed successfully." : "Please try again or contact support."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center text-center gap-4 py-4">
+            {isSuccess ? (
+              <>
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                  <CheckCircle2 className="w-10 h-10 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-gray-700 font-medium text-sm sm:text-base">{resultMessage}</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+                  <XCircle className="w-10 h-10 text-red-600" />
+                </div>
+                <div>
+                  <p className="text-gray-700 font-medium text-sm sm:text-base">{resultMessage}</p>
+                </div>
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => setShowResultDialog(false)}
+              className={`w-full ${isSuccess ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'} text-sm sm:text-base`}
+            >
+              {isSuccess ? 'Continue' : 'Close'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card className="mt-10 w-full max-w-6xl p-8 rounded-2xl shadow-md bg-white mx-auto">
         <FoodStalls handlePayNow={handleManualPayNow} />

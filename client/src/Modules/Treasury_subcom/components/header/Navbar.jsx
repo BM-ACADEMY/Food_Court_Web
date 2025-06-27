@@ -20,12 +20,15 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ChevronsUpDown, LogOut, User, Save } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 const UserDashboardHeader = () => {
   const { user, setUser, logout } = useAuth();
   const [openAccount, setOpenAccount] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [editData, setEditData] = useState({});
+  const navigate=useNavigate();
+
 
   useEffect(() => {
     if (user) {
@@ -48,6 +51,9 @@ const UserDashboardHeader = () => {
     }
   };
 
+  const handleHome=()=>{
+    navigate('/')
+  }
   const handleLogout = () => {
     // Clear sessionStorage flag for dropdown
     sessionStorage.removeItem("dropdownSubmitted");
@@ -62,9 +68,9 @@ const UserDashboardHeader = () => {
       <header className="w-full bg-[#000052] text-white px-6 py-4 flex items-center justify-between shadow-md">
         {/* Left */}
         <div className="flex items-center gap-3">
-          <img src={Pegasus} alt="Pegasus Logo" className="w-10 h-10" />
+          <img src={Pegasus} alt="Pegasus Logo" className="w-10 h-10 cursor-pointer" onClick={handleHome}/>
           <div>
-            <h1 className="text-base md:text-base font-bold tracking-wide">
+            <h1 className="text-base md:text-base font-bold tracking-wide cursor-pointer" onClick={handleHome}>
               PEGASUS 2K25
             </h1>
 
@@ -72,7 +78,7 @@ const UserDashboardHeader = () => {
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center text-sm md:text-xs font-medium text-white/80 hover:underline">
                   {user.name}
-                  <span className="ml-1 text-white/60">
+                  <span className="ml-1 text-white/60 cursor-pointer" onClick={handleHome}>
                     ({user.role?.name || "User"})
                   </span>
                   <ChevronsUpDown className="ml-2 h-4 w-4 text-white/50" />

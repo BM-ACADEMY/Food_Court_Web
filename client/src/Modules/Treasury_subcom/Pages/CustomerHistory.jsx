@@ -6,10 +6,25 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
+  DialogClose,
 } from "@/components/ui/dialog";
-import { QrCode, ScanLine } from "lucide-react";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationPrevious,
+  PaginationNext,
+} from "@/components/ui/pagination";
+import { QrCode, ScanLine, FileText, FileSpreadsheet, FileSignature } from "lucide-react";
 import { Html5Qrcode } from "html5-qrcode";
 import axios from "axios";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 
 export default function CustomerHistory() {
   const [showDetails, setShowDetails] = useState(false);
@@ -20,7 +35,10 @@ export default function CustomerHistory() {
   const [error, setError] = useState("");
   const [transactions, setTransactions] = useState([]);
   const [filteredTransactions, setFilteredTransactions] = useState([]);
-  const [activeFilter, setActiveFilter] = useState("all");
+  const [pagination, setPagination] = useState({ page: 1, limit: 10, totalPages: 1 });
+  const [openDialog, setOpenDialog] = useState(false);
+  const [exportFormat, setExportFormat] = useState("csv");
+  const [dateFilter, setDateFilter] = useState("all");
   const qrRef = useRef(null);
   const html5QrCodeRef = useRef(null);
 
@@ -111,7 +129,7 @@ export default function CustomerHistory() {
       const { customer_id, user_id, status, registration_type, created_at } = customerResponse.data.data;
 
       // Log user_id for debugging
-      console.log("User ID from QR scan:", user_id);
+      console.log("User ID from QR scan:", user_id._id);
 
       // Fetch customer details
       let detailsResponse;
@@ -149,27 +167,27 @@ export default function CustomerHistory() {
 
       const newScannedData = {
         customerId: customer_id || "N/A",
-        userId: user_id || "N/A",
-        name: customerData.name || "N/A",
-        phone: customerData.phone_number || "N/A",
-        email: customerData.email || "N/A",
+        name: customerData.name || user_id.name || "N/A",
+        phone: customerData.phone_number || user_id.phone_number || "N/A",
+        email: customerData.email || user_id.email || "N/A",
         currentBalance: balanceValue,
         registrationDate: created_at
           ? new Date(created_at).toLocaleDateString()
           : "20 Jan 2024",
         status: status || "Unknown",
         customerType: registration_type || "Unknown",
+        userId: user_id._id,
       };
 
       console.log("Scanned customer data:", newScannedData);
-      setScannedData(newScannedData);
       setShowDetails(true);
+      setScannedData(newScannedData);
       setScannerOpen(false);
       await stopScanner();
 
       // Fetch transactions using the user_id
-      if (user_id) {
-        await fetchTransactions(user_id);
+      if (user_id._id) {
+        await fetchTransactions(user_id._id);
       } else {
         setError("No user_id found for transactions.");
         setTransactions([]);
@@ -183,6 +201,7 @@ export default function CustomerHistory() {
       });
       if (err.response?.status === 401) {
         setError("Authentication failed. Please log in and try again.");
+     e
       } else if (err.response?.status === 404) {
         setError(err.response?.data?.message || "Customer not found for this QR code.");
       } else {
@@ -197,14 +216,17 @@ export default function CustomerHistory() {
   };
 
   // Fetch transaction history for the user
-  const fetchTransactions = async (userId) => {
+  const fetchTransactions = async (userId, page = 1, dateFilterValue = dateFilter) => {
     try {
-      // Log userId for debugging
-      console.log("Fetching transactions for userId:", userId);
+      console.log("Fetching transactions for userId:", userId, "with dateFilter:", dateFilterValue);
 
-      // Basic validation to ensure userId is a non-empty string
       if (!userId || typeof userId !== "string") {
         throw new Error("User ID is missing or invalid.");
+      }
+
+      let queryParams = `page=${page}&limit=${pagination.limit}`;
+      if (dateFilterValue !== "all") {
+        queryParams += `&quickFilter=${dateFilterValue}`;
       }
 
       let response;
@@ -212,14 +234,14 @@ export default function CustomerHistory() {
       while (retries > 0) {
         try {
           response = await axios.get(
-            `${BASE_URL}/transactions/history?userType=all&transactionType=all`,
+            `${BASE_URL}/transactions/history/user/${userId}/detailed?${queryParams}`,
             { withCredentials: true }
           );
           break;
         } catch (err) {
           if (err.response?.status === 500 && retries > 1) {
             retries--;
-            console.warn(`Retrying /transactions/history (attempt ${4 - retries})`);
+            console.warn(`Retrying /transactions/history/user/${userId}/detailed (attempt ${4 - retries})`);
             await new Promise((resolve) => setTimeout(resolve, 1000));
             continue;
           }
@@ -229,37 +251,12 @@ export default function CustomerHistory() {
 
       console.log("Transaction history response:", response.data);
 
-      if (response?.data?.transactions) {
-        // Filter transactions where user is sender or receiver
-        const userTransactions = response.data.transactions.filter(
-          (txn) =>
-            (txn.sender_id && String(txn.sender_id._id) === String(userId)) ||
-            (txn.receiver_id && String(txn.receiver_id._id) === String(userId))
-        );
-
-        console.log("Filtered user transactions:", userTransactions);
-
-        const formattedTransactions = userTransactions.map((txn) => {
-          const isSender = txn.sender_id && String(txn.sender_id._id) === String(userId);
-          const amountValue = parseFloat(txn.amount);
-          const isPositive = !isSender || txn.type === "Refund" || txn.type === "TopUp";
-
-          return {
-            type: txn.type,
-            date: txn.datetime,
-            method: `${txn.payment_method || "N/A"} • ${txn.description || txn.type}`,
-            id: txn.id,
-            amount: isPositive ? `+₹${amountValue.toFixed(2)}` : `-₹${amountValue.toFixed(2)}`,
-            balance: scannedData?.currentBalance
-              ? `₹${scannedData.currentBalance.toFixed(2)}`
-              : "N/A",
-            color: isPositive ? "text-green-600" : "text-red-500",
-            icon: txn.type === "TopUp" ? "➕" : txn.type === "Refund" ? "↩️" : "🔒",
-          };
-        });
-
-        setTransactions(formattedTransactions);
-        setFilteredTransactions(formattedTransactions);
+      if (response?.data?.success && response.data.transactions) {
+        const userTransactions = response.data.transactions;
+        console.log("User transactions:", userTransactions);
+        setTransactions(userTransactions);
+        setFilteredTransactions(userTransactions);
+        setPagination(response.data.pagination || { page: 1, limit: 10, totalPages: 1 });
       } else {
         console.warn("No transactions found or empty response.");
         setTransactions([]);
@@ -278,7 +275,7 @@ export default function CustomerHistory() {
         setError("No transactions found for this user.");
       } else {
         setError(
-          err.message || "Failed to fetch transactions. Please try again."
+          err.response?.data?.message || "Failed to fetch transactions. Please try again."
         );
       }
       setTransactions([]);
@@ -286,14 +283,109 @@ export default function CustomerHistory() {
     }
   };
 
-  // Filter transactions by type
-  const filterTransactions = (type) => {
-    setActiveFilter(type);
-    if (type === "all") {
-      setFilteredTransactions(transactions);
-    } else {
-      const filtered = transactions.filter((txn) => txn.type.toLowerCase() === type.toLowerCase());
-      setFilteredTransactions(filtered);
+  // Manual CSV generation function
+  const generateCSV = (transactions) => {
+    const headers = ["ID,Date,Type,Payment Method,Amount,Status,Customer ID"];
+    const rows = transactions.map(txn =>
+      [
+        `"${txn.id || "N/A"}"`,
+        `"${txn.date || "N/A"}"`,
+        `"${txn.type || "N/A"}"`,
+        `"${txn.payment_method || "N/A"}"`,
+        `"${txn.amount || "0.00"}"`,
+        `"${txn.status || "N/A"}"`,
+        `"${txn.customer_id || "N/A"}"`,
+      ].join(",")
+    );
+    return [...headers, ...rows].join("\n");
+  };
+
+  // Export transaction data
+  const exportData = async () => {
+    if (!scannedData?.userId) {
+      setError("No customer data available to export Novak export.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await axios.get(
+        `${BASE_URL}/transactions/history/user/${scannedData.userId}/detailed`,
+        { withCredentials: true }
+      );
+
+      if (!response?.data?.success || !response.data.transactions) {
+        throw new Error("No transactions found for export.");
+      }
+
+      const transactions = response.data.transactions;
+      const filename = `transactions_${scannedData.customerId}_${new Date().toISOString().split('T')[0]}`;
+
+      if (exportFormat === "csv") {
+        const csv = generateCSV(transactions);
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `${filename}.csv`;
+        link.click();
+      } else if (exportFormat === "excel") {
+        const worksheetData = transactions.map(txn => ({
+          ID: txn.id || "N/A",
+          Date: txn.date || "N/A",
+          Type: txn.type || "N/A",
+          PaymentMethod: txn.payment_method || "N/A",
+          Amount: txn.amount || "0.00",
+          Status: txn.status || "N/A",
+          CustomerID: txn.customer_id || "N/A",
+        }));
+        const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Transactions");
+        XLSX.writeFile(workbook, `${filename}.xlsx`);
+      } else if (exportFormat === "pdf") {
+        const doc = new jsPDF();
+        doc.text(`Transaction History for Customer ${scannedData.customerId}`, 14, 20);
+        autoTable(doc, {
+          startY: 30,
+          head: [['ID', 'Date', 'Type', 'Payment Method', 'Amount', 'Status', 'Customer ID']],
+          body: transactions.map(txn => [
+            txn.id || "N/A",
+            txn.date || "N/A",
+            txn.type || "N/A",
+            txn.payment_method || "N/A",
+            txn.amount || "0.00",
+            txn.status || "N/A",
+            txn.customer_id || "N/A",
+          ]),
+          theme: 'striped',
+          styles: { fontSize: 10 },
+          headStyles: { fillColor: [11, 7, 66] }, // #0B0742
+        });
+        doc.save(`${filename}.pdf`);
+      }
+
+      setOpenDialog(false);
+    } catch (err) {
+      console.error("Export error:", err);
+      setError("Failed to export transactions. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle date filter change
+  const handleDateFilterChange = (value) => {
+    setDateFilter(value);
+    if (scannedData?.userId) {
+      fetchTransactions(scannedData.userId, 1, value);
+    }
+  };
+
+  // Handle pagination
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= pagination.totalPages && scannedData) {
+      setPagination({ ...pagination, page: newPage });
+      fetchTransactions(scannedData.userId, newPage, dateFilter);
     }
   };
 
@@ -308,26 +400,6 @@ export default function CustomerHistory() {
     }
     return () => stopScanner();
   }, [scannerOpen]);
-
-  // Close details view
-  const handleClose = () => {
-    setShowDetails(false);
-    setScannedData(null);
-    setError("");
-    setTransactions([]);
-    setFilteredTransactions([]);
-    setActiveFilter("all");
-    window.history.back();
-  };
-
-  // Scroll transaction list
-  const handleScroll = (direction) => {
-    const container = document.querySelector(".space-y-4");
-    if (container) {
-      const scrollAmount = 200;
-      container.scrollTop += direction === "up" ? -scrollAmount : scrollAmount;
-    }
-  };
 
   return (
     <div className="flex justify-center items-center min-h-screen bg-gray-100 px-4 py-10">
@@ -354,14 +426,16 @@ export default function CustomerHistory() {
                 <DialogHeader>
                   <DialogTitle>Scan QR Code</DialogTitle>
                 </DialogHeader>
-                <div className="relative w-full h-64 bg-gray-100 border border-dashed border-[#070149] rounded-lg overflow-hidden">
+                < apt
+                  className="relative w-full h-64 bg-gray-100 border border-dashed border-[#070149] rounded-lg overflow-hidden"
+                >
                   {!html5QrCodeRef.current && (
                     <div className="absolute inset-0 flex items-center justify-center">
                       <ScanLine className="w-20 h-20 text-[#070149]" />
                     </div>
                   )}
                   <div id="qr-reader" ref={qrRef} className="w-full h-full" />
-                </div>
+                </apt>
                 {cameraError && (
                   <p className="text-red-500 text-sm mt-2">{cameraError}</p>
                 )}
@@ -398,10 +472,49 @@ export default function CustomerHistory() {
           <div className="p-6 space-y-6">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold">Customer Details</h3>
-              <button className="text-sm text-[# Pondicherry University0B0742] hover:underline">⬇️ Export Data</button>
+              <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+                <DialogTrigger asChild>
+                  <button className="text-sm text-[#0B0742] hover:underline">⬇️ Export Data</button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle className="text-lg font-semibold">Export Transactions</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-3">
+                    <RadioGroup value={exportFormat} onValueChange={setExportFormat}>
+                      <div className="flex items-center gap-3 p-2 rounded-md hover:bg-muted cursor-pointer">
+                        <RadioGroupItem value="csv" id="export-csv" />
+                        <Label htmlFor="export-csv" className="flex items-center gap-2">
+                          <FileText size={18} /> CSV
+                        </Label>
+                      </div>
+                      <div className="flex items-center gap-3 p-2 rounded-md hover:bg-muted cursor-pointer">
+                        <RadioGroupItem value="excel" id="export-excel" />
+                        <Label htmlFor="export-excel" className="flex items-center gap-2">
+                          <FileSpreadsheet size={18} /> Excel (.xlsx)
+                        </Label>
+                      </div>
+                      <div className="flex items-center gap-3 p-2 rounded-md hover:bg-muted cursor-pointer">
+                        <RadioGroupItem value="pdf" id="export-pdf" />
+                        <Label htmlFor="export-pdf" className="flex items-center gap-2">
+                          <FileSignature size={18} /> PDF
+                        </Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                  <DialogFooter className="pt-4">
+                    <DialogClose asChild>
+                      <Button variant="outline">Cancel</Button>
+                    </DialogClose>
+                    <Button onClick={exportData} disabled={loading}>
+                      {loading ? "Exporting..." : "Export"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               <p><strong>Name:</strong> {scannedData.name}</p>
               <p><strong>Email:</strong> {scannedData.email}</p>
               <p><strong>Phone:</strong> {scannedData.phone}</p>
@@ -417,33 +530,7 @@ export default function CustomerHistory() {
 
             {/* Transaction History */}
             <div className="pt-6 border-t">
-              <div className="flex justify-between items-center mb-4">
-                <div className="flex space-x-4">
-                  <button
-                    className={`border-b-2 ${activeFilter === "all" ? "border-blue-600 text-blue-600" : "border-transparent"}`}
-                    onClick={() => filterTransactions("all")}
-                  >
-                    All Transactions
-                  </button>
-                  <button
-                    className={`border-b-2 ${activeFilter === "topup" ? "border-blue-600 text-blue-600" : "border-transparent"}`}
-                    onClick={() => filterTransactions("topup")}
-                  >
-                    Top Ups
-                  </button>
-                  <button
-                    className={`border-b-2 ${activeFilter === "transfer" ? "border-blue-600 text-blue-600" : "border-transparent"}`}
-                    onClick={() => filterTransactions("transfer")}
-                  >
-                    Purchases
-                  </button>
-                  <button
-                    className={`border-b-2 ${activeFilter === "refund" ? "border-blue-600 text-blue-600" : "border-transparent"}`}
-                    onClick={() => filterTransactions("refund")}
-                  >
-                    Refunds
-                  </button>
-                </div>
+              <div className="flex justify-end items-center mb-4">
                 <div className="flex space-x-2">
                   <input
                     type="text"
@@ -452,16 +539,21 @@ export default function CustomerHistory() {
                     onChange={(e) => {
                       const searchTerm = e.target.value.toLowerCase();
                       const filtered = transactions.filter((txn) =>
-                        txn.method.toLowerCase().includes(searchTerm) || txn.id.toLowerCase().includes(searchTerm)
+                        (txn.payment_method || "").toLowerCase().includes(searchTerm) ||
+                        (txn.id || "").toLowerCase().includes(searchTerm)
                       );
                       setFilteredTransactions(filtered);
                     }}
                   />
-                  <select className="border px-3 py-1 text-sm rounded-md">
-                    <option>All Time</option>
-                    <option>Today</option>
-                    <option>Yesterday</option>
-                    <option>Last 7 Days</option>
+                  <select
+                    className="border px-3 py-1 text-sm rounded-md"
+                    value={dateFilter}
+                    onChange={(e) => handleDateFilterChange(e.target.value)}
+                  >
+                    <option value="all">All Time</option>
+                    <option value="today">Today</option>
+                    <option value="yesterday">Yesterday</option>
+                    <option value="last7days">Last 7 Days</option>
                   </select>
                 </div>
               </div>
@@ -473,16 +565,17 @@ export default function CustomerHistory() {
                       <div className="flex justify-between items-center">
                         <div>
                           <div className="flex items-center gap-2 font-medium">
-                            <span>{txn.icon}</span>
-                            <span>{txn.type}</span>
+                            <span>{txn.icon || "📄"}</span>
+                            <span>{txn.type || "N/A"}</span>
                           </div>
-                          <p className="text-gray-600">{txn.date}</p>
-                          <p className="text-gray-500">{txn.method}</p>
-                          <p className="text-xs text-gray-400">ID: {txn.id}</p>
+                          <p className="text-gray-600">{txn.date || "N/A"}</p>
+                          <p className="text-gray-500">{txn.payment_method || "N/A"}</p>
+                          <p className="text-xs text-gray-400">ID: {txn.id || "N/A"}</p>
+                          <p className="text-xs text-gray-400">Customer ID: {txn.customer_id || "N/A"}</p>
                         </div>
                         <div className="text-right">
-                          <p className={`${txn.color} font-semibold`}>{txn.amount}</p>
-                          <p className="text-gray-400 text-xs">Balance: {txn.balance}</p>
+                          <p className={`${txn.color || "text-gray-600"} font-semibold`}>{txn.amount || "0.00"}</p>
+                          <p className="text-gray-400 text-xs">Balance: ₹{scannedData.currentBalance.toFixed(2)}</p>
                         </div>
                       </div>
                     </div>
@@ -492,29 +585,37 @@ export default function CustomerHistory() {
                 )}
               </div>
 
-              <div className="text-center mt-4">
-                <button
-                  onClick={handleClose}
-                  className="bg-[#0B0742] text-white px-6 py-2 rounded-lg font-semibold text-sm"
-                >
-                  Close
-                </button>
-              </div>
-
-              <div className="flex justify-center space-x-4 mt-2">
-                <button
-                  onClick={() => handleScroll("up")}
-                  className="bg-[#0B0742] text-white px-3 py-1 rounded-lg"
-                >
-                  ↑
-                </button>
-                <button
-                  onClick={() => handleScroll("down")}
-                  className="bg-[#0B0742] text-white px-3 py-1 rounded-lg"
-                >
-                  ↓
-                </button>
-              </div>
+              {/* Pagination Controls */}
+              {pagination.totalPages > 1 && (
+                <div className="flex justify-center items-center mt-4">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious
+                          onClick={() => handlePageChange(pagination.page - 1)}
+                          disabled={pagination.page === 1}
+                        />
+                      </PaginationItem>
+                      {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((pageNum) => (
+                        <PaginationItem key={pageNum}>
+                          <PaginationLink
+                            onClick={() => handlePageChange(pageNum)}
+                            isActive={pagination.page === pageNum}
+                          >
+                            {pageNum}
+                          </PaginationLink>
+                        </PaginationItem>
+                      ))}
+                      <PaginationItem>
+                        <PaginationNext
+                          onClick={() => handlePageChange(pagination.page + 1)}
+                          disabled={pagination.page === pagination.totalPages}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
             </div>
           </div>
         )}

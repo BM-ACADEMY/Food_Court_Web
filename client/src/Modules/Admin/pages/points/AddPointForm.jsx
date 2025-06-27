@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 
 
+
 export default function AddPointForm({ onSuccess }) {
     const { user } = useAuth();
     const [loading, setLoading] = useState(false);
@@ -37,7 +38,7 @@ export default function AddPointForm({ onSuccess }) {
         setLoading(true);
 
         try {
-            await axios.post(`${import.meta.env.VITE_BASE_URL}/user-balance/create-or-update-balance`, {
+            await axios.post(`${import.meta.env.VITE_BASE_URL}/user-balance/create-or-update-balance-for-master-admin`, {
                 user_id: user._id,
                 balance: Number(balance),
                 transaction_type: transactionType,
@@ -51,7 +52,7 @@ export default function AddPointForm({ onSuccess }) {
                 theme: "colored",
                 transition: Bounce,
             });
-
+           
             setBalance("");
             setTransactionType("Credit");
             setPaymentMethod("");

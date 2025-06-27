@@ -24,144 +24,46 @@ function TopUpSuccess({ data, onNewTopUp, customer }) {
         throw new Error('Authenticated user ID is missing.');
       }
 
+      const objectIdPattern = /^[0-9a-fA-F]{24}$/;
+      if (!objectIdPattern.test(customer.receiver_id)) {
+        console.warn('Invalid receiver_id format:', customer.receiver_id);
+        navigate('/home');
+        return;
+      }
+
       // Debug: Log sender_id and receiver_id
       console.log("Sender ID vs Receiver ID:", {
         senderId: customer.sender_id,
         receiverId: customer.receiver_id,
       });
-      
+
       const customerResponse = await axios.get(
         `${import.meta.env.VITE_BASE_URL}/customers/fetch-all-customer-details`,
+      )
+
+      // Call the fee deduction endpoint
+      const response = await axios.post(
+        `${import.meta.env.VITE_BASE_URL}/fees/fee-deduction`,
+
         {
-          params: { search: customer.receiver_id },
-          withCredentials: true,
-        }
-      );
-
-      console.log("Customer fetch response:", customerResponse.data);
-
-      if (!customerResponse.data.success || !customerResponse.data.customers || customerResponse.data.customers.length === 0) {
-        throw new Error(`No customer found for receiver_id: ${customer.receiver_id}`);
-      }
-
-      // Find customer matching receiver_id
-      const customerData = customerResponse.data.customers.find(
-        (c) => c.user_id._id === customer.receiver_id
-      );
-
-      if (!customerData) {
-        throw new Error(`Customer with receiver_id ${customer.receiver_id} not found in response`);
-      }
-
-      // Validate receiver_id matches Customer.user_id
-      if (customerData.user_id._id !== customer.receiver_id) {
-        throw new Error(`Receiver ID ${customer.receiver_id} does not match customer user_id ${customerData.user_id._id}`);
-      }
-
-      console.log("Receiver ID validation successful:", {
-        receiverId: customer.receiver_id,
-        customerUserId: customerData.user_id._id,
-      });
-
-      const customerMongoId = customerData.customer_id; // Customer ID for update
-      const registrationFeePaid = customerData.registration_fee_paid;
-
-      // Check registration_fee_paid status
-      if (registrationFeePaid) {
-        console.log("Registration fee already paid, navigating to /home");
-        navigate('/home');
-        return;
-      }
-
-      // Check balance for receiver_id
-      const balanceResponse = await axios.get(
-        `${import.meta.env.VITE_BASE_URL}/user-balance/fetch-balance-by-id/${customer.receiver_id}`,
+          sender_id: customer.sender_id,
+          receiver_id: customer.receiver_id,
+        },
         { withCredentials: true }
       );
 
-      console.log("Balance fetch response:", balanceResponse.data);
+      console.log('Fee deduction response:', response.data);
 
-      if (!balanceResponse.data.success) {
-        throw new Error('Failed to fetch balance data');
-      }
-
-      const currentBalance = parseFloat(balanceResponse.data.data.balance.$numberDecimal || balanceResponse.data.data.balance);
-      if (currentBalance < 20) {
-        throw new Error('Insufficient balance to deduct registration fee');
-      }
-
-      // Perform fee deduction and updates
-      try {
-        // Deduct 20 from UserBalance
-        const balanceUpdateResponse = await axios.post(
-          `${import.meta.env.VITE_BASE_URL}/user-balance/create-or-update-balance`,
-          {
-            user_id: customer.receiver_id,
-            balance: -20,
-            transaction_type: 'Debit',
-            payment_method: 'Registration Fee',
-            remarks: 'Registration fee deduction',
-          },
-          { withCredentials: true }
-        );
-
-        if (!balanceUpdateResponse.data.success) {
-          throw new Error('Failed to deduct registration fee from balance');
-        }
-
-        // Create Fee record
-        const feeResponse = await axios.post(
-          `${import.meta.env.VITE_BASE_URL}/fees/create-fee`,
-          {
-            user_id: customer.receiver_id,
-            amount: 20,
-          },
-          { withCredentials: true }
-        );
-
-        if (!feeResponse.data.success) {
-          throw new Error('Failed to create fee record');
-        }
-
-        // Create Transaction record
-        const transactionResponse = await axios.post(
-          `${import.meta.env.VITE_BASE_URL}/transactions/transfer`,
-          {
-            sender_id: customer.sender_id,
-            receiver_id: customer.receiver_id,
-            amount: '20.00',
-            transaction_type: 'Registration Fee',
-            payment_method: 'Balance Deduction',
-            remarks: 'Registration fee payment',
-          },
-          { withCredentials: true }
-        );
-
-        if (!transactionResponse.data.success) {
-          throw new Error('Failed to create transaction record');
-        }
-
-        // Update Customer registration_fee_paid
-        const customerUpdateResponse = await axios.put(
-          `${import.meta.env.VITE_BASE_URL}/customers/update-customer/${customerMongoId}`,
-          {
-            registration_fee_paid: true,
-          },
-          { withCredentials: true }
-        );
-
-        if (!customerUpdateResponse.data.success) {
-          throw new Error('Failed to update customer registration fee status');
-        }
-
-        console.log("Registration fee processed successfully, navigating to /home");
-        navigate('/home');
-      } catch (err) {
-        throw new Error(`Failed to process registration fee operations: ${err.message}`);
+      if (response.data.success) {
+        console.log('Registration fee processed successfully, navigating to /home');
+        navigate('/');
+      } else {
+        throw new Error(response.data.message || 'Failed to process registration fee');
       }
     } catch (err) {
       console.error('Back to Home error:', err);
       alert(`Error processing registration fee: ${err.message || 'Unknown error'}`);
+      // Fallback navigation
     }
   };
 

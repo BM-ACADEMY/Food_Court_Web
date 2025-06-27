@@ -29,6 +29,9 @@ router.post("/create-user", userController.createUser);
 
 //verify otp
 router.post("/verify-otp", userController.verifyOtp);
+router.post("/verify-otp-login-otp", userController.verifyMobileLoginOtp);
+
+router.post("/send-otp-number", userController.sendOtpController);
 
 // GET /api/users/all
 router.get("/fetch-all-users", userController.getUsers);

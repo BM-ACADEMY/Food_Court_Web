@@ -154,10 +154,7 @@ const RestaurantNavbar = () => {
           </p>
           <p className="text-base sm:text-lg md:text-lg lg:text-2xl font-semibold">
             ₹{" "}
-            {user.balance?.toLocaleString("en-IN", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            }) || "0.00"}
+            {user.balance}
           </p>
         </div>
       </header>
