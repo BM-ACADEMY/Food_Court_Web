@@ -70,5 +70,7 @@ const PORT=process.env.PORT || 4000;
 connectDB().then(() => {
   app.listen(PORT,'0.0.0.0', () => {
     console.log(`🚀 Server running on ${PORT}`);
+    // In index.js, after dotenv.config()
+console.log('USE_MONGO_TRANSACTIONS:', process.env.USE_MONGO_TRANSACTIONS);
   });
 });
