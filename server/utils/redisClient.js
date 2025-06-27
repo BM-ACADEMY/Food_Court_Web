@@ -1,4 +1,3 @@
-// redisClient.js
 const { createClient } = require('redis');
 
 const redisClient = createClient({
@@ -10,6 +9,11 @@ const redisClient = createClient({
 
 redisClient.on('error', (err) => console.error('Redis Client Error', err));
 
-redisClient.connect();
+const connectRedis = async () => {
+  if (!redisClient.isOpen) {
+    await redisClient.connect();
+    console.log('Redis connected');
+  }
+};
 
-module.exports = redisClient;
+module.exports = { redisClient, connectRedis };

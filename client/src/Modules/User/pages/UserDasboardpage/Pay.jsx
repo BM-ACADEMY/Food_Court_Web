@@ -243,23 +243,7 @@ const QrScanner = () => {
                 <div id="qr-reader" ref={qrRef} className="w-full h-full" />
               </div>
 
-              <div className="mt-4 w-full">
-                <Input
-                  type="text"
-                  value={manualQrCode}
-                  onChange={(e) => setManualQrCode(e.target.value)}
-                  placeholder="Enter QR Code"
-                  className="text-sm mb-2"
-                  disabled={!isCustomer}
-                />
-                <Button
-                  onClick={handleManualQrSubmit}
-                  className="w-full bg-[#000066] hover:bg-[#000080] text-white text-sm"
-                  disabled={!isCustomer}
-                >
-                  Validate QR Code
-                </Button>
-              </div>
+              
             </div>
 
             <div className="mt-6 w-full flex justify-center">
@@ -427,3 +411,21 @@ const QrScanner = () => {
 };
 
 export default QrScanner;
+
+/*<div className="mt-4 w-full">
+                <Input
+                  type="text"
+                  value={manualQrCode}
+                  onChange={(e) => setManualQrCode(e.target.value)}
+                  placeholder="Enter QR Code"
+                  className="text-sm mb-2"
+                  disabled={!isCustomer}
+                />
+                <Button
+                  onClick={handleManualQrSubmit}
+                  className="w-full bg-[#000066] hover:bg-[#000080] text-white text-sm"
+                  disabled={!isCustomer}
+                >
+                  Validate QR Code
+                </Button>
+              </div>*/

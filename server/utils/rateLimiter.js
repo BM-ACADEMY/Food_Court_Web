@@ -1,26 +1,28 @@
 const { RateLimiterRedis } = require('rate-limiter-flexible');
-const redisClient = require('./redisClient');
+const { redisClient } = require('./redisClient');
 
-const createRateLimiter = ({ points = 20, duration = 60, keyPrefix = 'rl' }) => {
+const createRateLimiter = ({ points = 5, duration = 60, keyPrefix = 'rl' }) => {
   const rateLimiter = new RateLimiterRedis({
     storeClient: redisClient,
     keyPrefix,
-    points,     // Number of requests
-    duration,   // Per duration in seconds
+    points,
+    duration,
   });
 
   return (req, res, next) => {
-    const identifier = req.ip; // Or use req.user.id if authenticated
+    // Fix for IPv6 addresses like ::ffff:127.0.0.1
+    const identifier = req.ip.includes('::ffff:')
+      ? req.ip.split('::ffff:')[1]
+      : req.ip;
 
     rateLimiter.consume(identifier)
-      .then(() => {
-        next(); // Pass request
-      })
+      .then(() => next())
       .catch((rejRes) => {
+        const retrySecs = Math.round(rejRes.msBeforeNext / 1000) || 60;
         res.status(429).json({
           success: false,
-          message: 'Too many requests. Please try again later. 1 minute',
-          retryAfter: Math.round(rejRes.msBeforeNext / 1000) + 's',
+          message: `Too many requests. Please try again later. ${retrySecs}s`,
+          retryAfter: `${retrySecs}s`,
         });
       });
   };
