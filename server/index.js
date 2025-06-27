@@ -5,7 +5,7 @@ const cors =require('cors');
 const helmet=require('helmet');
 const morgan=require('morgan');
 const cookieParser = require('cookie-parser');
-const createRateLimiter=require('./utils/rateLimiter');
+// const createRateLimiter=require('./utils/rateLimiter');
 
 // Load environment variables from .env file
 dotenv.config();
@@ -41,10 +41,10 @@ app.use(cors({
 app.use(helmet());
 app.use(express.json());
 app.use(morgan('dev'));
-app.use(createRateLimiter({
-  points: 10,
-  duration: 60, // 1 minute
-}));
+// app.use(createRateLimiter({
+//   points: 10,
+//   duration: 60, // 1 minute
+// }));
 
 
 
