@@ -184,21 +184,25 @@ export default function Dashboard() {
     }
   };
 
-  const fetchExportData = async (type) => {
-    try {
-      const params = {};
-      if (type === "userType" && userType !== "all") {
-        params.userType = userType;
-      } else if (type === "range" && startDate && endDate) {
-        params.startDate = format(startDate, "yyyy-MM-dd");
-        params.endDate = format(endDate, "yyyy-MM-dd");
+  const fetchExportData = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/dashboards/transactions`, {
+      params: {
+        transactionType: transactionType === "all" ? undefined : transactionType,
+        userType: userType === "all" ? undefined : userType,
+        fromDate: fromDate ? format(fromDate, "yyyy-MM-dd") : undefined,
+        toDate: toDate ? format(toDate, "yyyy-MM-dd") : undefined,
+        limit: 10000, // Large limit for exports
+        page: 1
       }
-      const response = await axios.get(`${API_BASE_URL}/dashboards/export`, { params });
-      setExportData(response.data || []);
-    } catch (error) {
-      console.error("Error fetching export data:", error);
-    }
-  };
+    });
+    return response.data.transactions || [];
+  } catch (error) {
+    console.error("Error fetching export data:", error);
+    throw error;
+  }
+};
+
 
   useEffect(() => {
     fetchFilteredTransactions();
@@ -253,82 +257,102 @@ export default function Dashboard() {
     if (page >= 1 && page <= totalPages) setCurrentPage(page);
   };
 
-  const exportToExcel = () => {
-    const data = exportData.map((item) => ({
-      "Transaction ID": item.id || "N/A",
-      Name: item.name || "Unknown",
-      Phone: item.phone || "N/A",
-      Balance: `₹${(item.balance || 0).toLocaleString()}`,
-      Status: item.status || "N/A",
-      "Last Active": item.lastActive || "N/A",
-    }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Transactions");
-    const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-    const file = new Blob([excelBuffer], { type: "application/octet-stream" });
-    saveAs(file, `transactions_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
-  };
+ const exportToExcel = (data) => {
+  const formattedData = data.map((item) => ({
+    "Transaction ID": item.id || "N/A",
+    "Time": item.time || "N/A",
+    "Type": item.type || "N/A",
+    "From": item.from || "Unknown",
+    "To": item.to || "Unknown",
+    "Amount": item.amount || "₹0",
+    "Status": item.status || "N/A",
+  }));
 
-  const exportToCSV = () => {
-    const data = exportData.map((item) => ({
-      "Transaction ID": item.id || "N/A",
-      Name: item.name || "Unknown",
-      Phone: item.phone || "N/A",
-      Balance: `₹${(item.balance || 0).toLocaleString()}`,
-      Status: item.status || "N/A",
-      "Last Active": item.lastActive || "N/A",
-    }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    const csv = XLSX.utils.sheet_to_csv(ws);
-    const file = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    saveAs(file, `transactions_${format(new Date(), "yyyy-MM-dd")}.csv`);
-  };
+  const ws = XLSX.utils.json_to_sheet(formattedData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Transactions");
+  XLSX.writeFile(wb, `transactions_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+};
 
-  const exportToPDF = () => {
-    try {
-      const doc = new jsPDF();
-      doc.text("Transaction List", 14, 20);
-      autoTable(doc, {
-        startY: 30,
-        head: [["Transaction ID", "Name", "Phone", "Balance", "Status", "Last Active"]],
-        body: exportData.map((item) => [
-          item.id || "N/A",
-          item.name || "Unknown",
-          item.phone || "N/A",
-          `₹${(item.balance || 0).toLocaleString()}`,
-          item.status || "N/A",
-          item.lastActive || "N/A",
-        ]),
-        theme: "grid",
-        styles: { fontSize: 8 },
-        headStyles: { fillColor: [0, 0, 77], textColor: [255, 255, 255] },
-        margin: { top: 30 },
-      });
-      doc.save(`transactions_${format(new Date(), "yyyy-MM-dd")}.pdf`);
-    } catch (error) {
-      console.error("Error exporting to PDF:", error);
+const exportToCSV = (data) => {
+  const formattedData = data.map((item) => ({
+    "Transaction ID": item.id || "N/A",
+    "Time": item.time || "N/A",
+    "Type": item.type || "N/A",
+    "From": item.from || "Unknown",
+    "To": item.to || "Unknown",
+    "Amount": item.amount || "₹0",
+    "Status": item.status || "N/A",
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(formattedData);
+  const csv = XLSX.utils.sheet_to_csv(ws);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  saveAs(blob, `transactions_${format(new Date(), "yyyy-MM-dd")}.csv`);
+};
+
+const exportToPDF = (data) => {
+  const doc = new jsPDF();
+  
+  doc.setFontSize(16);
+  doc.text("Transaction Report", 14, 15);
+  
+  doc.setFontSize(10);
+  doc.text(`Generated on: ${format(new Date(), "yyyy-MM-dd HH:mm")}`, 14, 22);
+  
+  const tableData = data.map((item) => [
+    item.id || "N/A",
+    item.time || "N/A",
+    item.type || "N/A",
+    item.from || "Unknown",
+    item.to || "Unknown",
+    item.amount || "₹0",
+    item.status || "N/A",
+  ]);
+
+  autoTable(doc, {
+    startY: 30,
+    head: [["ID", "Time", "Type", "From", "To", "Amount", "Status"]],
+    body: tableData,
+    theme: "grid",
+    styles: { fontSize: 8 },
+    headStyles: { fillColor: [0, 0, 77] },
+  });
+
+  doc.save(`transactions_${format(new Date(), "yyyy-MM-dd")}.pdf`);
+};
+
+  const handleExport = async () => {
+  try {
+    setIsLoading(true);
+    const data = await fetchExportData();
+    
+    if (!data || data.length === 0) {
+      alert("No data available to export");
+      return;
     }
-  };
 
-  const handleExport = (type) => {
-    fetchExportData(type).then(() => {
-      switch (exportFormat) {
-        case "xlsx":
-          exportToExcel();
-          break;
-        case "csv":
-          exportToCSV();
-          break;
-        case "pdf":
-          exportToPDF();
-          break;
-        default:
-          console.error("Invalid export format");
-      }
-      setIsExportModalOpen(false);
-    });
-  };
+    switch (exportFormat) {
+      case "xlsx":
+        exportToExcel(data);
+        break;
+      case "csv":
+        exportToCSV(data);
+        break;
+      case "pdf":
+        exportToPDF(data);
+        break;
+      default:
+        console.error("Invalid export format");
+    }
+  } catch (error) {
+    console.error("Export failed:", error);
+    alert("Export failed. Please try again.");
+  } finally {
+    setIsLoading(false);
+    setIsExportModalOpen(false);
+  }
+};
 
   return (
     <div className="p-6 space-y-6 font-sans">
@@ -705,47 +729,41 @@ export default function Dashboard() {
       </div>
 
       <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Export Transactions</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <Label className="text-sm font-medium">Select Export Format</Label>
-            <RadioGroup value={exportFormat} onValueChange={setExportFormat} className="mt-2">
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="xlsx" id="xlsx" />
-                <Label htmlFor="xlsx">Excel (xlsx)</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="csv" id="csv" />
-                <Label htmlFor="csv">CSV</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="pdf" id="pdf" />
-                <Label htmlFor="pdf">PDF</Label>
-              </div>
-            </RadioGroup>
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Export Transactions</DialogTitle>
+      </DialogHeader>
+      <div className="py-4">
+        <Label className="text-sm font-medium">Select Export Format</Label>
+        <RadioGroup 
+          value={exportFormat} 
+          onValueChange={setExportFormat} 
+          className="mt-2"
+        >
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="xlsx" id="xlsx" />
+            <Label htmlFor="xlsx">Excel (xlsx)</Label>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsExportModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() =>
-                handleExport(
-                  startDate && endDate
-                    ? "range"
-                    : userType !== "all"
-                      ? "userType"
-                      : "all"
-                )
-              }
-            >
-              OK
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="csv" id="csv" />
+            <Label htmlFor="csv">CSV</Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="pdf" id="pdf" />
+            <Label htmlFor="pdf">PDF</Label>
+          </div>
+        </RadioGroup>
+      </div>
+      <DialogFooter>
+        <Button variant="outline" onClick={() => setIsExportModalOpen(false)}>
+          Cancel
+        </Button>
+        <Button onClick={handleExport} disabled={isLoading}>
+          {isLoading ? "Exporting..." : "Export"}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
     </div>
   );
 }
