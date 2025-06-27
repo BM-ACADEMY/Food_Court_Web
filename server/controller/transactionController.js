@@ -1113,6 +1113,188 @@ exports.getTransactionHistory = async (req, res) => {
 };
 
 
+
+exports.getTransactionTreasuryRestaurantHistory = async (req, res) => {
+  try {
+    const {
+      transactionType = "all",
+      restaurantId = "all",
+      fromDate,
+      toDate,
+      quickFilter,
+      search = "",
+      page = 1,
+      limit = 10,
+    } = req.query;
+
+    // Build filter object
+    let filter = { status: "Success" };
+
+    // Transaction type filter (only Transfer or Refund for restaurant transactions)
+    if (transactionType !== "all") {
+      filter.transaction_type = transactionType;
+    } else {
+      filter.transaction_type = { $in: ["Transfer", "Refund"] };
+    }
+
+    // Fetch restaurant role
+    const restaurantRole = await Role.findOne({ role_id: "role-4" });
+    if (!restaurantRole) {
+      return res.status(400).json({ error: "Restaurant role not found" });
+    }
+
+    // Fetch all restaurant user IDs
+    const restaurantUsers = await User.find({ role_id: restaurantRole._id }).select("_id");
+    const restaurantUserIds = restaurantUsers.map((user) => user._id);
+
+    // Restaurant filter
+    if (restaurantId !== "all") {
+      if (!mongoose.Types.ObjectId.isValid(restaurantId)) {
+        return res.status(400).json({ error: "Invalid restaurant ID" });
+      }
+      filter.$or = [
+        { sender_id: mongoose.Types.ObjectId(restaurantId) },
+        { receiver_id: mongoose.Types.ObjectId(restaurantId) },
+      ];
+    } else {
+      // Only include transactions involving restaurants
+      filter.$or = [
+        { sender_id: { $in: restaurantUserIds } },
+        { receiver_id: { $in: restaurantUserIds } },
+      ];
+    }
+
+    // Date filter
+    const dateFilter = buildDateFilter(quickFilter, fromDate, toDate);
+    if (dateFilter.created_at) {
+      filter = { ...filter, ...dateFilter };
+    }
+
+    // Search by transaction_id, customer name, or customer_id
+    if (search.trim()) {
+      const users = await User.find({
+        $or: [
+          { name: { $regex: search, $options: "i" } },
+          { phone_number: { $regex: search, $options: "i" } },
+        ],
+        role_id: await Role.findOne({ role_id: "role-5" }).select("_id"), // Only customers
+      }).select("_id");
+      const customers = await Customer.find({
+        customer_id: { $regex: search, $options: "i" },
+      }).select("user_id");
+      const userIds = [
+        ...users.map((user) => user._id),
+        ...customers.map((customer) => customer.user_id),
+      ];
+      filter.$or = [
+        { transaction_id: { $regex: search, $options: "i" } },
+        { sender_id: { $in: userIds } },
+        { receiver_id: { $in: userIds } },
+      ];
+    }
+
+    // Pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Fetch transactions
+    const transactionsPromise = Transaction.find(filter)
+      .populate({
+        path: "sender_id",
+        select: "name phone_number role_id",
+        populate: { path: "role_id", select: "role_id name" },
+      })
+      .populate({
+        path: "receiver_id",
+        select: "name phone_number role_id",
+        populate: { path: "role_id", select: "role_id name" },
+      })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+
+    // Calculate statistics
+    const statsPromise = Transaction.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: null,
+          totalTransactions: { $sum: 1 },
+          totalRevenue: { $sum: { $toDouble: "$amount" } },
+          avgTransactionValue: { $avg: { $toDouble: "$amount" } },
+          totalRefunds: {
+            $sum: {
+              $cond: [
+                { $eq: ["$transaction_type", "Refund"] },
+                { $toDouble: "$amount" },
+                0,
+              ],
+            },
+          },
+        },
+      },
+    ]);
+
+    const [transactions, statsResult] = await Promise.all([transactionsPromise, statsPromise]);
+
+    // Enrich with customer_id and customer_name
+    const formattedTransactions = await Promise.all(
+      transactions.map(async (txn) => {
+        let customer_id = "N/A";
+        let customer_name = "Unknown";
+        const senderRole = txn.sender_id?.role_id?.role_id;
+        const receiverRole = txn.receiver_id?.role_id?.role_id;
+
+        if (senderRole === "role-5") {
+          const customer = await Customer.findOne({ user_id: txn.sender_id._id }).select("customer_id").lean();
+          customer_id = customer?.customer_id || "N/A";
+          customer_name = txn.sender_id?.name || "Unknown";
+        } else if (receiverRole === "role-5") {
+          const customer = await Customer.findOne({ user_id: txn.receiver_id._id }).select("customer_id").lean();
+          customer_id = customer?.customer_id || "N/A";
+          customer_name = txn.receiver_id?.name || "Unknown";
+        }
+
+        return {
+          datetime: moment(txn.created_at).format("MMM DD, YYYY HH:mm"),
+          id: txn.transaction_id || "N/A",
+          customer: customer_name,
+          customer_id,
+          type: txn.transaction_type,
+          description: txn.remarks || `${txn.transaction_type} transaction`,
+          amount: parseFloat(txn.amount),
+          status: txn.status || "Completed",
+        };
+      })
+    );
+
+    // Format statistics
+    const stats = {
+      totalTransactions: statsResult[0]?.totalTransactions || 0,
+      totalRevenue: statsResult[0]?.totalRevenue || 0,
+      avgTransactionValue: statsResult[0]?.avgTransactionValue || 0,
+      totalRefunds: statsResult[0]?.totalRefunds || 0,
+    };
+
+    // Total pages for pagination
+    const totalTransactions = stats.totalTransactions;
+    const totalPages = Math.ceil(totalTransactions / parseInt(limit));
+
+    res.status(200).json({
+      transactions: formattedTransactions,
+      stats,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages,
+        totalTransactions,
+      },
+    });
+  } catch (error) {
+    console.error("Error in getTransactionHistory:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 // Update transaction by transaction_id
 exports.updateTransaction = async (req, res) => {
   try {

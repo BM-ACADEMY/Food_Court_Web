@@ -13,6 +13,7 @@ router.post("/process-payment", controller.processPayment);
 
 router.get("/fetch-all-recent-transaction", controller.getAllRecentTransaction);
 router.get("/history", controller.getTransactionHistory);
+router.get("/fetch-treasury-subcom-restaurant-history", controller.getTransactionTreasuryRestaurantHistory);
 
 
 router.get("/fetch-transaction-by-id/:id", controller.getTransactionById);

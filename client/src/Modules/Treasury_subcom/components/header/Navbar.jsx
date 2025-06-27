@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useState, useEffect } from "react";
 import Pegasus from "@/assets/pegasus.png";
 import {
@@ -20,54 +18,123 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ChevronsUpDown, LogOut, User, Save } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import axios from "axios";
+import { toast } from "react-toastify"; // Import toast
 
-const UserDashboardHeader = () => {
+const TreasuryDashboardHeader = () => {
   const { user, setUser, logout } = useAuth();
   const [openAccount, setOpenAccount] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [editData, setEditData] = useState({});
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (user) {
-      setEditData({ ...user });
+      console.log("UserDashboardHeader: User data:", user);
+      setEditData({
+        name: user.name || "",
+        email: user.email || "",
+        phone_number: user.phone_number || "",
+        treasury_subcom_id: user.treasury_subcom_id || "N/A",
+      });
     }
   }, [user]);
 
   const handleSave = async () => {
+    console.log("handleSave: User ID:", user._id);
+    console.log("handleSave: Payload:", {
+      name: editData.name,
+      email: editData.email,
+      phone_number: editData.phone_number,
+    });
+
+    if (!editData.name || !editData.phone_number) {
+      setError("Name and phone number are required");
+      toast.error("Name and phone number are required", {
+        position: "top-center",
+        autoClose: 3000,
+      });
+      console.error("handleSave: Validation failed - missing required fields");
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (editData.email && !emailRegex.test(editData.email)) {
+      setError("Invalid email format");
+      toast.error("Invalid email format", {
+        position: "top-center",
+        autoClose: 3000,
+      });
+      console.error("handleSave: Validation failed - invalid email format:", editData.email);
+      return;
+    }
+
+    const phoneRegex = /^\d{10}$/;
+    if (!phoneRegex.test(editData.phone_number)) {
+      setError("Phone number must be 10 digits");
+      toast.error("Phone number must be 10 digits", {
+        position: "top-center",
+        autoClose: 3000,
+      });
+      console.error("handleSave: Validation failed - invalid phone number format:", editData.phone_number);
+      return;
+    }
+
     try {
+      setError(null);
+      console.log("handleSave: Sending request to:", `${import.meta.env.VITE_BASE_URL}/users/update-user/${user._id}`);
       const res = await axios.put(
-        `${import.meta.env.VITE_BASE_URL}/users/${user._id}`,
-        editData,
+        `${import.meta.env.VITE_BASE_URL}/users/update-user/${user._id}`,
+        {
+          name: editData.name,
+          email: editData.email,
+          phone_number: editData.phone_number,
+        },
         { withCredentials: true }
       );
       setUser(res.data.data);
       setOpenAccount(false);
-      console.log("User updated:", res.data.data);
+      toast.success("Account updated successfully!", {
+        position: "top-center",
+        autoClose: 3000,
+      });
+      console.log("handleSave: User updated:", res.data.data);
     } catch (err) {
-      console.error("Failed to update user:", err);
+      const message = err.response?.data?.message || "Failed to update account";
+      console.error("handleSave: Error details:", {
+        status: err.response?.status,
+        data: err.response?.data,
+        message: err.message,
+      });
+      setError(message);
+      toast.error(message, {
+        position: "top-center",
+        autoClose: 3000,
+      });
     }
   };
 
   const handleLogout = () => {
-    // Clear sessionStorage flag for dropdown
+    console.log("handleLogout: Logging out user");
     sessionStorage.removeItem("dropdownSubmitted");
-    logout(); // Call AuthContext logout
+    logout();
     setShowLogoutDialog(false);
   };
 
-  if (!user) return null;
+  if (!user) {
+    console.warn("UserDashboardHeader: No user data available");
+    return null;
+  }
 
   return (
     <>
       <header className="w-full bg-[#000052] text-white px-6 py-4 flex items-center justify-between shadow-md">
-        {/* Left */}
         <div className="flex items-center gap-3">
           <img src={Pegasus} alt="Pegasus Logo" className="w-10 h-10" />
           <div>
             <h1 className="text-base md:text-base font-bold tracking-wide">
               PEGASUS 2K25
             </h1>
-
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center text-sm md:text-xs font-medium text-white/80 hover:underline">
@@ -98,8 +165,6 @@ const UserDashboardHeader = () => {
             </DropdownMenu>
           </div>
         </div>
-
-        {/* Right */}
         <div className="text-right">
           <p className="text-xs sm:text-sm md:text-sm lg:text-base font-medium text-white/70">
             Your Balance
@@ -110,7 +175,6 @@ const UserDashboardHeader = () => {
         </div>
       </header>
 
-      {/* Edit Account Dialog */}
       <Dialog open={openAccount} onOpenChange={setOpenAccount}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -119,6 +183,10 @@ const UserDashboardHeader = () => {
               You can update your personal details here.
             </DialogDescription>
           </DialogHeader>
+
+          {error && (
+            <p className="text-red-500 text-sm mb-3">{error}</p>
+          )}
 
           <div className="space-y-3">
             <div>
@@ -143,23 +211,21 @@ const UserDashboardHeader = () => {
             <div>
               <label className="block text-sm font-medium mb-1">Phone</label>
               <Input
-                value={editData.phone || ""}
+                value={editData.phone_number || ""}
                 onChange={(e) =>
-                  setEditData({ ...editData, phone: e.target.value })
+                  setEditData({ ...editData, phone_number: e.target.value })
                 }
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Customer ID
-              </label>
-              <Input
-                value={editData.customerId || ""}
-                onChange={(e) =>
-                  setEditData({ ...editData, customerId: e.target.value })
-                }
-              />
-            </div>
+            {user.role?.role_id === "role-3" && (
+              <div>
+                <label className="block text-sm font-medium mb-1">Treasury Subcom ID</label>
+                <Input
+                  value={editData.treasury_subcom_id || "N/A"}
+                  disabled
+                />
+              </div>
+            )}
           </div>
 
           <DialogFooter className="pt-4">
@@ -171,7 +237,6 @@ const UserDashboardHeader = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Logout Confirmation Dialog */}
       <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -200,4 +265,4 @@ const UserDashboardHeader = () => {
   );
 };
 
-export default UserDashboardHeader;
+export default TreasuryDashboardHeader;
