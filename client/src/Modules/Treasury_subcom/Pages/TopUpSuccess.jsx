@@ -51,14 +51,14 @@ function TopUpSuccess({ data, onNewTopUp, customer }) {
 
       if (response.data.success) {
         console.log('Registration fee processed successfully, navigating to /home');
-        navigate('/home');
+        navigate('/');
       } else {
         throw new Error(response.data.message || 'Failed to process registration fee');
       }
     } catch (err) {
       console.error('Back to Home error:', err);
       alert(`Error processing registration fee: ${err.message || 'Unknown error'}`);
-      navigate('/home'); // Fallback navigation
+       // Fallback navigation
     }
   };
 

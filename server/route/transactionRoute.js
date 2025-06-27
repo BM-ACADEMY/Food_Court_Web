@@ -20,5 +20,9 @@ router.get("/fetch-transaction-by-id/:id", controller.getTransactionById);
 
 router.put("/update-transaction/:transactionId", controller.updateTransaction);
 router.delete("/delete-transaction/:id", controller.deleteTransaction);
+router.get("/history/user/:userId", controller.getTransactionHistoryByUserId);
+router.get("/history/user/:userId/export", controller.exportTransactionHistoryByUserId);
+router.get("/history/user/:userId/detailed", controller.getUserTransactionHistory);
 
+router.get("/fetch-treasury-subcom-restaurant-history", controller.getTransactionTreasuryRestaurantHistory);
 module.exports = router;

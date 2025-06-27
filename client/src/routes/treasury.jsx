@@ -19,7 +19,7 @@ export default function TreasuryRoutes() {
         <Route path="customer-history" element={<CustomerHistory />} />
         <Route path="restaurant-history" element={<RestaurantHistory />} />
         <Route path="user-history" element={<UserHistory />} />
-        <Route path="generate-qr" element={<GenerateQr />} />
+        {/* <Route path="generate-qr" element={<GenerateQr />} /> */}
         </Route>
     </Routes>
   );
