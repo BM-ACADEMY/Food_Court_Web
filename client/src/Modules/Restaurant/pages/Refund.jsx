@@ -160,76 +160,35 @@ export default function Refund() {
     }
 
     try {
-      // Check restaurant balance
-      const restaurantBalanceResponse = await axios.get(
-        `${import.meta.env.VITE_BASE_URL}/user-balance/fetch-balance-by-id/${user._id}`,
-        { withCredentials: true }
-      );
-      const restaurantBalance = parseFloat(restaurantBalanceResponse.data.data.balance || "0.00");
-      if (refundAmount > restaurantBalance) {
-        setResultMessage(`Insufficient restaurant balance. Current balance: ₹${restaurantBalance.toFixed(2)}`);
-        setIsSuccess(false);
-        setShowResultDialog(true);
-        return;
-      }
-
-      // Format amount to string with two decimal places
+      console.log("Initiating refund:", { refundAmount, customerId: customer.id, restaurantId: user._id });
       const formattedAmount = refundAmount.toFixed(2);
-      const transactionPayload = {
-        sender_id: user._id,
-        receiver_id: customer.id,
-        amount: formattedAmount,
-        transaction_type: "Refund",
-        payment_method: "Gpay",
-        status: "Success",
-        remarks: `Refund to ${customer.name} from restaurant`,
-      };
-      console.log("Transaction Payload:", transactionPayload);
-
-      // Create transaction
-      const transactionResponse = await axios.post(
-        `${import.meta.env.VITE_BASE_URL}/transactions/create-transaction`,
-        transactionPayload,
-        { withCredentials: true }
-      );
-      console.log("Transaction Response:", transactionResponse.data);
-
-      // Update restaurant balance
-      const newRestaurantBalance = (restaurantBalance - refundAmount).toFixed(2);
-      await axios.post(
-        `${import.meta.env.VITE_BASE_URL}/user-balance/create-or-update-balance`,
+      const response = await axios.post(
+        `${import.meta.env.VITE_BASE_URL}/transactions/process-payment`,
         {
-          user_id: user._id,
-          balance: newRestaurantBalance,
+          sender_id: user._id, // Restaurant is the sender
+          receiver_id: customer.id, // Customer is the receiver
+          amount: formattedAmount,
+          transaction_type: "Refund",
+          payment_method: "Gpay",
+          remarks: `Refund to ${customer.name} from restaurant`,
         },
         { withCredentials: true }
       );
 
-      // Update customer balance
+      console.log("Refund response:", response.data);
       const newCustomerBalance = (customer.balance + refundAmount).toFixed(2);
-      await axios.post(
-        `${import.meta.env.VITE_BASE_URL}/user-balance/create-or-update-balance`,
-        {
-          user_id: customer.id,
-          balance: newCustomerBalance,
-        },
-        { withCredentials: true }
-      );
-
-      // Update local state
       setCustomer(prev => ({
         ...prev,
         balance: parseFloat(newCustomerBalance),
       }));
       setAmount("");
-      setResultMessage(`Refund successful! New customer balance: ₹${newCustomerBalance}`);
+      setResultMessage(response.data.message);
       setIsSuccess(true);
       setShowResultDialog(true);
     } catch (err) {
       console.error("Refund error:", err);
       const errorMessage = err.response?.data?.message || "Failed to process refund. Please try again.";
       setResultMessage(`Error: ${errorMessage}`);
-      console.error("Error Response:", err.response?.data);
       setIsSuccess(false);
       setShowResultDialog(true);
     }
@@ -396,7 +355,7 @@ export default function Refund() {
                   <CheckCircle2 className="w-10 h-10 text-green-600" />
                 </div>
                 <div>
-                  <p className="text-gray-700 font-medium">{resultMessage}</p>
+                  <p className="text-gray-700 font-medium text-sm sm:text-base">{resultMessage}</p>
                   <p className="text-sm text-gray-500 mt-2">
                     Transaction completed successfully
                   </p>
@@ -408,7 +367,7 @@ export default function Refund() {
                   <AlertCircle className="w-10 h-10 text-red-600" />
                 </div>
                 <div>
-                  <p className="text-gray-700 font-medium">{Rafael}</p>
+                  <p className="text-gray-700 font-medium text-sm sm:text-base">{resultMessage}</p>
                   <p className="text-sm text-gray-500 mt-2">
                     Please try again or contact support
                   </p>
@@ -419,9 +378,9 @@ export default function Refund() {
           <DialogFooter>
             <Button
               onClick={() => setShowResultDialog(false)}
-              className={`w-full ${isSuccess ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
+              className="bg-[#000052] hover:bg-[#000052cb] text-white text-sm"
             >
-              {isSuccess ? 'Continue' : 'Try Again'}
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

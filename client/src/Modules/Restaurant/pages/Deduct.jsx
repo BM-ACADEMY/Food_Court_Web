@@ -150,84 +150,137 @@ export default function Deduct() {
     }
   };
 
-  const handleDeduct = async () => {
-    const deductAmount = parseFloat(amount);
-    if (isNaN(deductAmount) || deductAmount <= 0) {
-      setResultMessage("Please enter a valid amount greater than 0.");
-      setIsSuccess(false);
-      setShowResultDialog(true);
-      return;
-    }
+  // const handleDeduct = async () => {
+  //   const deductAmount = parseFloat(amount);
+  //   if (isNaN(deductAmount) || deductAmount <= 0) {
+  //     setResultMessage("Please enter a valid amount greater than 0.");
+  //     setIsSuccess(false);
+  //     setShowResultDialog(true);
+  //     return;
+  //   }
 
-    if (deductAmount > customer.balance) {
-      setResultMessage(`Insufficient balance. Current balance: ₹${customer.balance.toFixed(2)}`);
-      setIsSuccess(false);
-      setShowResultDialog(true);
-      return;
-    }
+  //   if (deductAmount > customer.balance) {
+  //     setResultMessage(`Insufficient balance. Current balance: ₹${customer.balance.toFixed(2)}`);
+  //     setIsSuccess(false);
+  //     setShowResultDialog(true);
+  //     return;
+  //   }
 
-    try {
-      const formattedAmount = deductAmount.toFixed(2);
-      const transactionPayload = {
+  //   try {
+  //     const formattedAmount = deductAmount.toFixed(2);
+  //     const transactionPayload = {
+  //       sender_id: customer.id,
+  //       receiver_id: user._id,
+  //       amount: formattedAmount,
+  //       transaction_type: "Transfer",
+  //       payment_method: "Gpay",
+  //       status: "Success",
+  //       remarks: `Payment from ${customer.name} to restaurant`,
+  //     };
+
+  //     // Create transaction
+  //     await axios.post(
+  //       `${import.meta.env.VITE_BASE_URL}/transactions/create-transaction`,
+  //       transactionPayload,
+  //       { withCredentials: true }
+  //     );
+
+  //     // Update customer balance
+  //     const newCustomerBalance = (customer.balance - deductAmount).toFixed(2);
+  //     await axios.post(
+  //       `${import.meta.env.VITE_BASE_URL}/user-balance/create-or-update-balance`,
+  //       {
+  //         user_id: customer.id,
+  //         balance: newCustomerBalance,
+  //       },
+  //       { withCredentials: true }
+  //     );
+
+  //     // Update restaurant balance
+  //     const restaurantBalanceResponse = await axios.get(
+  //       `${import.meta.env.VITE_BASE_URL}/user-balance/fetch-balance-by-id/${user._id}`,
+  //       { withCredentials: true }
+  //     );
+  //     const currentRestaurantBalance = parseFloat(restaurantBalanceResponse.data.data.balance || "0.00");
+  //     const newRestaurantBalance = (currentRestaurantBalance + deductAmount).toFixed(2);
+  //     await axios.post(
+  //       `${import.meta.env.VITE_BASE_URL}/user-balance/create-or-update-balance`,
+  //       {
+  //         user_id: user._id,
+  //         balance: newRestaurantBalance,
+  //       },
+  //       { withCredentials: true }
+  //     );
+
+  //     setCustomer(prev => ({
+  //       ...prev,
+  //       balance: parseFloat(newCustomerBalance),
+  //     }));
+  //     setAmount("");
+  //     setResultMessage(`Payment successful! New customer balance: ₹${newCustomerBalance}`);
+  //     setIsSuccess(true);
+  //     setShowResultDialog(true);
+  //   } catch (err) {
+  //     console.error("Deduction error:", err);
+  //     const errorMessage = err.response?.data?.message || "Failed to process payment. Please try again.";
+  //     setResultMessage(`Error: ${errorMessage}`);
+  //     setIsSuccess(false);
+  //     setShowResultDialog(true);
+  //   }
+  // };
+
+
+
+const handleDeduct = async () => {
+  const deductAmount = parseFloat(amount);
+  if (isNaN(deductAmount) || deductAmount <= 0) {
+    setResultMessage("Please enter a valid amount greater than 0.");
+    setIsSuccess(false);
+    setShowResultDialog(true);
+    return;
+  }
+
+  if (deductAmount > customer.balance) {
+    setResultMessage(`Insufficient balance. Current balance: ₹${customer.balance.toFixed(2)}`);
+    setIsSuccess(false);
+    setShowResultDialog(true);
+    return;
+  }
+
+  try {
+    console.log("Initiating payment:", { deductAmount, customerId: customer.id, restaurantId: user._id });
+    const formattedAmount = deductAmount.toFixed(2);
+    const response = await axios.post(
+      `${import.meta.env.VITE_BASE_URL}/transactions/process-payment`,
+      {
         sender_id: customer.id,
         receiver_id: user._id,
         amount: formattedAmount,
         transaction_type: "Transfer",
         payment_method: "Gpay",
-        status: "Success",
         remarks: `Payment from ${customer.name} to restaurant`,
-      };
+      },
+      { withCredentials: true }
+    );
 
-      // Create transaction
-      await axios.post(
-        `${import.meta.env.VITE_BASE_URL}/transactions/create-transaction`,
-        transactionPayload,
-        { withCredentials: true }
-      );
-
-      // Update customer balance
-      const newCustomerBalance = (customer.balance - deductAmount).toFixed(2);
-      await axios.post(
-        `${import.meta.env.VITE_BASE_URL}/user-balance/create-or-update-balance`,
-        {
-          user_id: customer.id,
-          balance: newCustomerBalance,
-        },
-        { withCredentials: true }
-      );
-
-      // Update restaurant balance
-      const restaurantBalanceResponse = await axios.get(
-        `${import.meta.env.VITE_BASE_URL}/user-balance/fetch-balance-by-id/${user._id}`,
-        { withCredentials: true }
-      );
-      const currentRestaurantBalance = parseFloat(restaurantBalanceResponse.data.data.balance || "0.00");
-      const newRestaurantBalance = (currentRestaurantBalance + deductAmount).toFixed(2);
-      await axios.post(
-        `${import.meta.env.VITE_BASE_URL}/user-balance/create-or-update-balance`,
-        {
-          user_id: user._id,
-          balance: newRestaurantBalance,
-        },
-        { withCredentials: true }
-      );
-
-      setCustomer(prev => ({
-        ...prev,
-        balance: parseFloat(newCustomerBalance),
-      }));
-      setAmount("");
-      setResultMessage(`Payment successful! New customer balance: ₹${newCustomerBalance}`);
-      setIsSuccess(true);
-      setShowResultDialog(true);
-    } catch (err) {
-      console.error("Deduction error:", err);
-      const errorMessage = err.response?.data?.message || "Failed to process payment. Please try again.";
-      setResultMessage(`Error: ${errorMessage}`);
-      setIsSuccess(false);
-      setShowResultDialog(true);
-    }
-  };
+    console.log("Payment response:", response.data);
+    const newCustomerBalance = (customer.balance - deductAmount).toFixed(2);
+    setCustomer(prev => ({
+      ...prev,
+      balance: parseFloat(newCustomerBalance),
+    }));
+    setAmount("");
+    setResultMessage(response.data.message);
+    setIsSuccess(true);
+    setShowResultDialog(true);
+  } catch (err) {
+    console.error("Deduction error:", err);
+    const errorMessage = err.response?.data?.message || "Failed to process payment. Please try again.";
+    setResultMessage(`Error: ${errorMessage}`);
+    setIsSuccess(false);
+    setShowResultDialog(true);
+  }
+};
 
   useEffect(() => {
     return () => {

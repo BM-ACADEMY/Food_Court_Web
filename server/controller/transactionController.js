@@ -20,7 +20,6 @@ exports.createTransaction = async (req, res) => {
       payment_method,
       status = "Pending",
       remarks,
-      location_id,
     } = req.body;
 
     console.log("createTransaction - Request body:", req.body);
@@ -64,14 +63,15 @@ exports.createTransaction = async (req, res) => {
     }
 
     // Validate amount format
-    if (!/^\d+\.\d{2}$/.test(amount)) {
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount) || !/^\d+\.\d{2}$/.test(amount)) {
       return res.status(400).json({ success: false, message: "Amount must be a string with two decimal places (e.g., '10.00')" });
     }
 
     // Validate sender balance
     const senderBalance = await UserBalance.findOne({ user_id: sender_id });
     const senderBalanceAmount = senderBalance ? parseFloat(senderBalance.balance) : 0.0;
-    if (parseFloat(amount) > senderBalanceAmount) {
+    if (parsedAmount > senderBalanceAmount) {
       return res.status(400).json({ success: false, message: `Insufficient sender balance: ${senderBalanceAmount.toFixed(2)}` });
     }
 
@@ -97,7 +97,6 @@ exports.createTransaction = async (req, res) => {
       payment_method,
       status,
       remarks,
-      location_id,
     });
 
     await transaction.save();
@@ -108,6 +107,193 @@ exports.createTransaction = async (req, res) => {
     res.status(400).json({ success: false, message: err.message || "Failed to create transaction" });
   }
 };
+
+exports.createOrUpdateBalance = async (req, res) => {
+  const {
+    user_id,
+    balance,
+    transaction_type = "Credit",
+    payment_method,
+    remarks,
+  } = req.body;
+
+  try {
+    if (!mongoose.Types.ObjectId.isValid(user_id) || isNaN(balance) || !/^\-?\d+\.\d{2}$/.test(balance.toString())) {
+      return res.status(400).json({ message: "Invalid data provided" });
+    }
+
+    const amount = parseFloat(balance);
+
+    // Step 1: Fetch user & role
+    const user = await User.findById(user_id).populate("role_id");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Step 2: If Master Admin, check point_creation_limit
+    if (user.role_id?.name === "Master-Admin" && transaction_type === "Credit") {
+      const masterAdmin = await MasterAdmin.findOne({ user_id: user_id });
+      const creationLimit = parseFloat(masterAdmin?.point_creation_limit?.toString() || "0");
+      if (amount > creationLimit) {
+        return res.status(400).json({
+          message: `Amount exceeds Master Admin's creation limit of ₹${creationLimit}`,
+        });
+      }
+    }
+
+    // Step 3: Validate balance for debit operations
+    if (transaction_type === "Debit") {
+      const currentBalance = await UserBalance.findOne({ user_id });
+      const currentBalanceAmount = currentBalance ? parseFloat(currentBalance.balance) : 0.0;
+      if (currentBalanceAmount + amount < 0) {
+        return res.status(400).json({
+          message: `Insufficient balance: ₹${currentBalanceAmount.toFixed(2)}`,
+        });
+      }
+    }
+
+    // Step 4: Update balance
+    const updatedBalance = await UserBalance.findOneAndUpdate(
+      { user_id },
+      { $inc: { balance: amount } },
+      { new: true, upsert: true }
+    );
+
+    // Step 5: Record transaction
+    const newTransaction = await Transaction.create({
+      sender_id: user_id,
+      receiver_id: user_id,
+      amount: Math.abs(amount).toFixed(2),
+      transaction_type,
+      payment_method,
+      remarks,
+      status: "Success",
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Balance updated and transaction recorded",
+      balance: updatedBalance,
+      transaction: newTransaction,
+    });
+  } catch (error) {
+    console.error("Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+exports.processPayment = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const {
+      sender_id,
+      receiver_id,
+      amount,
+      transaction_type = "Transfer",
+      payment_method = "Gpay",
+      remarks,
+    } = req.body;
+
+    console.log("Processing payment:", { sender_id, receiver_id, amount, transaction_type });
+
+    // Validate ObjectIds
+    if (!mongoose.Types.ObjectId.isValid(sender_id) || !mongoose.Types.ObjectId.isValid(receiver_id)) {
+      await session.abortTransaction();
+      return res.status(400).json({ success: false, message: "Invalid sender_id or receiver_id format" });
+    }
+
+    // Validate users and roles
+    const sender = await User.findById(sender_id).populate("role_id").session(session);
+    if (!sender) {
+      await session.abortTransaction();
+      return res.status(400).json({ success: false, message: "Sender not found" });
+    }
+    const receiver = await User.findById(receiver_id).populate("role_id").session(session);
+    if (!receiver) {
+      await session.abortTransaction();
+      return res.status(400).json({ success: false, message: "Receiver not found" });
+    }
+
+    if (transaction_type === "Transfer") {
+      if (sender.role_id?.role_id !== "role-5") {
+        await session.abortTransaction();
+        return res.status(400).json({ success: false, message: "Sender must be a customer (role-5)" });
+      }
+      if (receiver.role_id?.role_id !== "role-4") {
+       romium:1
+        await session.abortTransaction();
+        return res.status(400).json({ success: false, message: "Receiver must be a restaurant (role-4)" });
+      }
+    }
+
+    // Validate amount format
+    const deductAmount = parseFloat(amount);
+    if (isNaN(deductAmount) || !/^\d+\.\d{2}$/.test(amount)) {
+      await session.abortTransaction();
+      return res.status(400).json({ success: false, message: "Amount must be a string with two decimal places (e.g., '10.00')" });
+    }
+
+    // Validate sender balance
+    const senderBalance = await UserBalance.findOne({ user_id: sender_id }).session(session);
+    const senderBalanceAmount = senderBalance ? parseFloat(senderBalance.balance) : 0.0;
+    if (deductAmount > senderBalanceAmount) {
+      await session.abortTransaction();
+      return res.status(400).json({ success: false, message: `Insufficient sender balance: ${senderBalanceAmount.toFixed(2)}` });
+    }
+
+    // Create transaction
+    const transaction = new Transaction({
+      sender_id,
+      receiver_id,
+      amount: deductAmount.toFixed(2),
+      transaction_type,
+      payment_method,
+      status: "Success",
+      remarks,
+    });
+    await transaction.save({ session });
+
+    // Update sender (customer) balance
+    const updatedSenderBalance = await UserBalance.findOneAndUpdate(
+      { user_id: sender_id },
+      { $inc: { balance: -deductAmount } },
+      { new: true, upsert: true, session }
+    );
+
+    // Update receiver (restaurant) balance
+    const updatedReceiverBalance = await UserBalance.findOneAndUpdate(
+      { user_id: receiver_id },
+      { $inc: { balance: deductAmount } },
+      { new: true, upsert: true, session }
+    );
+
+    console.log("Updated sender balance:", updatedSenderBalance.balance);
+    console.log("Updated receiver balance:", updatedReceiverBalance.balance);
+
+    await session.commitTransaction();
+    res.status(200).json({
+      success: true,
+      message: `Payment successful! New customer balance: ₹${(senderBalanceAmount - deductAmount).toFixed(2)}`,
+      transaction,
+      senderBalance: updatedSenderBalance,
+      receiverBalance: updatedReceiverBalance,
+    });
+  } catch (err) {
+    await session.abortTransaction();
+    console.error("Payment processing error:", err);
+    res.status(400).json({ success: false, message: err.message || "Failed to process payment" });
+  } finally {
+    session.endSession();
+  }
+};
+
+
+
 
 exports.getAllTransactions = async (req, res) => {
   try {
