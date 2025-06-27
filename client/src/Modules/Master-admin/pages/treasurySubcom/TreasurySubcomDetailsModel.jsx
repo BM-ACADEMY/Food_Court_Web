@@ -53,21 +53,48 @@ const TreasurySubcomDetailsModal = ({ subcom, isOpen, onClose }) => {
   const [filter, setFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [isEditingId, setIsEditingId] = useState("");
+  const [locations, setLocations] = useState([]);
+  const [upis, setUpis] = useState([]);
+  const [locationId, setLocationId] = useState("");
+  const [upiId, setUpiId] = useState("");
   const itemsPerPage = 5;
+
+  const handleReset = () => {
+    setLocationId("");
+    setUpiId("");
+    setFilter("all");
+  }
+  const fetchLocationsAndUpi = async () => {
+    setLoading(true);
+    try {
+      const locationRes = await axios.get(`${import.meta.env.VITE_BASE_URL}/locations/fetch-all-locations`);
+      setLocations(locationRes.data.data);
+
+      const upiRes = await axios.get(`${import.meta.env.VITE_BASE_URL}/upis/fetch-all-upis`);
+      setUpis(upiRes.data.data);
+    } catch (err) {
+      console.error("Error fetching locations or UPIs:", err);
+      setError("Failed to load locations or UPIs. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (isOpen && subcom?.id) {
       fetchSubcomDetails();
       fetchTransactions();
     }
-  }, [isOpen, subcom?.id]);
+  }, [isOpen, subcom?.id, locationId, upiId]);
+
+  useEffect(() => {
+    fetchLocationsAndUpi();
+  }, []);
 
   const fetchSubcomDetails = async () => {
     try {
       const response = await axios.get(
-        `${import.meta.env.VITE_BASE_URL}/treasurySubcom/fetch-single-treasurysubcom-details/${
-          subcom.id
-        }`
+        `${import.meta.env.VITE_BASE_URL}/treasurySubcom/fetch-single-treasurysubcom-details/${subcom.id}`
       );
       setSubcomData(response.data);
       setFormData({
@@ -87,11 +114,11 @@ const TreasurySubcomDetailsModal = ({ subcom, isOpen, onClose }) => {
     setLoading(true);
     try {
       const response = await axios.get(
-        `${import.meta.env.VITE_BASE_URL}/treasurySubcom/fetch-single-treasurysubcom-transactions/${
-          subcom.id
-        }/transactions`
+        `${import.meta.env.VITE_BASE_URL}/treasurySubcom/fetch-single-treasurysubcom-transactions/${subcom.id}/transactions`,
+        {
+          params: { location_id: locationId, upi_id: upiId },
+        }
       );
-      console.log("Transactions data:", response.data.data); // Debug: Log transaction data
       setTransactions(response.data.data || []);
       setError(null);
     } catch (err) {
@@ -163,11 +190,21 @@ const TreasurySubcomDetailsModal = ({ subcom, isOpen, onClose }) => {
   };
 
   useEffect(() => {
-    if (filter === "all") {
-      setFilteredTransactions(transactions);
-    } else {
-      setFilteredTransactions(transactions.filter((tx) => tx.type === filter));
+    let filtered = transactions;
+
+    if (filter !== "all") {
+      filtered = filtered.filter((tx) => tx.type === filter);
     }
+
+    // if (locationId !== "all") {
+    //   filtered = filtered.filter((tx) => tx.locationId === locationId);
+    // }
+
+    // if (upiId !== "all") {
+    //   filtered = filtered.filter((tx) => tx.upiId === upiId);
+    // }
+
+    setFilteredTransactions(filtered);
     setCurrentPage(1);
   }, [filter, transactions]);
 
@@ -183,49 +220,45 @@ const TreasurySubcomDetailsModal = ({ subcom, isOpen, onClose }) => {
 
   const initials = subcomData.name
     ? subcomData.name
-        .split(" ")
-        .map((part) => part[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase()
+      .split(" ")
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase()
     : "XX";
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-full sm:max-w-4xl lg:max-w-6xl w-full">
+      <DialogContent className="w-full max-w-[95vw] sm:max-w-[90vw] md:max-w-4xl lg:max-w-6xl p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle>Treasury Subcom Details - #{subcomData?.id}</DialogTitle>
+          <DialogTitle className="text-lg sm:text-xl">Treasury Subcom Details - #{subcomData?.id}</DialogTitle>
         </DialogHeader>
         <Tabs defaultValue="info" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="info">User Information</TabsTrigger>
-            <TabsTrigger value="transactions">Transaction History</TabsTrigger>
+          <TabsList className="flex flex-col sm:flex-row w-full gap-2 mb-4">
+            <TabsTrigger value="info" className="text-xs sm:text-sm">User Information</TabsTrigger>
+            <TabsTrigger value="transactions" className="text-xs sm:text-sm">Transaction History</TabsTrigger>
           </TabsList>
 
           {/* User Information Tab */}
-          <TabsContent value="info" className="space-y-4 w-full">
-            <div className="flex items-center space-x-4 mb-4">
-              <Avatar className="h-15 w-15">
+          <TabsContent value="info" className="space-y-4 overflow-y-hidden">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-4 mb-4">
+              <Avatar className="h-12 w-12 sm:h-16 sm:w-16">
                 <AvatarImage src={subcomData.avatar || undefined} />
-                <AvatarFallback className="bg-blue-700 text-white">
+                <AvatarFallback className="bg-blue-700 text-white text-sm sm:text-base">
                   {initials}
                 </AvatarFallback>
               </Avatar>
               <div>
-                <h2 className="text-xl font-semibold">{subcomData.name}</h2>
-                <p className="text-gray-500">#{subcomData.id}</p>
+                <h2 className="text-lg sm:text-xl font-semibold">{subcomData.name}</h2>
+                <p className="text-gray-500 text-sm">#{subcomData.id}</p>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label className="text-sm font-medium">Status</Label>
                 <Badge
                   variant="ghost"
-                  className={`text-white mt-1 ${
-                    subcomData.status?.toLowerCase() === "online"
-                      ? "bg-green-500"
-                      : "bg-red-500"
-                    }`}
+                  className={`text-white mt-1 ${subcomData.status?.toLowerCase() === "online" ? "bg-green-500" : "bg-red-500"}`}
                 >
                   {subcomData?.status}
                 </Badge>
@@ -237,10 +270,10 @@ const TreasurySubcomDetailsModal = ({ subcom, isOpen, onClose }) => {
                     name="name"
                     value={formData.name}
                     onChange={handleInputChange}
-                    className="mt-1"
+                    className="mt-1 text-sm"
                   />
                 ) : (
-                  <p className="mt-1 text-gray-700">{subcomData?.name || "N/A"}</p>
+                  <p className="mt-1 text-gray-700 text-sm">{subcomData?.name || "N/A"}</p>
                 )}
               </div>
               <div>
@@ -250,11 +283,11 @@ const TreasurySubcomDetailsModal = ({ subcom, isOpen, onClose }) => {
                     name="phone"
                     value={formData.phone}
                     onChange={handleInputChange}
-                    className="mt-1"
+                    className="mt-1 text-sm"
                     type="tel"
                   />
                 ) : (
-                  <p className="mt-1 text-gray-700">{subcomData?.phone || "N/A"}</p>
+                  <p className="mt-1 text-gray-700 text-sm">{subcomData?.phone || "N/A"}</p>
                 )}
               </div>
               <div>
@@ -264,16 +297,16 @@ const TreasurySubcomDetailsModal = ({ subcom, isOpen, onClose }) => {
                     name="email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    className="mt-1"
+                    className="mt-1 text-sm"
                     type="email"
                   />
                 ) : (
-                  <p className="mt-1 text-gray-700">{subcomData?.email || "N/A"}</p>
+                  <p className="mt-1 text-gray-700 text-sm">{subcomData?.email || "N/A"}</p>
                 )}
               </div>
               <div>
                 <Label className="text-sm font-medium">Registration Date</Label>
-                <p className="mt-1 text-gray-700">
+                <p className="mt-1 text-gray-700 text-sm">
                   {subcomData?.registrationDate && !isNaN(new Date(subcomData.registrationDate).getTime())
                     ? format(new Date(subcomData.registrationDate), "MMM dd, yyyy")
                     : "N/A"}
@@ -281,58 +314,133 @@ const TreasurySubcomDetailsModal = ({ subcom, isOpen, onClose }) => {
               </div>
               <div>
                 <Label className="text-sm font-medium">Last Active</Label>
-                <p className="mt-1 text-gray-700">
+                <p className="mt-1 text-gray-700 text-sm">
                   {subcomData?.lastActive && !isNaN(new Date(subcomData.lastActive).getTime())
-                    ? formatDistanceToNow(new Date(subcomData.lastActive), {
-                        addSuffix: true,
-                      })
+                    ? formatDistanceToNow(new Date(subcomData.lastActive), { addSuffix: true })
                     : "N/A"}
                 </p>
               </div>
               <div>
                 <Label className="text-sm font-medium">Balance</Label>
-                <p className="mt-1 text-gray-700">
+                <p className="mt-1 text-gray-700 text-sm">
                   ₹{subcomData?.balance?.toLocaleString() || "0.00"}
                 </p>
               </div>
             </div>
-            {error && <p className="text-red-500">{error}</p>}
+            {error && <p className="text-red-500 text-sm">{error}</p>}
             <div className="flex justify-end gap-2">
               {isEditing ? (
                 <>
-                  <Button variant="outline" onClick={() => setIsEditing(false)}>
+                  <Button variant="outline" onClick={() => setIsEditing(false)} className="text-xs sm:text-sm">
                     Cancel
                   </Button>
-                  <Button onClick={handleSave}>Save</Button>
+                  <Button onClick={handleSave} className="text-xs sm:text-sm">Save</Button>
                 </>
               ) : (
-                <Button onClick={handleEdit}>Edit Information</Button>
+                <Button onClick={handleEdit} className="text-xs sm:text-sm">Edit Information</Button>
               )}
             </div>
           </TabsContent>
 
           {/* Transaction History Tab */}
-          <TabsContent value="transactions" className="space-y-4 w-full">
-            <div className="flex justify-end mb-4">
+          <TabsContent value="transactions" className="space-y-4 overflow-y-hidden">
+            {/* Filters */}
+            <div className="flex flex-col sm:flex-row sm:justify-end gap-3 mb-4">
               <Select value={filter} onValueChange={setFilter}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full sm:w-[160px] text-xs sm:text-sm">
                   <SelectValue placeholder="Filter transactions" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Transactions</SelectItem>
-                  <SelectItem value="transfer">Transfer</SelectItem>
-                  <SelectItem value="topup">Topup</SelectItem>
-                  <SelectItem value="credit">Credit</SelectItem>
-                  <SelectItem value="refund">Refund</SelectItem>
+                  <SelectItem value="all" className="text-xs sm:text-sm">All Transactions</SelectItem>
+                  <SelectItem value="transfer" className="text-xs sm:text-sm">Transfer</SelectItem>
+                  <SelectItem value="topup" className="text-xs sm:text-sm">Topup</SelectItem>
+                  <SelectItem value="credit" className="text-xs sm:text-sm">Credit</SelectItem>
+                  <SelectItem value="refund" className="text-xs sm:text-sm">Refund</SelectItem>
                 </SelectContent>
               </Select>
+
+              <Select value={locationId} onValueChange={setLocationId}>
+                <SelectTrigger className="w-full sm:w-[160px] text-xs sm:text-sm">
+                  <SelectValue placeholder="Filter by location" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-xs sm:text-sm">All Locations</SelectItem>
+                  {locations.map((loc) => (
+                    <SelectItem key={loc._id} value={loc._id} className="text-xs sm:text-sm">
+                      {loc.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={upiId} onValueChange={setUpiId}>
+                <SelectTrigger className="w-full sm:w-[160px] text-xs sm:text-sm">
+                  <SelectValue placeholder="Filter by UPI" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-xs sm:text-sm">All UPIs</SelectItem>
+                  {upis.map((upi) => (
+                    <SelectItem key={upi._id} value={upi._id} className="text-xs sm:text-sm">
+                      {upi.upiName} - ({upi.upiId})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button className="text-xs sm:text-sm" onClick={handleReset}>Reset</Button>
             </div>
-            {loading && <p className="text-center text-gray-600">Loading transactions...</p>}
-            {error && <p className="text-center text-red-500">{error}</p>}
+
+            {/* Loading/Error */}
+            {loading && <p className="text-center text-gray-600 text-sm">Loading transactions...</p>}
+            {error && <p className="text-center text-red-500 text-sm">{error}</p>}
+
+            {/* Transactions Table */}
             {!loading && !error && (
               <>
-                <div className="overflow-x-auto w-full">
-                  <Table className="min-w-[1000px] table-fixed">
+                <div className="overflow-y-auto min-h-[200px]">
+                  {/* Mobile View: Card-like layout */}
+                  <div className="sm:hidden flex flex-col gap-4">
+                    {currentTransactions.map((transaction) => (
+                      <div key={transaction.id} className="border rounded-lg p-4 bg-white shadow-sm">
+                        <div className="flex flex-col gap-2">
+                          <div className="flex justify-between">
+                            <span className="font-medium text-xs">Transaction ID:</span>
+                            <span className="text-xs">#{transaction.id}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="font-medium text-xs">Type:</span>
+                            <span className="text-xs">{transactionTypes[transaction.type] || transaction.type}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="font-medium text-xs">Amount:</span>
+                            <span className="text-xs">
+                              ₹{transaction.amount.toLocaleString()}
+                              {transaction.type === "transfer" && (
+                                <span className="text-red-500"> (Debit)</span>
+                              )}
+                              {(transaction.type === "topup" || transaction.type === "credit") && (
+                                <span className="text-green-500"> (Credit)</span>
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="font-medium text-xs">Date:</span>
+                            <span className="text-xs">
+                              {transaction.date && !isNaN(new Date(transaction.date).getTime())
+                                ? format(new Date(transaction.date), "dd-MM-yyyy HH:mm")
+                                : "N/A"}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="font-medium text-xs">Description:</span>
+                            <span className="text-xs">{transaction.description || "N/A"}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Desktop View: Table layout */}
+                  <Table className="hidden sm:table min-w-[600px] text-xs sm:text-sm">
                     <TableHeader>
                       <TableRow>
                         <TableHead className="whitespace-nowrap">Transaction ID</TableHead>
@@ -345,9 +453,7 @@ const TreasurySubcomDetailsModal = ({ subcom, isOpen, onClose }) => {
                     <TableBody>
                       {currentTransactions.map((transaction) => (
                         <TableRow key={transaction.id}>
-                          <TableCell className="whitespace-nowrap">
-                            #{transaction.id}
-                          </TableCell>
+                          <TableCell className="whitespace-nowrap">#{transaction.id}</TableCell>
                           <TableCell className="whitespace-nowrap">
                             {transactionTypes[transaction.type] || transaction.type}
                           </TableCell>
@@ -356,8 +462,7 @@ const TreasurySubcomDetailsModal = ({ subcom, isOpen, onClose }) => {
                             {transaction.type === "transfer" && (
                               <span className="text-red-500"> (Debit)</span>
                             )}
-                            {(transaction.type === "topup" ||
-                              transaction.type === "credit") && (
+                            {(transaction.type === "topup" || transaction.type === "credit") && (
                               <span className="text-green-500"> (Credit)</span>
                             )}
                           </TableCell>
@@ -374,18 +479,21 @@ const TreasurySubcomDetailsModal = ({ subcom, isOpen, onClose }) => {
                     </TableBody>
                   </Table>
                   {currentTransactions.length === 0 && (
-                    <p className="text-center text-gray-600 mt-4">
+                    <p className="text-center text-gray-600 mt-4 text-sm">
                       No transactions found for the selected filter.
                     </p>
                   )}
                 </div>
+
+                {/* Pagination */}
                 {totalPages > 1 && (
-                  <Pagination className="mt-4">
+                  <Pagination className="mt-4 flex justify-center sm:justify-start">
                     <PaginationContent>
                       <PaginationItem>
                         <PaginationPrevious
                           onClick={() => handlePageChange(currentPage - 1)}
                           disabled={currentPage === 1}
+                          className="text-xs sm:text-sm"
                         />
                       </PaginationItem>
                       {[...Array(totalPages)].map((_, index) => (
@@ -393,6 +501,7 @@ const TreasurySubcomDetailsModal = ({ subcom, isOpen, onClose }) => {
                           <PaginationLink
                             onClick={() => handlePageChange(index + 1)}
                             isActive={currentPage === index + 1}
+                            className="text-xs sm:text-sm"
                           >
                             {index + 1}
                           </PaginationLink>
@@ -402,6 +511,7 @@ const TreasurySubcomDetailsModal = ({ subcom, isOpen, onClose }) => {
                         <PaginationNext
                           onClick={() => handlePageChange(currentPage + 1)}
                           disabled={currentPage === totalPages}
+                          className="text-xs sm:text-sm"
                         />
                       </PaginationItem>
                     </PaginationContent>
@@ -411,8 +521,8 @@ const TreasurySubcomDetailsModal = ({ subcom, isOpen, onClose }) => {
             )}
           </TabsContent>
         </Tabs>
-        <DialogFooter>
-          <Button variant="default" onClick={onClose}>
+        <DialogFooter className="mt-4">
+          <Button variant="default" onClick={onClose} className="text-xs sm:text-sm">
             Close
           </Button>
         </DialogFooter>

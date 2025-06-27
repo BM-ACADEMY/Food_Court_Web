@@ -17,7 +17,6 @@ const LoginLog = require("../model/loginLogModel");
 const Role = require("../model/roleModel");
 const Transaction = require("../model/transactionModel");
 
-
 // Login function
 exports.loginUser = async (req, res) => {
   const { emailOrPhone, password } = req.body;
@@ -46,7 +45,7 @@ exports.loginUser = async (req, res) => {
     );
 
     // Set token in cookie
-     res.cookie("token", token, {
+    res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
@@ -57,7 +56,7 @@ exports.loginUser = async (req, res) => {
     await LoginLog.create({
       user_id: user._id,
       login_time: new Date(),
-      status:true
+      status: true,
     });
 
     res.json({ success: true, message: "Login successful" });
@@ -85,7 +84,9 @@ exports.getMe = async (req, res) => {
 
     // Fetch balance
     const userBalance = await UserBalance.findOne({ user_id: user._id });
-    const balance = userBalance ? parseFloat(userBalance.balance.toString()) : 0.0;
+    const balance = userBalance
+      ? parseFloat(userBalance.balance.toString())
+      : 0.0;
 
     // Fetch customer data
     const customer = await Customer.findOne({ user_id: user._id }).lean();
@@ -137,7 +138,7 @@ exports.logoutUser = async (req, res) => {
     // Update the most recent login log with logout time
     const updatedLog = await LoginLog.findOneAndUpdate(
       { user_id: userId, logout_time: null },
-      { logout_time: new Date(),status:false },
+      { logout_time: new Date(), status: false },
       { sort: { login_time: -1 }, new: true } // Return updated document
     );
 
@@ -201,7 +202,8 @@ function generateOtp() {
 // Create User
 exports.createUser = async (req, res) => {
   try {
-    const { role_id, name, email, phone_number, password, confirm_password } = req.body;
+    const { role_id, name, email, phone_number, password, confirm_password } =
+      req.body;
 
     if (!password || !confirm_password) {
       return res.status(400).json({
@@ -241,6 +243,8 @@ exports.createUser = async (req, res) => {
 
     // Hash password
     const password_hash = await bcrypt.hash(password, 10);
+    const otpres = sendOtpSms(phone_number, otp);
+    console.log(otpres, "otp");
 
     // Create user
     const newUser = new User({
@@ -303,11 +307,15 @@ exports.verifyOtp = async (req, res) => {
     const user = await User.findOne({ phone_number });
 
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     if (user.number_verified) {
-      return res.status(200).json({ success: true, message: "Number already verified" });
+      return res
+        .status(200)
+        .json({ success: true, message: "Number already verified" });
     }
 
     // Check if OTP is correct and not expired
@@ -342,6 +350,157 @@ exports.verifyOtp = async (req, res) => {
   }
 };
 
+
+exports.verifyMobileLoginOtp = async (req, res) => {
+  try {
+    const { phone_number, otp } = req.body;
+
+    if (!phone_number || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: "Phone number and OTP are required",
+      });
+    }
+
+    // Find user and populate role_id
+    const user = await User.findOne({ phone_number }).populate("role_id");
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Check if OTP is correct and not expired
+    const now = new Date();
+    if (
+      user.phone_number_otp !== otp ||
+      !user.otp_expires_at ||
+      now > user.otp_expires_at
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          user.phone_number_otp !== otp
+            ? "Invalid OTP"
+            : "OTP has expired. Please request a new one.",
+      });
+    }
+
+    // Mark number as verified
+    user.number_verified = true;
+    user.phone_number_otp = null;
+    user.otp_expires_at = null;
+    await user.save();
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { id: user._id, role: user.role_id.role_id }, // Use role_id from populated role
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
+
+    // Set token in cookie
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+      maxAge: 86400000, // 1 day
+    });
+
+    // Create login log
+    await LoginLog.create({
+      user_id: user._id,
+      login_time: new Date(),
+      status: true,
+    });
+
+    // Return user data with populated role
+    return res.status(200).json({
+      success: true,
+      message: "Phone number verified and login successful",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone_number: user.phone_number,
+        role: {
+          role_id: user.role_id.role_id,
+          name:user.role_id.name
+        },
+        number_verified: user.number_verified,
+      },
+    });
+  } catch (err) {
+    console.error("Verify OTP error:", err);
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+}
+exports.sendOtpController = async (req, res) => {
+  const { phone_number } = req.body;
+
+  try {
+    // Validate phone number
+    if (!phone_number) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid phone number. Must be a valid Indian number (+91xxxxxxxxxx).",
+      });
+    }
+
+    // Check if user exists
+    const user = await User.findOne({ phone_number });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found with this phone number.",
+      });
+    }
+
+    // Generate OTP
+    const otp = generateOtp();
+    const otpExpiry = new Date(Date.now() + 3 * 60 * 1000); // OTP expires in 3 minutes
+
+    // Update user's OTP fields
+    user.phone_number_otp = otp;
+    user.otp_expires_at = otpExpiry;
+    await user.save();
+
+    // Send OTP via ChennaiSMS
+    try {
+      const smsResponse = await sendOtpSms(phone_number, otp);
+      if (smsResponse) {
+        return res.status(200).json({
+          success: true,
+          message: "OTP sent successfully.",
+        });
+      } else {
+        console.error("SMS response:", smsResponse);
+        return res.status(500).json({
+          success: false,
+          message: "Failed to send OTP. Please try again.",
+        });
+      }
+    } catch (smsError) {
+      console.error("SMS sending failed:", smsError.message);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send OTP. Please try again.",
+      });
+    }
+  } catch (error) {
+    console.error("Error in sendOtpController:", error);
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while processing your request.",
+    });
+  }
+};
+
 // Get all users with pagination, search, and role filter
 exports.getUsers = async (req, res) => {
   try {
@@ -363,7 +522,9 @@ exports.getUsers = async (req, res) => {
     // Filter by role ObjectId
     if (role) {
       if (!mongoose.Types.ObjectId.isValid(role)) {
-        return res.status(400).json({ success: false, message: "Invalid role ID" });
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid role ID" });
       }
       query.role_id = role;
     }
@@ -393,7 +554,9 @@ exports.getUsers = async (req, res) => {
 
         switch (roleKey) {
           case "role-1": {
-            const master = await MasterAdmin.findOne({ user_id: user._id }).lean();
+            const master = await MasterAdmin.findOne({
+              user_id: user._id,
+            }).lean();
             if (master) {
               enriched.master_admin_id = master.master_admin_id;
               enriched.m_id = master._id;
@@ -407,13 +570,17 @@ exports.getUsers = async (req, res) => {
             if (admin) {
               enriched.admin_id = admin.admin_id;
               enriched.a_id = admin._id;
-              enriched.admin_to_admin_transfer_limit = admin.admin_to_admin_transfer_limit;
-              enriched.admin_to_subcom_transfer_limit = admin.admin_to_subcom_transfer_limit;
+              enriched.admin_to_admin_transfer_limit =
+                admin.admin_to_admin_transfer_limit;
+              enriched.admin_to_subcom_transfer_limit =
+                admin.admin_to_subcom_transfer_limit;
             }
             break;
           }
           case "role-3": {
-            const subcom = await TreasurySubcom.findOne({ user_id: user._id }).lean();
+            const subcom = await TreasurySubcom.findOne({
+              user_id: user._id,
+            }).lean();
             if (subcom) {
               enriched.treasury_subcom_id = subcom.treasury_subcom_id;
               enriched.t_id = subcom._id;
@@ -432,12 +599,15 @@ exports.getUsers = async (req, res) => {
               enriched.location = restaurant.location?.name || "-";
               enriched.qr_code = restaurant.qr_code;
               enriched.status = restaurant.status;
-              enriched.treasury_to_customer_refund = restaurant.treasury_to_customer_refund;
+              enriched.treasury_to_customer_refund =
+                restaurant.treasury_to_customer_refund;
             }
             break;
           }
           case "role-5": {
-            const customer = await Customer.findOne({ user_id: user._id }).lean();
+            const customer = await Customer.findOne({
+              user_id: user._id,
+            }).lean();
             if (customer) {
               enriched.customer_id = customer.customer_id;
               enriched.c_id = customer._id;
@@ -477,14 +647,18 @@ exports.getAllUsersforHistory = async (req, res) => {
     const { userId, startDate, endDate } = req.query;
 
     // Validate requesting user
-    const requestingUser = await User.findById(requestingUserId).populate("role_id");
+    const requestingUser = await User.findById(requestingUserId).populate(
+      "role_id"
+    );
     if (!requestingUser) {
       return res.status(404).json({ error: "Requesting user not found" });
     }
 
     const roleName = requestingUser.role_id?.name || "";
     if (!["Master-Admin", "Admin"].includes(roleName)) {
-      return res.status(403).json({ error: "Unauthorized to view user history" });
+      return res
+        .status(403)
+        .json({ error: "Unauthorized to view user history" });
     }
 
     // Build match query for users
@@ -526,7 +700,12 @@ exports.getAllUsersforHistory = async (req, res) => {
           from: "loginlogs",
           let: { user_id: "$_id" },
           pipeline: [
-            { $match: { $expr: { $eq: ["$user_id", "$$user_id"] }, ...sessionMatch } },
+            {
+              $match: {
+                $expr: { $eq: ["$user_id", "$$user_id"] },
+                ...sessionMatch,
+              },
+            },
             { $sort: { login_time: -1 } },
             { $limit: 1 },
           ],
@@ -540,7 +719,9 @@ exports.getAllUsersforHistory = async (req, res) => {
           let: {
             user_id: "$_id",
             session_start: "$latestSession.login_time",
-            session_end: { $ifNull: ["$latestSession.logout_time", new Date()] },
+            session_end: {
+              $ifNull: ["$latestSession.logout_time", new Date()],
+            },
           },
           pipeline: [
             {
@@ -615,7 +796,9 @@ exports.getUserById = async (req, res) => {
       .lean();
 
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     const enriched = {
@@ -641,7 +824,7 @@ exports.getUserById = async (req, res) => {
 exports.updateUser = async (req, res) => {
   try {
     const userId = req.params.id;
-    const { name, email, phone_number ,is_flagged } = req.body;
+    const { name, email, phone_number, is_flagged } = req.body;
 
     // Validate input
     // if (!name || !email || !phone_number) {
@@ -651,7 +834,7 @@ exports.updateUser = async (req, res) => {
     // Update user
     const updatedUser = await User.findByIdAndUpdate(
       userId,
-      { name, email, phone_number,is_flagged, updatedAt: Date.now() },
+      { name, email, phone_number, is_flagged, updatedAt: Date.now() },
       { new: true, runValidators: true }
     )
       .select("-password_hash")
@@ -675,13 +858,19 @@ exports.updateUser = async (req, res) => {
 
     // Fetch balance
     const userBalance = await UserBalance.findOne({ user_id: updatedUser._id });
-    const balance = userBalance ? parseFloat(userBalance.balance.toString()) : 0.0;
+    const balance = userBalance
+      ? parseFloat(userBalance.balance.toString())
+      : 0.0;
 
     // Fetch customer data
-    const customer = await Customer.findOne({ user_id: updatedUser._id }).lean();
+    const customer = await Customer.findOne({
+      user_id: updatedUser._id,
+    }).lean();
 
     // Fetch restaurant data
-    const restaurant = await Restaurant.findOne({ user_id: updatedUser._id }).lean();
+    const restaurant = await Restaurant.findOne({
+      user_id: updatedUser._id,
+    }).lean();
 
     // Prepare response object
     const userObj = {
@@ -715,14 +904,17 @@ exports.deleteUser = async (req, res) => {
   try {
     const user = await User.findByIdAndDelete(req.params.id);
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
-    res.status(200).json({ success: true, message: "User deleted successfully" });
+    res
+      .status(200)
+      .json({ success: true, message: "User deleted successfully" });
   } catch (err) {
     console.error("Delete user error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
-
 };
 
 const roleModelMap = {
@@ -886,29 +1078,30 @@ exports.getUsersWithBalanceByRole = async (req, res) => {
   }
 };
 
-
-
-
-
-
 exports.getTransactionDetails = async (req, res) => {
   try {
     const { transactionId } = req.params;
     const requestingUserId = req.user?.id;
 
     // Validate requesting user
-    const requestingUser = await User.findById(requestingUserId).populate("role_id");
+    const requestingUser = await User.findById(requestingUserId).populate(
+      "role_id"
+    );
     if (!requestingUser) {
       return res.status(404).json({ error: "Requesting user not found" });
     }
 
     const roleName = requestingUser.role_id?.name || "";
     if (!["Master-Admin", "Admin"].includes(roleName)) {
-      return res.status(403).json({ error: "Unauthorized to view transaction details" });
+      return res
+        .status(403)
+        .json({ error: "Unauthorized to view transaction details" });
     }
 
     // Find transaction and populate sender/receiver details
-    const transaction = await Transaction.findOne({ transaction_id: transactionId })
+    const transaction = await Transaction.findOne({
+      transaction_id: transactionId,
+    })
       .populate({
         path: "sender_id",
         select: "name email phone_number role_id",
@@ -956,5 +1149,3 @@ exports.getTransactionDetails = async (req, res) => {
     res.status(500).json({ error: "Server error", details: error.message });
   }
 };
-
-

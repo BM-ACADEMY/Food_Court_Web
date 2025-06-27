@@ -24,7 +24,6 @@ exports.createSubcom = async (req, res) => {
     res.status(400).json({ success: false, message: err.message });
   }
 };
-
 // Get all Treasury Subcom members
 exports.getAllSubcoms = async (req, res) => {
   try {
@@ -34,7 +33,6 @@ exports.getAllSubcoms = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
 // Get a Treasury Subcom by ID
 exports.getSubcomById = async (req, res) => {
   try {
@@ -47,7 +45,6 @@ exports.getSubcomById = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
 // Update Treasury Subcom
 exports.updateSubcom = async (req, res) => {
   try {
@@ -63,7 +60,6 @@ exports.updateSubcom = async (req, res) => {
     res.status(400).json({ success: false, message: err.message });
   }
 };
-
 // Delete Treasury Subcom
 exports.deleteSubcom = async (req, res) => {
   try {
@@ -76,9 +72,6 @@ exports.deleteSubcom = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
-
-
 exports.getAllTreasurySubcomDetails = async (req, res) => {
   try {
     const {
@@ -244,8 +237,6 @@ exports.getAllTreasurySubcomDetails = async (req, res) => {
   }
 };
 
-
-
 exports.getTreasuryDetails = async (req, res) => {
   try {
     const { treasuryId } = req.params;
@@ -332,22 +323,52 @@ exports.getTreasuryDetails = async (req, res) => {
   }
 };
 
-
 exports.getTreasuryTransactions = async (req, res) => {
   try {
     const { treasuryId } = req.params;
+    const { location_id, upi_id } = req.query; // New query parameters
+
     const treasury = await Treasury.findOne({ treasury_id: treasuryId }).select("user_id");
     if (!treasury) {
       return res.status(404).json({ error: "Treasury not found" });
     }
 
-    const transactions = await Transaction.find({
+    // Base transaction query
+    let transactionQuery = {
       $or: [
         { sender_id: treasury.user_id },
         { receiver_id: treasury.user_id },
       ],
       transaction_type: { $in: ["Transfer", "TopUp", "Refund", "Credit"] },
-    })
+    };
+
+    // If location_id or upi_id is provided, filter by LoginLog time ranges
+    if (location_id || upi_id) {
+      const loginLogQuery = { user_id: treasury.user_id };
+      if (location_id) loginLogQuery.location_id = location_id;
+      if (upi_id) loginLogQuery.upi_id = upi_id;
+
+      const loginLogs = await mongoose.model("LoginLog").find(loginLogQuery).select("login_time logout_time");
+      
+      if (!loginLogs.length) {
+        return res.status(200).json({ data: [] }); // No matching login logs
+      }
+
+      // Create time range conditions
+      const timeConditions = loginLogs.map(log => ({
+        created_at: {
+          $gte: log.login_time,
+          $lte: log.logout_time || new Date(), // Use current time if logout_time is null
+        },
+      }));
+
+      transactionQuery = {
+        ...transactionQuery,
+        $or: timeConditions, // Transactions must fall within any login log's time range
+      };
+    }
+
+    const transactions = await Transaction.find(transactionQuery)
       .populate("sender_id", "name")
       .populate("receiver_id", "name")
       .lean();
@@ -371,3 +392,41 @@ exports.getTreasuryTransactions = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch transactions" });
   }
 };
+// exports.getTreasuryTransactions = async (req, res) => {
+//   try {
+//     const { treasuryId } = req.params;
+//     const treasury = await Treasury.findOne({ treasury_id: treasuryId }).select("user_id");
+//     if (!treasury) {
+//       return res.status(404).json({ error: "Treasury not found" });
+//     }
+
+//     const transactions = await Transaction.find({
+//       $or: [
+//         { sender_id: treasury.user_id },
+//         { receiver_id: treasury.user_id },
+//       ],
+//       transaction_type: { $in: ["Transfer", "TopUp", "Refund", "Credit"] },
+//     })
+//       .populate("sender_id", "name")
+//       .populate("receiver_id", "name")
+//       .lean();
+
+//     const formattedTransactions = transactions.map((tx) => ({
+//       id: tx.transaction_id,
+//       type: tx.transaction_type.toLowerCase(),
+//       amount: parseFloat(tx.amount),
+//       date: tx.created_at,
+//       description:
+//         tx.transaction_type === "Transfer"
+//           ? `To ${tx.receiver_id?.name || "Unknown"}`
+//           : tx.transaction_type === "Refund"
+//           ? `From ${tx.sender_id?.name || "Unknown"}`
+//           : tx.remarks || `${tx.transaction_type} transaction`,
+//     }));
+
+//     res.status(200).json({ data: formattedTransactions });
+//   } catch (error) {
+//     console.error("Error fetching treasury transactions:", error);
+//     res.status(500).json({ error: "Failed to fetch transactions" });
+//   }
+// };

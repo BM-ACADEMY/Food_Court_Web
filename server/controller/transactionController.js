@@ -20,7 +20,6 @@ exports.createTransaction = async (req, res) => {
       payment_method,
       status = "Pending",
       remarks,
-      location_id,
     } = req.body;
 
     console.log("createTransaction - Request body:", req.body);
@@ -64,14 +63,15 @@ exports.createTransaction = async (req, res) => {
     }
 
     // Validate amount format
-    if (!/^\d+\.\d{2}$/.test(amount)) {
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount) || !/^\d+\.\d{2}$/.test(amount)) {
       return res.status(400).json({ success: false, message: "Amount must be a string with two decimal places (e.g., '10.00')" });
     }
 
     // Validate sender balance
     const senderBalance = await UserBalance.findOne({ user_id: sender_id });
     const senderBalanceAmount = senderBalance ? parseFloat(senderBalance.balance) : 0.0;
-    if (parseFloat(amount) > senderBalanceAmount) {
+    if (parsedAmount > senderBalanceAmount) {
       return res.status(400).json({ success: false, message: `Insufficient sender balance: ${senderBalanceAmount.toFixed(2)}` });
     }
 
@@ -97,7 +97,6 @@ exports.createTransaction = async (req, res) => {
       payment_method,
       status,
       remarks,
-      location_id,
     });
 
     await transaction.save();
@@ -106,6 +105,190 @@ exports.createTransaction = async (req, res) => {
   } catch (err) {
     console.error("Transaction creation error:", err.message, err.stack);
     res.status(400).json({ success: false, message: err.message || "Failed to create transaction" });
+  }
+};
+
+exports.createOrUpdateBalance = async (req, res) => {
+  const {
+    user_id,
+    balance,
+    transaction_type = "Credit",
+    payment_method,
+    remarks,
+  } = req.body;
+
+  try {
+    if (!mongoose.Types.ObjectId.isValid(user_id) || isNaN(balance) || !/^\-?\d+\.\d{2}$/.test(balance.toString())) {
+      return res.status(400).json({ message: "Invalid data provided" });
+    }
+
+    const amount = parseFloat(balance);
+
+    // Step 1: Fetch user & role
+    const user = await User.findById(user_id).populate("role_id");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Step 2: If Master Admin, check point_creation_limit
+    if (user.role_id?.name === "Master-Admin" && transaction_type === "Credit") {
+      const masterAdmin = await MasterAdmin.findOne({ user_id: user_id });
+      const creationLimit = parseFloat(masterAdmin?.point_creation_limit?.toString() || "0");
+      if (amount > creationLimit) {
+        return res.status(400).json({
+          message: `Amount exceeds Master Admin's creation limit of ₹${creationLimit}`,
+        });
+      }
+    }
+
+    // Step 3: Validate balance for debit operations
+    if (transaction_type === "Debit") {
+      const currentBalance = await UserBalance.findOne({ user_id });
+      const currentBalanceAmount = currentBalance ? parseFloat(currentBalance.balance) : 0.0;
+      if (currentBalanceAmount + amount < 0) {
+        return res.status(400).json({
+          message: `Insufficient balance: ₹${currentBalanceAmount.toFixed(2)}`,
+        });
+      }
+    }
+
+    // Step 4: Update balance
+    const updatedBalance = await UserBalance.findOneAndUpdate(
+      { user_id },
+      { $inc: { balance: amount } },
+      { new: true, upsert: true }
+    );
+
+    // Step 5: Record transaction
+    const newTransaction = await Transaction.create({
+      sender_id: user_id,
+      receiver_id: user_id,
+      amount: Math.abs(amount).toFixed(2),
+      transaction_type,
+      payment_method,
+      remarks,
+      status: "Success",
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Balance updated and transaction recorded",
+      balance: updatedBalance,
+      transaction: newTransaction,
+    });
+  } catch (error) {
+    console.error("Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+exports.processPayment = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const {
+      sender_id,
+      receiver_id,
+      amount,
+      transaction_type = "Transfer",
+      payment_method = "Gpay",
+      remarks,
+    } = req.body;
+
+    console.log("Processing payment:", { sender_id, receiver_id, amount, transaction_type });
+
+    // Validate ObjectIds
+    if (!mongoose.Types.ObjectId.isValid(sender_id) || !mongoose.Types.ObjectId.isValid(receiver_id)) {
+      await session.abortTransaction();
+      return res.status(400).json({ success: false, message: "Invalid sender_id or receiver_id format" });
+    }
+
+    // Validate users and roles
+    const sender = await User.findById(sender_id).populate("role_id").session(session);
+    if (!sender) {
+      await session.abortTransaction();
+      return res.status(400).json({ success: false, message: "Sender not found" });
+    }
+    const receiver = await User.findById(receiver_id).populate("role_id").session(session);
+    if (!receiver) {
+      await session.abortTransaction();
+      return res.status(400).json({ success: false, message: "Receiver not found" });
+    }
+
+    if (transaction_type === "Transfer") {
+      if (sender.role_id?.role_id !== "role-5") {
+        await session.abortTransaction();
+        return res.status(400).json({ success: false, message: "Sender must be a customer (role-5)" });
+      }
+      if (receiver.role_id?.role_id !== "role-4") {
+       romium:1
+        await session.abortTransaction();
+        return res.status(400).json({ success: false, message: "Receiver must be a restaurant (role-4)" });
+      }
+    }
+
+    // Validate amount format
+    const deductAmount = parseFloat(amount);
+    if (isNaN(deductAmount) || !/^\d+\.\d{2}$/.test(amount)) {
+      await session.abortTransaction();
+      return res.status(400).json({ success: false, message: "Amount must be a string with two decimal places (e.g., '10.00')" });
+    }
+
+    // Validate sender balance
+    const senderBalance = await UserBalance.findOne({ user_id: sender_id }).session(session);
+    const senderBalanceAmount = senderBalance ? parseFloat(senderBalance.balance) : 0.0;
+    if (deductAmount > senderBalanceAmount) {
+      await session.abortTransaction();
+      return res.status(400).json({ success: false, message: `Insufficient sender balance: ${senderBalanceAmount.toFixed(2)}` });
+    }
+
+    // Create transaction
+    const transaction = new Transaction({
+      sender_id,
+      receiver_id,
+      amount: deductAmount.toFixed(2),
+      transaction_type,
+      payment_method,
+      status: "Success",
+      remarks,
+    });
+    await transaction.save({ session });
+
+    // Update sender (customer) balance
+    const updatedSenderBalance = await UserBalance.findOneAndUpdate(
+      { user_id: sender_id },
+      { $inc: { balance: -deductAmount } },
+      { new: true, upsert: true, session }
+    );
+
+    // Update receiver (restaurant) balance
+    const updatedReceiverBalance = await UserBalance.findOneAndUpdate(
+      { user_id: receiver_id },
+      { $inc: { balance: deductAmount } },
+      { new: true, upsert: true, session }
+    );
+
+    console.log("Updated sender balance:", updatedSenderBalance.balance);
+    console.log("Updated receiver balance:", updatedReceiverBalance.balance);
+
+    await session.commitTransaction();
+    res.status(200).json({
+      success: true,
+      message: `Payment successful! New customer balance: ₹${(senderBalanceAmount - deductAmount).toFixed(2)}`,
+      transaction,
+      senderBalance: updatedSenderBalance,
+      receiverBalance: updatedReceiverBalance,
+    });
+  } catch (err) {
+    await session.abortTransaction();
+    console.error("Payment processing error:", err);
+    res.status(400).json({ success: false, message: err.message || "Failed to process payment" });
+  } finally {
+    session.endSession();
   }
 };
 
@@ -926,6 +1109,187 @@ exports.getTransactionHistory = async (req, res) => {
   }
 };
 
+
+exports.getTransactionTreasuryRestaurantHistory = async (req, res) => {
+  try {
+    const {
+      transactionType = "all",
+      restaurantId = "all",
+      fromDate,
+      toDate,
+      quickFilter,
+      search = "",
+      page = 1,
+      limit = 10,
+    } = req.query;
+
+    // Build filter object
+    let filter = { status: "Success" };
+
+    // Transaction type filter (only Transfer or Refund for restaurant transactions)
+    if (transactionType !== "all") {
+      filter.transaction_type = transactionType;
+    } else {
+      filter.transaction_type = { $in: ["Transfer", "Refund"] };
+    }
+
+    // Fetch restaurant role
+    const restaurantRole = await Role.findOne({ role_id: "role-4" });
+    if (!restaurantRole) {
+      return res.status(400).json({ error: "Restaurant role not found" });
+    }
+
+    // Fetch all restaurant user IDs
+    const restaurantUsers = await User.find({ role_id: restaurantRole._id }).select("_id");
+    const restaurantUserIds = restaurantUsers.map((user) => user._id);
+
+    // Restaurant filter
+    if (restaurantId !== "all") {
+      if (!mongoose.Types.ObjectId.isValid(restaurantId)) {
+        return res.status(400).json({ error: "Invalid restaurant ID" });
+      }
+      filter.$or = [
+        { sender_id: mongoose.Types.ObjectId(restaurantId) },
+        { receiver_id: mongoose.Types.ObjectId(restaurantId) },
+      ];
+    } else {
+      // Only include transactions involving restaurants
+      filter.$or = [
+        { sender_id: { $in: restaurantUserIds } },
+        { receiver_id: { $in: restaurantUserIds } },
+      ];
+    }
+
+    // Date filter
+    const dateFilter = buildDateFilter(quickFilter, fromDate, toDate);
+    if (dateFilter.created_at) {
+      filter = { ...filter, ...dateFilter };
+    }
+
+    // Search by transaction_id, customer name, or customer_id
+    if (search.trim()) {
+      const users = await User.find({
+        $or: [
+          { name: { $regex: search, $options: "i" } },
+          { phone_number: { $regex: search, $options: "i" } },
+        ],
+        role_id: await Role.findOne({ role_id: "role-5" }).select("_id"), // Only customers
+      }).select("_id");
+      const customers = await Customer.find({
+        customer_id: { $regex: search, $options: "i" },
+      }).select("user_id");
+      const userIds = [
+        ...users.map((user) => user._id),
+        ...customers.map((customer) => customer.user_id),
+      ];
+      filter.$or = [
+        { transaction_id: { $regex: search, $options: "i" } },
+        { sender_id: { $in: userIds } },
+        { receiver_id: { $in: userIds } },
+      ];
+    }
+
+    // Pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Fetch transactions
+    const transactionsPromise = Transaction.find(filter)
+      .populate({
+        path: "sender_id",
+        select: "name phone_number role_id",
+        populate: { path: "role_id", select: "role_id name" },
+      })
+      .populate({
+        path: "receiver_id",
+        select: "name phone_number role_id",
+        populate: { path: "role_id", select: "role_id name" },
+      })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+
+    // Calculate statistics
+    const statsPromise = Transaction.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: null,
+          totalTransactions: { $sum: 1 },
+          totalRevenue: { $sum: { $toDouble: "$amount" } },
+          avgTransactionValue: { $avg: { $toDouble: "$amount" } },
+          totalRefunds: {
+            $sum: {
+              $cond: [
+                { $eq: ["$transaction_type", "Refund"] },
+                { $toDouble: "$amount" },
+                0,
+              ],
+            },
+          },
+        },
+      },
+    ]);
+
+    const [transactions, statsResult] = await Promise.all([transactionsPromise, statsPromise]);
+
+    // Enrich with customer_id and customer_name
+    const formattedTransactions = await Promise.all(
+      transactions.map(async (txn) => {
+        let customer_id = "N/A";
+        let customer_name = "Unknown";
+        const senderRole = txn.sender_id?.role_id?.role_id;
+        const receiverRole = txn.receiver_id?.role_id?.role_id;
+
+        if (senderRole === "role-5") {
+          const customer = await Customer.findOne({ user_id: txn.sender_id._id }).select("customer_id").lean();
+          customer_id = customer?.customer_id || "N/A";
+          customer_name = txn.sender_id?.name || "Unknown";
+        } else if (receiverRole === "role-5") {
+          const customer = await Customer.findOne({ user_id: txn.receiver_id._id }).select("customer_id").lean();
+          customer_id = customer?.customer_id || "N/A";
+          customer_name = txn.receiver_id?.name || "Unknown";
+        }
+
+        return {
+          datetime: moment(txn.created_at).format("MMM DD, YYYY HH:mm"),
+          id: txn.transaction_id || "N/A",
+          customer: customer_name,
+          customer_id,
+          type: txn.transaction_type,
+          description: txn.remarks || `${txn.transaction_type} transaction`,
+          amount: parseFloat(txn.amount),
+          status: txn.status || "Completed",
+        };
+      })
+    );
+
+    // Format statistics
+    const stats = {
+      totalTransactions: statsResult[0]?.totalTransactions || 0,
+      totalRevenue: statsResult[0]?.totalRevenue || 0,
+      avgTransactionValue: statsResult[0]?.avgTransactionValue || 0,
+      totalRefunds: statsResult[0]?.totalRefunds || 0,
+    };
+
+    // Total pages for pagination
+    const totalTransactions = stats.totalTransactions;
+    const totalPages = Math.ceil(totalTransactions / parseInt(limit));
+
+    res.status(200).json({
+      transactions: formattedTransactions,
+      stats,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages,
+        totalTransactions,
+      },
+    });
+  } catch (error) {
+    console.error("Error in getTransactionHistory:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
 
 // Update transaction by transaction_id
 exports.updateTransaction = async (req, res) => {

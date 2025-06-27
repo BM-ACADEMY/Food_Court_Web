@@ -1,5 +1,4 @@
 const Customer = require("../model/customerModel");
-
 const Role = require("../model/roleModel");
 const User = require("../model/userModel");
 const Transaction = require("../model/transactionModel");

@@ -67,11 +67,14 @@ import {
 } from "@/components/ui/dialog";
 
 
+
 export function SiteHeader() {
   const { toggleSidebar } = useSidebar();
   const { user, logout } = useAuth();
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const navigate = useNavigate();
+
+
 
   const [openAccountModal, setOpenAccountModal] = useState(false);
   const handleHistory = () => {
