@@ -21,6 +21,7 @@ import { QrCode, ScanLine, FileText, FileSpreadsheet, FileSignature } from "luci
 import { Html5Qrcode } from "html5-qrcode";
 import axios from "axios";
 import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -39,6 +40,7 @@ export default function CustomerHistory() {
   const [openDialog, setOpenDialog] = useState(false);
   const [exportFormat, setExportFormat] = useState("csv");
   const [dateFilter, setDateFilter] = useState("all");
+  const [searchInput, setSearchInput] = useState(""); // New state for search input
   const qrRef = useRef(null);
   const html5QrCodeRef = useRef(null);
 
@@ -99,7 +101,6 @@ export default function CustomerHistory() {
     try {
       const qrCode = encodeURIComponent(qrString);
 
-      // Fetch customer data
       let customerResponse;
       let retries = 3;
       while (retries > 0) {
@@ -128,10 +129,8 @@ export default function CustomerHistory() {
 
       const { customer_id, user_id, status, registration_type, created_at } = customerResponse.data.data;
 
-      // Log user_id for debugging
       console.log("User ID from QR scan:", user_id._id);
 
-      // Fetch customer details
       let detailsResponse;
       retries = 3;
       while (retries > 0) {
@@ -185,7 +184,6 @@ export default function CustomerHistory() {
       setScannerOpen(false);
       await stopScanner();
 
-      // Fetch transactions using the user_id
       if (user_id._id) {
         await fetchTransactions(user_id._id);
       } else {
@@ -201,7 +199,6 @@ export default function CustomerHistory() {
       });
       if (err.response?.status === 401) {
         setError("Authentication failed. Please log in and try again.");
-     e
       } else if (err.response?.status === 404) {
         setError(err.response?.data?.message || "Customer not found for this QR code.");
       } else {
@@ -283,10 +280,163 @@ export default function CustomerHistory() {
     }
   };
 
+  // Handle search by customer_id or phone number
+  const handleSearch = async () => {
+    if (!searchInput.trim()) {
+      setError("Please enter a customer ID or phone number.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setShowDetails(false);
+    setTransactions([]);
+    setFilteredTransactions([]);
+
+    try {
+      let userId;
+      let input = searchInput.trim();
+
+      // Normalize customer_id to uppercase if it starts with "cust" (case-insensitive)
+      if (input.toLowerCase().startsWith("cust")) {
+        input = input.toUpperCase(); // Convert to uppercase
+        // Search by customer_id
+        const customerResponse = await axios.get(
+          `${BASE_URL}/customers/fetch-by-customer-id?customer_id=${encodeURIComponent(input)}`,
+          { withCredentials: true }
+        );
+
+        if (!customerResponse?.data?.success) {
+          throw new Error(customerResponse?.data?.message || "Customer not found.");
+        }
+
+        const { customer_id, user_id, status, registration_type, created_at } = customerResponse.data.data;
+        userId = user_id._id;
+
+        // Fetch customer details
+        const detailsResponse = await axios.get(
+          `${BASE_URL}/customers/fetch-customer-details-by-qr?qr_code=${encodeURIComponent(customerResponse.data.data.qr_code)}`,
+          { withCredentials: true }
+        );
+
+        if (!detailsResponse?.data?.success) {
+          throw new Error(detailsResponse?.data?.message || "Customer details not found.");
+        }
+
+        const customerData = detailsResponse.data.data;
+
+        const balanceValue =
+          customerData.balance && customerData.balance !== "Payment not done yet"
+            ? parseFloat(customerData.balance.toString())
+            : 0;
+
+        const newScannedData = {
+          customerId: customer_id || "N/A",
+          name: customerData.name || user_id.name || "N/A",
+          phone: customerData.phone_number || user_id.phone_number || "N/A",
+          email: customerData.email || user_id.email || "N/A",
+          currentBalance: balanceValue,
+          registrationDate: created_at
+            ? new Date(created_at).toLocaleDateString()
+            : "20 Jan 2024",
+          status: status || "Unknown",
+          customerType: registration_type || "Unknown",
+          userId: user_id._id,
+        };
+
+        setShowDetails(true);
+        setScannedData(newScannedData);
+
+        // Fetch transactions
+        await fetchTransactions(userId);
+      } else {
+        // Assume input is a phone number
+        const userResponse = await axios.get(
+          `${BASE_URL}/users/fetch-by-phone?phone_number=${encodeURIComponent(input)}`,
+          { withCredentials: true }
+        );
+
+        if (!userResponse?.data?.success) {
+          throw new Error(userResponse?.data?.message || "User not found.");
+        }
+
+        const { _id, name, email, phone_number } = userResponse.data.data;
+        userId = _id;
+
+        // Fetch customer data to get customer_id and other details
+        const customerResponse = await axios.get(
+          `${BASE_URL}/customers/fetch-by-user-id/${userId}`,
+          { withCredentials: true }
+        );
+
+        if (!customerResponse?.data?.success) {
+          throw new Error(customerResponse?.data?.message || "Customer not found for this user.");
+        }
+
+        const { customer_id, status, registration_type, created_at, qr_code } = customerResponse.data.data;
+
+        // Fetch customer details
+        const detailsResponse = await axios.get(
+          `${BASE_URL}/customers/fetch-customer-details-by-qr?qr_code=${encodeURIComponent(qr_code)}`,
+          { withCredentials: true }
+        );
+
+        if (!detailsResponse?.data?.success) {
+          throw new Error(detailsResponse?.data?.message || "Customer details not found.");
+        }
+
+        const customerData = detailsResponse.data.data;
+
+        const balanceValue =
+          customerData.balance && customerData.balance !== "Payment not done yet"
+            ? parseFloat(customerData.balance.toString())
+            : 0;
+
+        const newScannedData = {
+          customerId: customer_id || "N/A",
+          name: customerData.name || name || "N/A",
+          phone: customerData.phone_number || phone_number || "N/A",
+          email: customerData.email || email || "N/A",
+          currentBalance: balanceValue,
+          registrationDate: created_at
+            ? new Date(created_at).toLocaleDateString()
+            : "20 Jan 2024",
+          status: status || "Unknown",
+          customerType: registration_type || "Unknown",
+          userId: _id,
+        };
+
+        setShowDetails(true);
+        setScannedData(newScannedData);
+
+        // Fetch transactions
+        await fetchTransactions(userId);
+      }
+    } catch (err) {
+      console.error("Search error:", {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+      });
+      if (err.response?.status === 401) {
+        setError("Authentication failed. Please log in and try again.");
+      } else if (err.response?.status === 404) {
+        setError(err.response?.data?.message || "Customer or user not found.");
+      } else {
+        setError(
+          err.response?.data?.message ||
+            "Failed to fetch customer details. Please try again or contact support."
+        );
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Manual CSV generation function
   const generateCSV = (transactions) => {
     const headers = ["ID,Date,Type,Payment Method,Amount,Status,Customer ID"];
-    const rows = transactions.map(txn =>
+    const rows = transactions.map((txn) =>
       [
         `"${txn.id || "N/A"}"`,
         `"${txn.date || "N/A"}"`,
@@ -303,14 +453,20 @@ export default function CustomerHistory() {
   // Export transaction data
   const exportData = async () => {
     if (!scannedData?.userId) {
-      setError("No customer data available to export Novak export.");
+      setError("No customer data available to export.");
       return;
     }
 
     try {
       setLoading(true);
+      // Fetch all transactions by setting limit=0
+      let queryParams = "limit=0"; // Fetch all transactions
+      if (dateFilter !== "all") {
+        queryParams += `&quickFilter=${dateFilter}`;
+      }
+
       const response = await axios.get(
-        `${BASE_URL}/transactions/history/user/${scannedData.userId}/detailed`,
+        `${BASE_URL}/transactions/history/user/${scannedData.userId}/detailed?${queryParams}`,
         { withCredentials: true }
       );
 
@@ -324,10 +480,7 @@ export default function CustomerHistory() {
       if (exportFormat === "csv") {
         const csv = generateCSV(transactions);
         const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = `${filename}.csv`;
-        link.click();
+        saveAs(blob, `${filename}.csv`);
       } else if (exportFormat === "excel") {
         const worksheetData = transactions.map(txn => ({
           ID: txn.id || "N/A",
@@ -426,7 +579,7 @@ export default function CustomerHistory() {
                 <DialogHeader>
                   <DialogTitle>Scan QR Code</DialogTitle>
                 </DialogHeader>
-                < apt
+                <div
                   className="relative w-full h-64 bg-gray-100 border border-dashed border-[#070149] rounded-lg overflow-hidden"
                 >
                   {!html5QrCodeRef.current && (
@@ -435,7 +588,7 @@ export default function CustomerHistory() {
                     </div>
                   )}
                   <div id="qr-reader" ref={qrRef} className="w-full h-full" />
-                </apt>
+                </div>
                 {cameraError && (
                   <p className="text-red-500 text-sm mt-2">{cameraError}</p>
                 )}
@@ -461,9 +614,25 @@ export default function CustomerHistory() {
                 type="text"
                 placeholder="Enter ID or Phone Number"
                 className="px-4 py-2 border border-gray-300 rounded-l-lg w-64"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === "Enter") {
+                    handleSearch();
+                  }
+                }}
               />
-              <button className="bg-[#0B0742] px-4 text-white rounded-r-lg">🔍</button>
+              <Button
+                className="bg-[#0B0742] px-4 text-white rounded-r-lg"
+                onClick={handleSearch}
+                disabled={loading}
+              >
+                {loading ? "Searching..." : "🔍"}
+              </Button>
             </div>
+            {error && (
+              <p className="text-red-500 text-sm mt-2">{error}</p>
+            )}
           </div>
         )}
 

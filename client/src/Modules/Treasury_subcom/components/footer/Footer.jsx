@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Mail, Phone } from "lucide-react";
-import TermsModal from "@/Modules/User/components/footer/TermsModal";
-import PrivacyModal from "@/Modules/User/components/footer/PrivacyModal";
+import TermsModal from "@/Modules/Treasury_subcom/components/footer/TermsModal";
+import PrivacyModal from "@/Modules/Treasury_subcom/components/footer/PrivacyModal";
 
 const Footer = () => {
   const [showTerms, setShowTerms] = useState(false);

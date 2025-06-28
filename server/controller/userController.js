@@ -777,5 +777,23 @@ exports.getUsersWithBalanceByRole = async (req, res) => {
   }
 };
 
+// Get User by Phone Number
+exports.getUserByPhone = async (req, res) => {
+  try {
+    const { phone_number } = req.query;
+    if (!phone_number) {
+      return res.status(400).json({ success: false, message: "Phone number is required" });
+    }
 
+    const user = await User.findOne({ phone_number }).populate("role_id", "name");
+    if (!user) {
+      return res.status(404).json({ success: false, message: "No user found for this phone number" });
+    }
+
+    res.status(200).json({ success: true, data: user });
+  } catch (err) {
+    console.error("Error in getUserByPhone:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
 
