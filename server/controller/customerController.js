@@ -854,3 +854,49 @@ exports.getCustomerDetailsByQrCode = async (req, res) => {
   }
 };
 
+// Get Customer by Customer ID
+exports.getCustomerByCustomerId = async (req, res) => {
+  try {
+    const { customer_id } = req.query;
+    if (!customer_id) {
+      return res.status(400).json({ success: false, message: "Customer ID is required" });
+    }
+
+    const customer = await Customer.findOne({ customer_id }).populate(
+      "user_id",
+      "name email phone_number"
+    );
+    if (!customer) {
+      return res.status(404).json({ success: false, message: "No customer found for this customer ID" });
+    }
+
+    res.status(200).json({ success: true, data: customer });
+  } catch (err) {
+    console.error("Error in getCustomerByCustomerId:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// Get Customer by User ID
+exports.getCustomerByUserId = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid user ID" });
+    }
+
+    const customer = await Customer.findOne({ user_id: id }).populate(
+      "user_id",
+      "name email phone_number"
+    );
+    if (!customer) {
+      return res.status(404).json({ success: false, message: "No customer found for this user ID" });
+    }
+
+    res.status(200).json({ success: true, data: customer });
+  } catch (err) {
+    console.error("Error in getCustomerByUserId:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+

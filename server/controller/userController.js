@@ -41,7 +41,9 @@ exports.loginUser = async (req, res) => {
       }
     } else if (role === "customer") {
       if (userRoleId !== "role-5") {
-        return res.status(403).json({ message: "Unauthorized: Not a customer" });
+        return res
+          .status(403)
+          .json({ message: "Unauthorized: Not a customer" });
       }
     } else {
       return res.status(400).json({ message: "Invalid role context provided" });
@@ -82,7 +84,6 @@ exports.loginUser = async (req, res) => {
   }
 };
 
-
 // Get current user
 exports.getMe = async (req, res) => {
   const token = req.cookies.token;
@@ -105,7 +106,9 @@ exports.getMe = async (req, res) => {
 
     // Fetch balance
     const userBalance = await UserBalance.findOne({ user_id: user._id });
-    const balance = userBalance ? parseFloat(userBalance.balance.toString()) : 0.0;
+    const balance = userBalance
+      ? parseFloat(userBalance.balance.toString())
+      : 0.0;
 
     // Fetch customer data
     const customer = await Customer.findOne({ user_id: user._id }).lean();
@@ -116,7 +119,9 @@ exports.getMe = async (req, res) => {
     // Fetch treasury subcom data for role-3 users
     let treasurySubcom = null;
     if (user.role_id?.role_id === "role-3") {
-      treasurySubcom = await TreasurySubcom.findOne({ user_id: user._id }).lean();
+      treasurySubcom = await TreasurySubcom.findOne({
+        user_id: user._id,
+      }).lean();
     }
 
     // Prepare response object
@@ -136,13 +141,17 @@ exports.getMe = async (req, res) => {
       customer_id: customer ? customer.customer_id : "N/A",
       restaurant_id: restaurant ? restaurant.restaurant_id : "N/A", // Add restaurant_id
       r_id: restaurant ? restaurant._id : null, // Mongo ID for updating restaurant
-      treasury_subcom_id: treasurySubcom ? treasurySubcom.treasury_subcom_id : "N/A", // Add treasury_subcom_id
+      treasury_subcom_id: treasurySubcom
+        ? treasurySubcom.treasury_subcom_id
+        : "N/A", // Add treasury_subcom_id
     };
 
     res.json({ user: userObj });
   } catch (err) {
     console.error("getMe error:", err.message, err.stack);
-    return res.status(401).json({ message: "Invalid token", details: err.message });
+    return res
+      .status(401)
+      .json({ message: "Invalid token", details: err.message });
   }
 };
 // Logout function
@@ -450,7 +459,7 @@ exports.verifyMobileLoginOtp = async (req, res) => {
         phone_number: user.phone_number,
         role: {
           role_id: user.role_id.role_id,
-          name:user.role_id.name
+          name: user.role_id.name,
         },
         number_verified: user.number_verified,
       },
@@ -462,7 +471,7 @@ exports.verifyMobileLoginOtp = async (req, res) => {
       message: err.message,
     });
   }
-}
+};
 
 exports.sendOtpController = async (req, res) => {
   const { phone_number } = req.body;
@@ -851,7 +860,13 @@ exports.updateUser = async (req, res) => {
     const userId = req.params.id;
     const { name, email, phone_number, is_flagged } = req.body;
 
-    console.log("updateUser: Request payload:", { userId, name, email, phone_number, is_flagged });
+    console.log("updateUser: Request payload:", {
+      userId,
+      name,
+      email,
+      phone_number,
+      is_flagged,
+    });
 
     if (!mongoose.isValidObjectId(userId)) {
       console.error(`updateUser: Invalid user ID format: ${userId}`);
@@ -859,8 +874,14 @@ exports.updateUser = async (req, res) => {
     }
 
     if (!name || !email || !phone_number) {
-      console.error("updateUser: Missing required fields", { name, email, phone_number });
-      return res.status(400).json({ message: "Name, email, and phone number are required" });
+      console.error("updateUser: Missing required fields", {
+        name,
+        email,
+        phone_number,
+      });
+      return res
+        .status(400)
+        .json({ message: "Name, email, and phone number are required" });
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -872,7 +893,9 @@ exports.updateUser = async (req, res) => {
     const phoneRegex = /^\d{10}$/;
     if (!phoneRegex.test(phone_number)) {
       console.error(`updateUser: Invalid phone number format: ${phone_number}`);
-      return res.status(400).json({ message: "Phone number must be 10 digits" });
+      return res
+        .status(400)
+        .json({ message: "Phone number must be 10 digits" });
     }
 
     const existingEmail = await User.findOne({ email, _id: { $ne: userId } });
@@ -881,7 +904,10 @@ exports.updateUser = async (req, res) => {
       return res.status(409).json({ message: "Email already exists" });
     }
 
-    const existingPhone = await User.findOne({ phone_number, _id: { $ne: userId } });
+    const existingPhone = await User.findOne({
+      phone_number,
+      _id: { $ne: userId },
+    });
     if (existingPhone) {
       console.error(`updateUser: Phone number already exists: ${phone_number}`);
       return res.status(409).json({ message: "Phone number already exists" });
@@ -912,14 +938,22 @@ exports.updateUser = async (req, res) => {
     }
 
     const userBalance = await UserBalance.findOne({ user_id: updatedUser._id });
-    const balance = userBalance ? parseFloat(userBalance.balance.toString()) : 0.0;
+    const balance = userBalance
+      ? parseFloat(userBalance.balance.toString())
+      : 0.0;
 
-    const customer = await Customer.findOne({ user_id: updatedUser._id }).lean();
-    const restaurant = await Restaurant.findOne({ user_id: updatedUser._id }).lean();
+    const customer = await Customer.findOne({
+      user_id: updatedUser._id,
+    }).lean();
+    const restaurant = await Restaurant.findOne({
+      user_id: updatedUser._id,
+    }).lean();
 
     let treasurySubcom = null;
     if (updatedUser.role_id?.role_id === "role-3") {
-      treasurySubcom = await TreasurySubcom.findOne({ user_id: updatedUser._id }).lean();
+      treasurySubcom = await TreasurySubcom.findOne({
+        user_id: updatedUser._id,
+      }).lean();
       console.log("updateUser: TreasurySubcom:", treasurySubcom);
     }
 
@@ -940,7 +974,9 @@ exports.updateUser = async (req, res) => {
       customer_id: customer ? customer.customer_id : "N/A",
       restaurant_id: restaurant ? restaurant.restaurant_id : "N/A",
       r_id: restaurant ? restaurant._id : null,
-      treasury_subcom_id: treasurySubcom ? treasurySubcom.treasury_subcom_id : "N/A",
+      treasury_subcom_id: treasurySubcom
+        ? treasurySubcom.treasury_subcom_id
+        : "N/A",
     };
 
     console.log("updateUser: Success, user updated:", userObj);
@@ -1130,6 +1166,25 @@ exports.getUsersWithBalanceByRole = async (req, res) => {
   }
 };
 
+
+exports.getUserByPhone = async (req, res) => {
+  try {
+    const { phone_number } = req.query;
+    if (!phone_number) {
+      return res.status(400).json({ success: false, message: "Phone number is required" });
+    }
+
+    const user = await User.findOne({ phone_number }).populate("role_id", "name");
+    if (!user) {
+      return res.status(404).json({ success: false, message: "No user found for this phone number" });
+    }
+
+    res.status(200).json({ success: true, data: user });
+  } catch (err) {
+    console.error("Error in getUserByPhone:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
 exports.getTransactionDetails = async (req, res) => {
   try {
     const { transactionId } = req.params;

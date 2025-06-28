@@ -47,4 +47,7 @@ router.put("/update-user/:id", userController.updateUser);
 // DELETE /api/users/delete/:id
 router.delete("/delete-user/:id", userController.deleteUser);
 
+// Add to existing routes
+router.get("/fetch-by-phone", userController.getUserByPhone);
+
 module.exports = router;

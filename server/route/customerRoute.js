@@ -33,4 +33,9 @@ router.get("/fetch-single-customer-transaction/:customerId/transactions", custom
 router.get("/fetch-customer-details-by-qr", customerController.getCustomerDetailsByQrCode);
 
 
+// Add to existing routes
+router.get("/fetch-by-customer-id", customerController.getCustomerByCustomerId);
+router.get("/fetch-by-user-id/:id", customerController.getCustomerByUserId);
+
+
 module.exports = router;

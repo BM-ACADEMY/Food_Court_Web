@@ -1,37 +1,44 @@
+import { useState } from "react";
 import { Mail, Phone } from "lucide-react";
+import TermsModal from "@/Modules/Treasury_subcom/components/footer/TermsModal";
+import PrivacyModal from "@/Modules/Treasury_subcom/components/footer/PrivacyModal";
 
 const Footer = () => {
+  const [showTerms, setShowTerms] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
+
   return (
-    <footer className="bg-[#05023A] text-white px-6 sm:px-12 lg:px-20 py-10">
+    <footer className="bg-[#05023A] text-white px-4 sm:px-6 md:px-12 lg:px-20 py-10">
       <div className="max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-10 text-sm sm:text-base">
+        {/* Top Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-10 text-sm sm:text-base">
           {/* Left Section */}
-          <div>
+          <div className="text-center md:text-left">
             <h2 className="font-bold text-lg sm:text-xl mb-1">PEGASUS 2K25</h2>
-            <p className="italic text-[#cfcfd8]">
+            <p className="italic text-[#cfcfd8] text-sm sm:text-base">
               "One Destination. Endless Taste, Treasures and Thrills"
             </p>
           </div>
 
           {/* Center Section */}
-          <div>
+          <div className="text-center md:text-left">
             <h3 className="font-bold text-lg sm:text-xl mb-3">Contact Support</h3>
-            
-            <div className="flex items-start gap-2 mb-1 text-[#8ef5b7]">
+
+            <div className="flex items-start gap-2 mb-2 justify-center md:justify-start text-[#8ef5b7]">
               <Phone className="w-4 h-4 mt-1" />
               <a href="tel:+916369777051" className="text-white hover:underline">
-               Samuel Vincent D G: +91 6369777051
+                Samuel Vincent D G: +91 6369777051
               </a>
             </div>
 
-            <div className="flex items-start gap-2 mb-1 text-[#8ef5b7]">
+            <div className="flex items-start gap-2 mb-2 justify-center md:justify-start text-[#8ef5b7]">
               <Phone className="w-4 h-4 mt-1" />
-              <a href="+917010124947" className="text-white hover:underline">
-                 Mohith Varshan G: +91 7010124947
+              <a href="tel:+917010124947" className="text-white hover:underline">
+                Mohith Varshan G: +91 7010124947
               </a>
             </div>
 
-            <div className="flex items-start gap-2 text-[#8ef5b7]">
+            <div className="flex items-start gap-2 justify-center md:justify-start text-[#8ef5b7]">
               <Mail className="w-4 h-4 mt-1" />
               <a href="mailto:pegasus25coupons@gmail.com" className="text-white hover:underline break-words">
                 pegasus25coupons@gmail.com
@@ -40,14 +47,24 @@ const Footer = () => {
           </div>
 
           {/* Right Section */}
-          <div>
+          <div className="text-center md:text-left">
             <h3 className="font-bold text-lg sm:text-xl mb-3">Legal</h3>
             <ul className="space-y-1 text-[#cfcfd8]">
               <li>
-                <a href="#" className="hover:underline">Terms & Conditions</a>
+                <button
+                  className="hover:underline text-left w-full"
+                  onClick={() => setShowTerms(true)}
+                >
+                  Terms & Conditions
+                </button>
               </li>
               <li>
-                <a href="#" className="hover:underline">Privacy Policy</a>
+                <button
+                  className="hover:underline text-left w-full"
+                  onClick={() => setShowPrivacy(true)}
+                >
+                  Privacy Policy
+                </button>
               </li>
             </ul>
           </div>
@@ -70,6 +87,10 @@ const Footer = () => {
           All Rights Reserved.
         </p>
       </div>
+
+      {/* Modals */}
+      <TermsModal open={showTerms} onOpenChange={setShowTerms} />
+      <PrivacyModal open={showPrivacy} onOpenChange={setShowPrivacy} />
     </footer>
   );
 };
