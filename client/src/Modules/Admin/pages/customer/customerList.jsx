@@ -1,46 +1,32 @@
-import { Input } from "@/components/ui/input";
+import React, { useState, useEffect, useMemo } from "react";
+import axios from "axios";
+import { format, differenceInMinutes } from "date-fns";
 import {
   Select,
+  SelectTrigger,
   SelectContent,
   SelectItem,
-  SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  CalendarIcon,
-  QrCode,
-  Users,
-  Wifi,
-  Wallet,
-  ChevronDownIcon,
-  Search,
-  Download,
-  Eye,
-  Pencil,
-} from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
-import { useState, useEffect, useMemo } from "react";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { format } from "date-fns";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import {
   Table,
-  TableBody,
-  TableCell,
-  TableHead,
   TableHeader,
   TableRow,
+  TableHead,
+  TableBody,
+  TableCell,
 } from "@/components/ui/table";
 import {
   Pagination,
   PaginationContent,
   PaginationItem,
   PaginationLink,
-  PaginationNext,
   PaginationPrevious,
+  PaginationNext,
 } from "@/components/ui/pagination";
 import {
   Dialog,
@@ -50,13 +36,25 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import axios from "axios";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Badge } from "@/components/ui/badge";
+import {
+  CalendarIcon,
+  Users,
+  Wifi,
+  Wallet,
+  ChevronDownIcon,
+  Search,
+  Download,
+  Eye,
+} from "lucide-react";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import CustomerDetailsModal from "./CustomersDetailsModel"
-import moment from "moment";
+import { toast } from "react-toastify";
+import CustomerDetailsModal from "./CustomersDetailsModel";
 
 const getRandomColor = () => {
   const colors = ["#FF6B6B", "#4ECDC4", "#556270", "#C7F464", "#FFA500"];
@@ -78,11 +76,12 @@ const Avatar = ({ name = "" }) => {
     </div>
   );
 };
+
 export default function CustomerList() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [lastActive, setLastActive] = useState("all");
-  const [sortBy, setSortBy] = useState("asc");
+  const [sort, setSort] = useState("name-asc");
   const [regDate, setRegDate] = useState("");
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState(undefined);
@@ -101,34 +100,42 @@ export default function CustomerList() {
   const [exportFormat, setExportFormat] = useState("xlsx");
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [registrationType, setRegistrationType] = useState("all");
 
   // Fetch data from backend
   useEffect(() => {
     const fetchCustomers = async () => {
       setLoading(true);
+      setError(null);
       try {
-        const response = await axios.get(`${import.meta.env.VITE_BASE_URL}/customers/fetch-all-customer-details`, {
-          params: {
-            search,
-            status,
-            lastActive,
-            regDate: regDate ? format(new Date(regDate), "yyyy-MM-dd") : "",
-            sortBy,
-            page,
-            pageSize,
-          },
-        });
+        const [sortBy, sortOrder] = sort.split("-");
+        const response = await axios.get(
+          `${import.meta.env.VITE_BASE_URL}/customers/fetch-all-customer-details`,
+          {
+            params: {
+              search,
+              status,
+              lastActive,
+              regDate: regDate ? format(new Date(regDate), "yyyy-MM-dd") : "",
+              registration_type: registrationType, // Add new parameter
+              sortBy: sortBy === "name" ? sortOrder : sort, // Map to backend sortBy
+              page,
+              pageSize,
+            },
+          }
+        );
         setData(response.data);
-        setError(null);
       } catch (err) {
         console.error("Error fetching customers:", err);
-        setError("Failed to load data. Please try again.");
+        const errorMsg = err.response?.data?.error || "Failed to load data. Please try again.";
+        setError(errorMsg);
+        toast.error(errorMsg);
       } finally {
         setLoading(false);
       }
     };
     fetchCustomers();
-  }, [search, status, lastActive, regDate, sortBy, page, pageSize]);
+  }, [search, status, registrationType, lastActive, sort, regDate, page, pageSize]);
 
   const { customers, totalCustomers, totalBalance, onlineCount, totalPages } = data;
 
@@ -192,6 +199,7 @@ export default function CustomerList() {
     } catch (error) {
       console.error("Error exporting to PDF:", error);
       setError("Failed to export PDF. Please try again.");
+      toast.error("Failed to export PDF. Please try again.");
     }
   };
 
@@ -211,30 +219,28 @@ export default function CustomerList() {
     }
     setIsExportModalOpen(false);
   };
+
   const handleViewCustomer = (customer) => {
     setSelectedCustomer(customer);
     setIsDetailsModalOpen(true);
   };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       <h2 className="text-3xl font-bold text-[#00004D]">Customer Check</h2>
 
       {/* Filters */}
       <div className="bg-white p-4 rounded-lg shadow-sm space-y-4">
         <div className="flex flex-col md:flex-row md:items-center gap-4">
-          <div className="relative flex flex-1/3">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground size-4" />
             <Input
-              placeholder="Search by name, ID or phone number..."
+              placeholder="Search by name, ID, or phone number..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"
             />
           </div>
-          {/* <Button className="bg-[#00004D] text-white flex items-center gap-2 flex-1/5">
-            <QrCode className="size-4" />
-            Scan QR Code
-          </Button> */}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           {/* Status */}
@@ -254,7 +260,9 @@ export default function CustomerList() {
 
           {/* Registration Date */}
           <div className="flex flex-col gap-1">
-            <Label htmlFor="date" className="text-sm px-1">Registration Date</Label>
+            <Label htmlFor="date" className="text-sm px-1">
+              Registration Date
+            </Label>
             <Popover open={open} onOpenChange={setOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" id="date" className="w-full justify-between font-normal">
@@ -278,7 +286,19 @@ export default function CustomerList() {
               </PopoverContent>
             </Popover>
           </div>
-
+          <div>
+            <Label className="text-sm px-1">Customer Registration Type</Label>
+            <Select value={registrationType} onValueChange={setRegistrationType}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Registration Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="online">Online</SelectItem>
+                <SelectItem value="offline">Offline</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           {/* Last Active */}
           <div className="flex flex-col gap-1">
             <Label className="text-sm px-1">Last Active</Label>
@@ -295,19 +315,22 @@ export default function CustomerList() {
             </Select>
           </div>
 
-          {/* Sort By */}
+          {/* Sort */}
           <div className="flex flex-col gap-1">
-            <Label className="text-sm px-1">Sort By</Label>
-            <Select value={sortBy} onValueChange={setSortBy}>
+            <Label className="text-sm px-1">Sort</Label>
+            <Select
+              value={sort}
+              onValueChange={setSort}
+            >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Sort By" />
+                <SelectValue placeholder="Sort" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="asc">Name (A-Z)</SelectItem>
-                <SelectItem value="desc">Name (Z-A)</SelectItem>
+                <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+                <SelectItem value="name-desc">Name (Z-A)</SelectItem>
                 <SelectItem value="recent">Most Recent</SelectItem>
-                <SelectItem value="high-balance">Balance (High–Low)</SelectItem>
-                <SelectItem value="low-balance">Balance (Low–High)</SelectItem>
+                <SelectItem value="high-balance">Balance (High-Low)</SelectItem>
+                <SelectItem value="low-balance">Balance (Low-High)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -363,67 +386,125 @@ export default function CustomerList() {
               <Download className="mr-2 h-4 w-4" /> Export List
             </Button>
           </div>
-          <div className="overflow-x-auto">
-            <Table>
+          <div className="w-full overflow-x-auto">
+            <Table className="min-w-[1200px]">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Customer ID</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Balance</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Last Active</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead className="whitespace-nowrap">Customer ID</TableHead>
+                  <TableHead className="whitespace-nowrap">Sender Name</TableHead>
+                  <TableHead className="whitespace-nowrap">Receiver Name</TableHead>
+                  <TableHead className="whitespace-nowrap">Phone</TableHead>
+                  <TableHead className="whitespace-nowrap">Balance</TableHead>
+                  <TableHead className="whitespace-nowrap">Status</TableHead>
+                  <TableHead className="whitespace-nowrap">Registration Type</TableHead>
+                  <TableHead className="whitespace-nowrap">Last Active</TableHead>
+                  <TableHead className="whitespace-nowrap">Actions</TableHead>
                 </TableRow>
               </TableHeader>
+
               <TableBody>
                 {paginatedCustomers?.map((customer) => (
                   <TableRow key={customer.id}>
-                    <TableCell className="font-medium">#{customer.id}</TableCell>
-                    <TableCell>
+                    <TableCell className="font-medium whitespace-nowrap">#{customer.id}</TableCell>
+
+                    {/* Sender Name */}
+                    {/* <TableCell className="whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        <Avatar name={customer.name} />
-                        <span className="font-medium">{customer.name}</span>
+                        <Avatar name={customer.sender_name} />
+                        <div className="flex flex-col gap-1">
+                          <span className="font-medium">{customer.sender_name}</span>
+                          <span className="text-sm text-gray-500">{customer.sender_role}</span>
+                        </div>
+                      </div>
+                    </TableCell> */}
+
+                    {/* Receiver Name */}
+                    <TableCell className="whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <Avatar name={customer.sender_name} />
+                        <div className="flex flex-col gap-1">
+                          <span className="font-medium">{customer.sender_name}</span>
+                          <span className="text-sm text-gray-500">({customer.sender_role})</span>
+                        </div>
                       </div>
                     </TableCell>
 
-                    <TableCell>{customer.phone}</TableCell>
-                    <TableCell>
+                    {/* Phone (Name + Number) */}
+                    <TableCell className="whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <Avatar name={customer.receiver_name} />
+                       <div className="flex flex-col gap-1">
+                         <span className="font-medium">{customer.receiver_name}</span>
+                        <span className="font-medium">({customer.receiver_role})</span>
+                       </div>
+                      </div>
+                    </TableCell>
+
+                    <TableCell className="whitespace-nowrap">{customer.phone}</TableCell>
+
+                    {/* Balance */}
+                    <TableCell className="whitespace-nowrap">
                       <span
                         className={`font-semibold ${customer.balance > 0
-                          ? "text-green-600"
-                          : customer.balance < 0
-                            ? "text-red-600"
-                            : "text-gray-500"
+                            ? "text-green-600"
+                            : customer.balance < 0
+                              ? "text-red-600"
+                              : "text-gray-500"
                           }`}
                       >
                         ₹{customer.balance.toLocaleString()}
                       </span>
                     </TableCell>
 
-                    <TableCell>
+                    {/* Status */}
+                    <TableCell className="whitespace-nowrap">
                       <Badge
                         variant="ghost"
-                        className={`text-white ${customer.status.toLowerCase() === "online" ? "bg-green-500" : "bg-red-500"
+                        className={`text-white ${customer.status.toLowerCase() === "online"
+                            ? "bg-green-500"
+                            : "bg-red-500"
                           }`}
                       >
                         {customer.status}
                       </Badge>
                     </TableCell>
-                    <TableCell>{customer.lastActive}</TableCell>
-                    <TableCell className="flex gap-2">
-                      <Button variant="link" className="text-blue-600 p-0 h-auto text-sm" onClick={() => handleViewCustomer(customer)}>
-                        <Eye className="mr-1 h-4 w-4" /> View
-                      </Button>
-                      {/* <Button variant="link" className="text-green-600 p-0 h-auto text-sm">
-                        <Pencil className="mr-1 h-4 w-4" /> Edit
-                      </Button> */}
+
+                    {/* Registration Type */}
+                    <TableCell className="whitespace-nowrap">
+                      <span
+                        className={`px-2 py-1 rounded text-white text-sm font-medium ${customer.registration_type === "online"
+                            ? "bg-pink-500"
+                            : customer.registration_type === "offline"
+                              ? "bg-blue-600"
+                              : "bg-gray-400"
+                          }`}
+                      >
+                        {customer.registration_type}
+                      </span>
+                    </TableCell>
+
+                    {/* Last Active */}
+                    <TableCell className="whitespace-nowrap">{customer.lastActive}</TableCell>
+
+                    {/* Actions */}
+                    <TableCell className="whitespace-nowrap">
+                      <div className="flex gap-2">
+                        <Button
+                          variant="link"
+                          className="text-blue-600 p-0 h-auto text-sm"
+                          onClick={() => handleViewCustomer(customer)}
+                        >
+                          <Eye className="mr-1 h-4 w-4" /> View
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </div>
+
+
         </div>
       )}
       <div className="w-full max-w-none">

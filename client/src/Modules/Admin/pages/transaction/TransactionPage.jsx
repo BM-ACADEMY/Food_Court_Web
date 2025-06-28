@@ -1,4 +1,5 @@
 
+
 import {
   Card,
   CardContent,
@@ -69,7 +70,6 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { useAuth } from "@/context/AuthContext"; // Assuming you have an AuthContext
 
-
 const getRandomColor = () => {
   const colors = ["#FF6B6B", "#4ECDC4", "#556270", "#C7F464", "#FFA500"];
   return colors[Math.floor(Math.random() * colors.length)];
@@ -91,8 +91,9 @@ const Avatar = ({ name = "" }) => {
   );
 };
 
+
 export default function TransactionHistory() {
-  const { user } = useAuth(); // Get logged-in user from AuthContext
+  const { user } = useAuth();
   const [transactionType, setTransactionType] = useState("all");
   const [userType, setUserType] = useState("all");
   const [selectedLocation, setSelectedLocation] = useState("all");
@@ -124,6 +125,9 @@ export default function TransactionHistory() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState("xlsx");
   const [editingTransactionId, setEditingTransactionId] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState("all");
+  const [sortBy, setSortBy] = useState("date");
+  const [sortOrder, setSortOrder] = useState("desc");
   const [editFormData, setEditFormData] = useState({
     amount: "",
     transaction_type: "",
@@ -133,7 +137,6 @@ export default function TransactionHistory() {
     location_id: "",
   });
 
-  // Fetch data (locations, roles, transactions)
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -153,6 +156,9 @@ export default function TransactionHistory() {
           transactionType,
           userType,
           location: selectedLocation,
+          paymentMethod,
+          sortBy, // New
+          sortOrder, // New
           fromDate: fromDate ? format(fromDate, "yyyy-MM-dd") : undefined,
           toDate: toDate ? format(toDate, "yyyy-MM-dd") : undefined,
           quickFilter: fromDate || toDate ? undefined : quickFilter,
@@ -180,7 +186,7 @@ export default function TransactionHistory() {
         });
       } catch (err) {
         console.error("Error fetching data:", err);
-        setError("Failed to load data. Please try again.");
+        setError(err.response?.data?.error || "Failed to load data. Please try again.");
       } finally {
         setLoading(false);
       }
@@ -191,6 +197,9 @@ export default function TransactionHistory() {
     transactionType,
     userType,
     selectedLocation,
+    paymentMethod,
+    sortBy,
+    sortOrder,
     fromDate,
     toDate,
     quickFilter,
@@ -199,27 +208,25 @@ export default function TransactionHistory() {
     pagination.limit,
   ]);
 
-  // Handle edit button click
   const handleEditClick = (txn) => {
     setEditingTransactionId(txn.id);
     setEditFormData({
       amount: txn.amount.toString(),
       transaction_type: txn.type,
-      payment_method: txn.payment_method || "",
-      status: txn.status || "Pending",
-      remarks: txn.remarks || "",
-      location_id: txn.location_id || "",
+      payment_method: txn.paymentMethod || "",
+      status: txn.status || "Success",
+      remarks: txn.description || "",
+      location_id: txn.location || "",
     });
   };
 
-  // Handle save button click
   const handleSaveEdit = async (transactionId) => {
     try {
       const response = await axios.put(
         `${import.meta.env.VITE_BASE_URL}/transactions/update-transaction/${transactionId}`,
         {
           ...editFormData,
-          edited_by_id: user._id, // From useAuth
+          edited_by_id: user._id,
         }
       );
       if (response.data.success) {
@@ -230,10 +237,10 @@ export default function TransactionHistory() {
                 ...txn,
                 amount: parseFloat(editFormData.amount),
                 type: editFormData.transaction_type,
-                payment_method: editFormData.payment_method,
+                paymentMethod: editFormData.payment_method,
                 status: editFormData.status,
-                remarks: editFormData.remarks,
-                location_id: editFormData.location_id,
+                description: editFormData.remarks,
+                location: editFormData.location_id,
                 edited_at: new Date(),
               }
               : txn
@@ -255,18 +262,47 @@ export default function TransactionHistory() {
     }
   };
 
-  // Export functions
-  const exportToExcel = () => {
-    const data = transactions.map((txn) => ({
-      "Date & Time": txn.datetime,
-      "Transaction ID": txn.id,
-      "User Name": txn.user.name,
-      "User Type": txn.user.type,
-      Type: txn.type,
-      Description: txn.description,
-      Location: txn.location,
-      Amount: txn.amount < 0 ? `-₹${Math.abs(txn.amount)}` : `₹${txn.amount}`,
+  const fetchAllTransactions = async () => {
+    try {
+      const response = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/transactions/history`,
+        {
+          params: {
+            transactionType: "all",
+            userType: "all",
+            location: "all",
+            search: "",
+            page: 1,
+            limit: 10000,
+          },
+          withCredentials: true,
+        }
+      );
+      return response.data.transactions || [];
+    } catch (err) {
+      console.error("Error fetching all transactions for export:", err);
+      setError("Failed to fetch transactions for export.");
+      return [];
+    }
+  };
+
+  // Prepare export data
+  const prepareExportData = (transactions) => {
+    return transactions.map((txn) => ({
+      "Date & Time": txn.datetime || format(new Date(), "yyyy-MM-dd HH:mm:ss"),
+      "Transaction ID": txn.id || "Unknown",
+      "User Name": txn.user?.name || "Unknown",
+      "User Type": txn.user?.type || "Unknown",
+      Type: txn.type || "Unknown",
+      Description: txn.description || txn.remarks || "No description",
+      Amount: txn.amount < 0 ? `-₹${Math.abs(txn.amount).toFixed(2)}` : `₹${txn.amount.toFixed(2)}`,
     }));
+  };
+
+  // Export to Excel
+  const exportToExcel = async () => {
+    const allTransactions = await fetchAllTransactions();
+    const data = prepareExportData(allTransactions);
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Transactions");
@@ -275,39 +311,34 @@ export default function TransactionHistory() {
     saveAs(file, `transactions_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
   };
 
-  const exportToCSV = () => {
-    const data = transactions.map((txn) => ({
-      "Date & Time": txn.datetime,
-      "Transaction ID": txn.id,
-      "User Name": txn.user.name,
-      "User Type": txn.user.type,
-      Type: txn.type,
-      Description: txn.description,
-      Location: txn.location,
-      Amount: txn.amount < 0 ? `-₹${Math.abs(txn.amount)}` : `₹${txn.amount}`,
-    }));
+  // Export to CSV
+  const exportToCSV = async () => {
+    const allTransactions = await fetchAllTransactions();
+    const data = prepareExportData(allTransactions);
     const ws = XLSX.utils.json_to_sheet(data);
     const csv = XLSX.utils.sheet_to_csv(ws);
     const file = new Blob([csv], { type: "text/csv;charset=utf-8" });
     saveAs(file, `transactions_${format(new Date(), "yyyy-MM-dd")}.csv`);
   };
 
-  const exportToPDF = () => {
+  // Export to PDF
+  const exportToPDF = async () => {
     try {
+      const allTransactions = await fetchAllTransactions();
+      const data = prepareExportData(allTransactions);
       const doc = new jsPDF();
       doc.text("Transaction History", 14, 20);
       autoTable(doc, {
         startY: 30,
-        head: [["Date & Time", "Transaction ID", "User Name", "User Type", "Type", "Description", "Location", "Amount"]],
-        body: transactions.map((txn) => [
-          txn.faktiskt || "N/A",
-          txn.id || "N/A",
-          txn.user?.name || "Unknown",
-          txn.user?.type || "Unknown",
-          txn.type || "N/A",
-          txn.description || "N/A",
-          txn.location || "N/A",
-          txn.amount < 0 ? `-₹${Math.abs(txn.amount) || 0}` : `₹${txn.amount || 0}`,
+        head: [["Date & Time", "Transaction ID", "User Name", "User Type", "Type", "Description", "Amount"]],
+        body: data.map((txn) => [
+          txn["Date & Time"],
+          txn["Transaction ID"],
+          txn["User Name"],
+          txn["User Type"],
+          txn.Type,
+          txn.Description,
+          txn.Amount,
         ]),
         theme: "grid",
         styles: { fontSize: 8 },
@@ -321,6 +352,7 @@ export default function TransactionHistory() {
     }
   };
 
+  // Handle export
   const handleExport = () => {
     switch (exportFormat) {
       case "xlsx":
@@ -455,54 +487,105 @@ export default function TransactionHistory() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Select value={transactionType} onValueChange={setTransactionType}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Transaction Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="Credit">Credit</SelectItem>
-                <SelectItem value="Refund">Refund</SelectItem>
-                <SelectItem value="TopUp">TopUp</SelectItem>
-                <SelectItem value="Transfer">Transfer</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div>
+              <Label htmlFor="transactionType">Transaction Type</Label>
+              <Select value={transactionType} onValueChange={setTransactionType}>
+                <SelectTrigger id="transactionType" className="w-full">
+                  <SelectValue placeholder="Transaction Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="Credit">Credit</SelectItem>
+                  <SelectItem value="Refund">Refund</SelectItem>
+                  <SelectItem value="TopUp">TopUp</SelectItem>
+                  <SelectItem value="Transfer">Transfer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-            <Select value={userType} onValueChange={setUserType}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="User Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Users</SelectItem>
-                {roles.map((role) => (
-                  <SelectItem key={role._id} value={role.name}>
-                    {role.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div>
+              <Label htmlFor="paymentMethod">Payment Method</Label>
+              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <SelectTrigger id="paymentMethod" className="w-full">
+                  <SelectValue placeholder="Select payment method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="Cash">Cash</SelectItem>
+                  <SelectItem value="Gpay">Gpay</SelectItem>
+                  <SelectItem value="Mess bill">Mess bill</SelectItem>
+                  <SelectItem value="Balance Deduction">Balance Deduction</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-            <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select Location" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Locations</SelectItem>
-                {locations.map((loc) => (
-                  <SelectItem key={loc._id} value={loc._id}>
-                    {loc.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div>
+              <Label htmlFor="userType">User Type</Label>
+              <Select value={userType} onValueChange={setUserType}>
+                <SelectTrigger id="userType" className="w-full">
+                  <SelectValue placeholder="User Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Users</SelectItem>
+                  {roles.map((role) => (
+                    <SelectItem key={role._id} value={role.name}>
+                      {role.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-            <Input
-              className="w-full"
-              placeholder="Search by name, phone..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+            <div>
+              <Label htmlFor="location">Location</Label>
+              <Select value={selectedLocation} onValueChange={setSelectedLocation}>
+                <SelectTrigger id="location" className="w-full">
+                  <SelectValue placeholder="Select Location" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Locations</SelectItem>
+                  {locations.map((loc) => (
+                    <SelectItem key={loc._id} value={loc._id}>
+                      {loc.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="sort">Sort</Label>
+              <Select
+                value={`${sortBy}-${sortOrder}`}
+                onValueChange={(value) => {
+                  const [newSortBy, newSortOrder] = value.split("-");
+                  setSortBy(newSortBy);
+                  setSortOrder(newSortOrder);
+                }}
+              >
+                <SelectTrigger id="sort" className="w-full">
+                  <SelectValue placeholder="Sort" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="date-desc">Date (Newest First)</SelectItem>
+                  <SelectItem value="date-asc">Date (Oldest First)</SelectItem>
+                  <SelectItem value="amount-desc">Amount (High to Low)</SelectItem>
+                  <SelectItem value="amount-asc">Amount (Low to High)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="search">Search</Label>
+              <Input
+                id="search"
+                className="w-full"
+                placeholder="Search by name, phone..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -599,9 +682,10 @@ export default function TransactionHistory() {
                   <TableHead>User</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead>Location</TableHead>
+                  <TableHead>Payment Method</TableHead>
+                  {/* <TableHead>Location</TableHead> */}
                   <TableHead className="text-right">Amount</TableHead>
-                  {/* <TableHead className="text-right">Actions</TableHead> */}
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -638,7 +722,7 @@ export default function TransactionHistory() {
                       ) : (
                         <span
                           className={`capitalize rounded px-2 py-1 text-xs font-medium
-    ${txn.type === "Transfer"
+                            ${txn.type === "Transfer"
                               ? "bg-blue-100 text-blue-700"
                               : txn.type === "TopUp"
                                 ? "bg-purple-100 text-purple-700"
@@ -647,8 +731,7 @@ export default function TransactionHistory() {
                                   : txn.type === "Credit"
                                     ? "bg-green-100 text-green-700"
                                     : "bg-gray-100 text-gray-600"
-                            }
-  `}
+                            }`}
                         >
                           {txn.type || "N/A"}
                         </span>
@@ -670,6 +753,29 @@ export default function TransactionHistory() {
                     <TableCell>
                       {editingTransactionId === txn.id ? (
                         <Select
+                          value={editFormData.payment_method}
+                          onValueChange={(value) =>
+                            setEditFormData((prev) => ({ ...prev, payment_method: value }))
+                          }
+                        >
+                          <SelectTrigger className="w-[150px]">
+                            <SelectValue placeholder="Select payment method" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {["Cash", "Gpay", "Mess bill", "Balance Deduction"].map((method) => (
+                              <SelectItem key={method} value={method}>
+                                {method}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        txn.paymentMethod
+                      )}
+                    </TableCell>
+                    {/* <TableCell>
+                      {editingTransactionId === txn.id ? (
+                        <Select
                           value={editFormData.location_id}
                           onValueChange={(value) =>
                             setEditFormData((prev) => ({ ...prev, location_id: value }))
@@ -689,7 +795,7 @@ export default function TransactionHistory() {
                       ) : (
                         txn.location
                       )}
-                    </TableCell>
+                    </TableCell> */}
                     <TableCell className="text-right font-semibold">
                       {editingTransactionId === txn.id ? (
                         <Input
@@ -706,7 +812,7 @@ export default function TransactionHistory() {
                         <span className="text-green-600">+ ₹{txn.amount}</span>
                       )}
                     </TableCell>
-                    {/* <TableCell className="text-right">
+                    <TableCell className="text-right">
                       {editingTransactionId === txn.id ? (
                         <Button
                           variant="default"
@@ -728,7 +834,7 @@ export default function TransactionHistory() {
                           Edit
                         </Button>
                       )}
-                    </TableCell> */}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -750,7 +856,6 @@ export default function TransactionHistory() {
                       }
                     />
                   </PaginationItem>
-
                   {Array.from({ length: pagination.totalPages || 1 }, (_, i) => i + 1).map((p) => (
                     <PaginationItem key={p}>
                       <PaginationLink
@@ -762,7 +867,6 @@ export default function TransactionHistory() {
                       </PaginationLink>
                     </PaginationItem>
                   ))}
-
                   <PaginationItem>
                     <PaginationNext
                       href="#"
@@ -778,7 +882,6 @@ export default function TransactionHistory() {
               </Pagination>
             </div>
           </div>
-
         </CardContent>
       </Card>
 

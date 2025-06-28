@@ -5,9 +5,8 @@ import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Loader2 } from "lucide-react"; // lucide spinner
-import { toast, Bounce } from "react-toastify";
 
-const LoginForm = ({ onBack, onForgotPassword, role, onLoginWithOtp }) => {
+const AdminLoginForm = ({ onBack, onForgotPassword, onLoginWithOtp }) => {
   const navigate = useNavigate();
   const { login } = useAuth();
   const [emailOrPhone, setEmailOrPhone] = useState("");
@@ -22,31 +21,11 @@ const LoginForm = ({ onBack, onForgotPassword, role, onLoginWithOtp }) => {
     setError("");
 
     try {
-      const res = await login(emailOrPhone, password, role); // context login
-      console.log(res, 'red');
-
-      toast.success(res.data.message, {
-        position: "top-center",
-        autoClose: 4000,
-        theme: "colored",
-        transition: Bounce,
-      });
-
-      navigate("/"); // handled by AppRoutes
-
+      await login(emailOrPhone, password); 
+      navigate("/");
     } catch (err) {
-      const message =
-        err?.response?.data?.message || "Login failed. Please try again.";
-      setError(message);
-
-      toast.error(message, {
-        position: "top-center",
-        autoClose: 4000,
-        theme: "colored",
-        transition: Bounce,
-      });
-    }
-    finally {
+      setError("Invalid credentials. Please try again.");
+    } finally {
       setLoading(false);
     }
   };
@@ -60,18 +39,9 @@ const LoginForm = ({ onBack, onForgotPassword, role, onLoginWithOtp }) => {
         }}
         className="z-10 w-full max-w-md mt-6 shadow-xl rounded-2xl overflow-hidden border bg-white"
       >
-        {
-          role === "admin" ? <>
-            <div className="bg-[#00004d] py-5 px-6 text-center rounded-t-2xl">
-              <h2 className="text-3xl font-bold text-white">Welcome Back to Admin</h2>
-            </div>
-          </> :
-            <>
-              <div className="bg-[#00004d] py-5 px-6 text-center rounded-t-2xl">
-                <h2 className="text-3xl font-bold text-white">Welcome Back to Customer</h2>
-              </div>
-            </>
-        }
+        <div className="bg-[#00004d] py-5 px-6 text-center rounded-t-2xl">
+          <h2 className="text-3xl font-bold text-white">Welcome Back to Admin Login</h2>
+        </div>
 
         <div className="p-8 space-y-6">
           <div>
@@ -161,4 +131,4 @@ const LoginForm = ({ onBack, onForgotPassword, role, onLoginWithOtp }) => {
   );
 };
 
-export default LoginForm;
+export default AdminLoginForm;

@@ -405,7 +405,8 @@ export default function RestaurantList() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Restaurant ID</TableHead>
-                  <TableHead>Name</TableHead>
+                  <TableHead>Sender Name</TableHead>
+                  <TableHead>Receiver Name</TableHead>
                   {/* <TableHead>Category</TableHead> */}
                   <TableHead>Sales</TableHead>
                   <TableHead>Status</TableHead>
@@ -428,8 +429,20 @@ export default function RestaurantList() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <Avatar name={restaurant.name} />
-                          <span>{restaurant.name}</span>
+                          <Avatar name={restaurant.sender_name} />
+                          <div className="flex flex-col gap-1">
+                            <span>{restaurant.sender_name}</span>
+                            <span className="text-[12px] text-gray-500">({restaurant.sender_role_name})</span>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Avatar name={restaurant.receiver_name} />
+                          <div className="flex flex-col gap-1">
+                            <span>{restaurant.receiver_name}</span>
+                            <span className="text-[12px] text-gray-500">({restaurant.receiver_role_name})</span>
+                          </div>
                         </div>
                       </TableCell>
 
@@ -437,10 +450,10 @@ export default function RestaurantList() {
                       <TableCell>
                         <span
                           className={`font-medium ${restaurant.sales > 100000
-                              ? "text-green-600"
-                              : restaurant.sales > 50000
-                                ? "text-yellow-600"
-                                : "text-red-600"
+                            ? "text-green-600"
+                            : restaurant.sales > 50000
+                              ? "text-yellow-600"
+                              : "text-red-600"
                             }`}
                         >
                           ₹{restaurant.sales.toLocaleString()}

@@ -50,9 +50,11 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { useAuth } from "@/context/AuthContext";
-
+import { io } from "socket.io-client";
 const PER_PAGE = 15;
-
+const socket = io(import.meta.env.VITE_BASE_SOCKET_URL,{
+   withCredentials: true,
+}); 
 export default function History() {
   const { user } = useAuth();
   const [transactions, setTransactions] = useState([]);
@@ -65,6 +67,22 @@ export default function History() {
   const [exportFormat, setExportFormat] = useState("csv");
   const [dateFilter, setDateFilter] = useState("All Time");
   const [typeFilter, setTypeFilter] = useState("All");
+
+
+  useEffect(() => {
+    if (user?._id) {
+      socket.emit("joinRestaurantRoom", user._id.toString());
+
+      socket.on("newTransaction", (data) => {
+        console.log("🔔 New transaction received via socket:", data);
+        loadData(); // 🔁 Re-fetch transactions and balance
+      });
+
+      return () => {
+        socket.off("newTransaction");
+      };
+    }
+  }, [user?._id]);
 
   // Fetch balance and transactions
   const loadData = async () => {

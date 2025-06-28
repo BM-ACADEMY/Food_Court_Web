@@ -6,7 +6,9 @@ const helmet=require('helmet');
 const morgan=require('morgan');
 const cookieParser = require('cookie-parser');
 const compression=require('compression');
-// const createRateLimiter=require('./utils/rateLimiter');
+const http = require("http");
+const {initSocket}=require("./config/socket")
+
 
 // Load environment variables from .env file
 dotenv.config();
@@ -38,15 +40,14 @@ app.use(cors({
   ],
   credentials: true,
 }));
+const server = http.createServer(app);
+
+initSocket(server); 
 
 app.use(helmet());
 app.use(express.json());
 app.use(morgan('dev'));
 app.use(compression());
-// app.use(createRateLimiter({
-//   points: 10,
-//   duration: 60, // 1 minute
-// }));
 
 
 
@@ -70,7 +71,7 @@ app.use('/api/dashboards',dashboardRoute);
 const PORT=process.env.PORT || 4000;
 // Connect to MongoDB and then start the server
 connectDB().then(() => {
-  app.listen(PORT,'0.0.0.0', () => {
-    console.log(`🚀 Server running on ${PORT}`);
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Server + Socket.IO running on ${PORT}`);
   });
 });

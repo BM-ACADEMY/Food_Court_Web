@@ -107,7 +107,12 @@ const adminNavLinks = [
     url: "/admin/transaction-history",
     icon: History,
   },
-    {
+  {
+    title: "Add / Delete Access",
+    url: "/admin/adddelete/add-new-user",
+    icon: KeyRound,
+  },
+  {
     title: "Point Exchange",
     url: "/admin/points/point-exchange",
     icon: Coins,

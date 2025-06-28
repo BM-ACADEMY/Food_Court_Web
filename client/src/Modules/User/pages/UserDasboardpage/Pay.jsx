@@ -61,7 +61,7 @@ const QrScanner = () => {
     try {
       await html5QrCode.start(
         { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 300, height: 350 } },
+        { fps: 10, qrbox: { width: 300, height: 150 } },
         async (decodedText) => {
           await validateQrCode(decodedText);
           stopScanner();
@@ -243,7 +243,23 @@ const QrScanner = () => {
                 <div id="qr-reader" ref={qrRef} className="w-full h-full" />
               </div>
 
-              
+              <div className="mt-4 w-full">
+                <Input
+                  type="text"
+                  value={manualQrCode}
+                  onChange={(e) => setManualQrCode(e.target.value)}
+                  placeholder="Enter QR Code"
+                  className="text-sm mb-2"
+                  disabled={!isCustomer}
+                />
+                <Button
+                  onClick={handleManualQrSubmit}
+                  className="w-full bg-[#000066] hover:bg-[#000080] text-white text-sm"
+                  disabled={!isCustomer}
+                >
+                  Validate QR Code
+                </Button>
+              </div>
             </div>
 
             <div className="mt-6 w-full flex justify-center">
@@ -268,28 +284,27 @@ const QrScanner = () => {
             </div>
           </div>
 
-          <div className="flex-1 bg-white/50 backdrop-blur-lg border border-gray-200 rounded-xl p-6 shadow-sm max-h-[calc(50vh-100px)] overflow-y-auto">
+         <div className="flex-1 bg-white/50 backdrop-blur-lg border border-gray-200 rounded-xl p-6 shadow-sm max-h-[calc(50vh-100px)] overflow-y-auto">
             <div className="flex items-center gap-3 mb-4">
               <QrCode className="w-6 h-6 text-[#00004d]" />
               <h3 className="text-lg font-semibold text-[#00004d]">
-                Scan QR to Pay
+                How to Pay
               </h3>
             </div>
 
-            <p className="text-sm text-gray-600 mb-4">How to Pay</p>
-            <ul className="space-y-3 text-gray-700 text-sm">
-              <li className="flex items-start gap-2">
-                <span className="text-[#000066] font-semibold">•</span>
-                Scan the vendor's QR code or enter it manually.
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-[#000066] font-semibold">•</span>
-                Confirm the amount and vendor details.
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-[#000066] font-semibold">•</span>
-                Complete your payment.
-              </li>
+            <ul className="space-y-4 text-gray-700 text-sm">
+              {[
+                "Scan the vendor's QR code or enter it manually.",
+                "Confirm the amount and vendor details.",
+                "Complete your payment.",
+              ].map((text, index) => (
+                <li key={index} className="flex gap-3 items-start">
+                  <span className="bg-[#000066] text-white min-w-6 min-h-6 rounded-full flex items-center justify-center text-xs font-bold mt-1">
+                    {index + 1}
+                  </span>
+                  <span className="flex-1">{text}</span>
+                </li>
+              ))}
             </ul>
           </div>
         </div>
@@ -411,21 +426,3 @@ const QrScanner = () => {
 };
 
 export default QrScanner;
-
-/*<div className="mt-4 w-full">
-                <Input
-                  type="text"
-                  value={manualQrCode}
-                  onChange={(e) => setManualQrCode(e.target.value)}
-                  placeholder="Enter QR Code"
-                  className="text-sm mb-2"
-                  disabled={!isCustomer}
-                />
-                <Button
-                  onClick={handleManualQrSubmit}
-                  className="w-full bg-[#000066] hover:bg-[#000080] text-white text-sm"
-                  disabled={!isCustomer}
-                >
-                  Validate QR Code
-                </Button>
-              </div>*/

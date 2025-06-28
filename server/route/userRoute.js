@@ -9,6 +9,8 @@ const authMiddleware= require("../middleware/authMiddleware")
 // login function
 router.post("/login", userController.loginUser);
 
+router.post("/verify-credentials", userController.verifyCredentials);
+
 //logout function
 router.post("/logout", authMiddleware, userController.logoutUser);
 

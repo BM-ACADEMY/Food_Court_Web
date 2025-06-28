@@ -70,72 +70,92 @@ export default function RecentTransactions() {
           <CardTitle>Recent Fund Transfers</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>DATE & TIME</TableHead>
-                <TableHead>TRANSACTION ID</TableHead>
-                <TableHead>MEMBER</TableHead>
-                <TableHead>AMOUNT</TableHead>
-                <TableHead>STATUS</TableHead>
-                <TableHead>PAYMENT METHOD</TableHead>
-                {/* <TableHead>LOCATION</TableHead> */}
-                <TableHead>ACTIONS</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {visibleTransactions.map((tx, index) => {
-                const member = tx.receiver_id?.name || "N/A";
-                const transactionId = tx.transaction_id;
-                const amount = `₹${parseFloat(tx.amount || 0).toFixed(2)}`;
-                const status = tx.status;
-                const upi = tx.receiver_id?.phone_number || "—";
-                const location = tx.location_id?.name || "—";
-                const dateTime = new Date(tx.created_at).toLocaleString();
+          <div className="overflow-x-auto">
+            <Table className="min-w-[1000px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="whitespace-nowrap">DATE & TIME</TableHead>
+                  <TableHead className="whitespace-nowrap">TRANSACTION ID</TableHead>
+                  <TableHead className="whitespace-nowrap">SENDER NAME</TableHead>
+                  <TableHead className="whitespace-nowrap">RECEIVER NAME</TableHead>
+                  <TableHead className="whitespace-nowrap">AMOUNT</TableHead>
+                  <TableHead className="whitespace-nowrap">STATUS</TableHead>
+                  <TableHead className="whitespace-nowrap">PAYMENT METHOD</TableHead>
+                  <TableHead className="whitespace-nowrap">ACTIONS</TableHead>
+                </TableRow>
+              </TableHeader>
 
-                return (
-                  <TableRow key={index}>
-                    <TableCell>{dateTime}</TableCell>
-                    <TableCell>{transactionId}</TableCell>
-                    <TableCell className="flex items-center gap-2">
-                      <Avatar name={member} />
-                      <span>
-                        {member}{" "}
-                        <span className="text-gray-500">
-                          #{transactionId?.split("-")[1] || ""}
+              <TableBody>
+                {visibleTransactions.map((tx, index) => {
+                  const dateTime = new Date(tx.created_at).toLocaleString();
+                  const amount = `₹${parseFloat(tx.amount || 0).toFixed(2)}`;
+                  const status = tx.status || "N/A";
+
+                  return (
+                    <TableRow key={index}>
+                      <TableCell className="whitespace-nowrap">{dateTime}</TableCell>
+                      <TableCell className="whitespace-nowrap">{tx.transaction_id}</TableCell>
+
+                      {/* Sender Name */}
+                      <TableCell className="whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <Avatar name={tx.sender_name} />
+                          <div className="flex flex-col">
+                            <span className="text-gray-700">{tx.sender_name}</span>
+                            <span className="text-xs text-gray-500">({tx.sender_role})</span>
+                          </div>
+                        </div>
+                      </TableCell>
+
+                      {/* Receiver Name */}
+                      <TableCell className="whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <Avatar name={tx.receiver_name} />
+                          <div className="flex flex-col">
+                            <span className="text-gray-700">{tx.receiver_name}</span>
+                            <span className="text-xs text-gray-500">({tx.receiver_role})</span>
+                          </div>
+                        </div>
+                      </TableCell>
+
+                      <TableCell className="whitespace-nowrap">{amount}</TableCell>
+
+                      <TableCell className="whitespace-nowrap">
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${status === "Success"
+                              ? "bg-green-100 text-green-700"
+                              : status === "Pending"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : status === "Failed"
+                                  ? "bg-red-100 text-red-700"
+                                  : "bg-gray-100 text-gray-600"
+                            }`}
+                        >
+                          {status}
                         </span>
-                      </span>
-                    </TableCell>
-                    <TableCell>{amount}</TableCell>
-                    <TableCell>
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-medium
-      ${tx.status === "Success"
-                            ? "bg-green-100 text-green-700"
-                            : tx.status === "Pending"
-                              ? "bg-yellow-100 text-yellow-800"
-                              : tx.status === "Failed"
-                                ? "bg-red-100 text-red-700"
-                                : "bg-gray-100 text-gray-600"
-                          }
-    `}
-                      >
-                        {status || "N/A"}
-                      </span>
-                    </TableCell>
+                      </TableCell>
 
-                    <TableCell>{tx.payment_method || "—"}</TableCell>
-                    {/* <TableCell>{location}</TableCell> */}
-                    <TableCell>
-                      <Button size="sm" variant="ghost" className="flex items-center gap-1">
-                        <Eye className="w-4 h-4" /> View
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                      <TableCell className="whitespace-nowrap">
+                        {tx.payment_method || "—"}
+                      </TableCell>
+
+                      {/* ACTIONS column */}
+                      <TableCell className="whitespace-nowrap">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="flex items-center gap-1"
+                          onClick={() => handleView(tx)}
+                        >
+                          <Eye className="w-4 h-4" /> View
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
 
           {visibleTransactions.length < transactions.length && (
             <button
@@ -148,5 +168,6 @@ export default function RecentTransactions() {
         </CardContent>
       </Card>
     </div>
+
   );
 }

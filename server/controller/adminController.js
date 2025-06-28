@@ -5,7 +5,6 @@ const MasterAdmin=require('../model/masterAdminModel');
 const User=require('../model/userModel')
 const moment=require('moment');
 const Role =require('../model/roleModel');
-const mongoose=require('mongoose');
 const LoginLog=require('../model/loginLogModel')
 
 
@@ -348,22 +347,22 @@ exports.deleteAdmin = async (req, res) => {
 exports.getAllAdminDetails = async (req, res) => {
   try {
     const {
-      search = '',
-      status = 'all',
-      lastActive = 'all',
-      regDate = '',
-      sortBy = 'asc',
+      search = "",
+      status = "all",
+      lastActive = "all",
+      regDate = "",
+      sortBy = "asc",
       page = 1,
       pageSize = 10,
     } = req.query;
 
     // Log query parameters for debugging
-    console.log('Query Parameters:', { search, status, lastActive, regDate, sortBy, page, pageSize });
+    console.log("Query Parameters:", { search, status, lastActive, regDate, sortBy, page, pageSize });
 
     // Find Admin role ID
-    const adminRole = await Role.findOne({ name: 'Admin' }).select('_id');
+    const adminRole = await Role.findOne({ name: "Admin" }).select("_id");
     if (!adminRole) {
-      console.log('No Admin role found');
+      console.log("No Admin role found");
       return res.json({
         admins: [],
         totalAdmins: 0,
@@ -373,7 +372,7 @@ exports.getAllAdminDetails = async (req, res) => {
       });
     }
     const adminRoleId = adminRole._id;
-    console.log('Admin Role ID:', adminRoleId);
+    console.log("Admin Role ID:", adminRoleId);
 
     // Build user query
     let userQuery = {
@@ -382,13 +381,13 @@ exports.getAllAdminDetails = async (req, res) => {
 
     if (search) {
       const adminIds = await Admin.find({
-        admin_id: { $regex: search, $options: 'i' },
-      }).select('user_id');
+        admin_id: { $regex: search, $options: "i" },
+      }).select("user_id");
       const adminUserIds = adminIds.map((admin) => admin.user_id);
-      console.log('Admin User IDs from search:', adminUserIds);
+      console.log("Admin User IDs from search:", adminUserIds);
       userQuery.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { phone_number: { $regex: search, $options: 'i' } },
+        { name: { $regex: search, $options: "i" } },
+        { phone_number: { $regex: search, $options: "i" } },
         { _id: { $in: adminUserIds } },
       ];
     }
@@ -398,66 +397,142 @@ exports.getAllAdminDetails = async (req, res) => {
       const endDate = new Date(startDate);
       endDate.setDate(startDate.getDate() + 1);
       userQuery.created_at = { $gte: startDate, $lt: endDate };
-      console.log('Registration Date Filter:', { startDate, endDate });
+      console.log("Registration Date Filter:", { startDate, endDate });
     }
 
     // Handle last active filter
-    const validLastActiveValues = ['all', 'today', 'week', 'month'];
-    if (validLastActiveValues.includes(lastActive) && lastActive !== 'all') {
+    const validLastActiveValues = ["all", "today", "week", "month"];
+    if (validLastActiveValues.includes(lastActive) && lastActive !== "all") {
       const now = new Date();
       let dateFilter;
-      if (lastActive === 'today') {
+      if (lastActive === "today") {
         dateFilter = new Date(now.setHours(0, 0, 0, 0));
-      } else if (lastActive === 'week') {
+      } else if (lastActive === "week") {
         dateFilter = new Date(now.setDate(now.getDate() - 7));
-      } else if (lastActive === 'month') {
+      } else if (lastActive === "month") {
         dateFilter = new Date(now.setMonth(now.getMonth() - 1));
       }
       const recentLogs = await LoginLog.find({
         login_time: { $gte: dateFilter },
-      }).distinct('user_id');
-      console.log('Last Active User IDs:', recentLogs);
-      userQuery._id = recentLogs.length > 0 ? { $in: recentLogs } : { $in: [] };
+      }).distinct("user_id");
+      console.log("Last Active User IDs:", recentLogs);
+      if (recentLogs.length > 0) {
+        userQuery._id = { $in: recentLogs };
+      }
     }
 
-    // Aggregate to join User, Admin, UserBalance
+    // Aggregate to join User, Admin, UserBalance, and Transactions
     let pipeline = [
       { $match: userQuery },
       {
         $lookup: {
-          from: 'admins',
-          localField: '_id',
-          foreignField: 'user_id',
-          as: 'admin',
+          from: "admins",
+          localField: "_id",
+          foreignField: "user_id",
+          as: "admin",
         },
       },
-      { $unwind: { path: '$admin', preserveNullAndEmptyArrays: false } },
+      { $unwind: { path: "$admin", preserveNullAndEmptyArrays: false } },
       {
         $lookup: {
-          from: 'userbalances',
-          localField: '_id',
-          foreignField: 'user_id',
-          as: 'balance',
+          from: "userbalances",
+          localField: "_id",
+          foreignField: "user_id",
+          as: "balance",
         },
       },
-      { $unwind: { path: '$balance', preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: "$balance", preserveNullAndEmptyArrays: true } },
       {
         $lookup: {
-          from: 'loginlogs',
-          localField: '_id',
-          foreignField: 'user_id',
-          as: 'loginLogs',
+          from: "loginlogs",
+          localField: "_id",
+          foreignField: "user_id",
+          as: "loginLogs",
         },
       },
+      {
+        $lookup: {
+          from: "transactions",
+          let: { user_id: "$_id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $or: [
+                    { $eq: ["$sender_id", "$$user_id"] },
+                    { $eq: ["$receiver_id", "$$user_id"] },
+                  ],
+                },
+              },
+            },
+            { $sort: { created_at: -1 } },
+            { $limit: 1 },
+            {
+              $lookup: {
+                from: "users",
+                localField: "sender_id",
+                foreignField: "_id",
+                as: "sender",
+              },
+            },
+            { $unwind: { path: "$sender", preserveNullAndEmptyArrays: true } },
+            {
+              $lookup: {
+                from: "roles",
+                localField: "sender.role_id",
+                foreignField: "_id",
+                as: "sender_role",
+              },
+            },
+            { $unwind: { path: "$sender_role", preserveNullAndEmptyArrays: true } },
+            {
+              $lookup: {
+                from: "users",
+                localField: "receiver_id",
+                foreignField: "_id",
+                as: "receiver",
+              },
+            },
+            { $unwind: { path: "$receiver", preserveNullAndEmptyArrays: true } },
+            {
+              $lookup: {
+                from: "roles",
+                localField: "receiver.role_id",
+                foreignField: "_id",
+                as: "receiver_role",
+              },
+            },
+            { $unwind: { path: "$receiver_role", preserveNullAndEmptyArrays: true } },
+            {
+              $project: {
+                sender_id: "$sender._id",
+                sender_name: "$sender.name",
+                sender_role_name: "$sender_role.name",
+                receiver_id: "$receiver._id",
+                receiver_name: "$receiver.name",
+                receiver_role_name: "$receiver_role.name",
+              },
+            },
+          ],
+          as: "transaction",
+        },
+      },
+      { $unwind: { path: "$transaction", preserveNullAndEmptyArrays: true } },
       {
         $project: {
           _id: 1,
           name: 1,
           phone_number: 1,
-          admin_id: '$admin.admin_id',
-          balance: { $ifNull: ['$balance.balance', 0] },
+          admin_id: "$admin.admin_id",
+          balance: { $ifNull: ["$balance.balance", 0] },
           created_at: 1,
           loginLogs: 1,
+          sender_id: "$transaction.sender_id",
+          sender_name: "$transaction.sender_name",
+          sender_role_name: "$transaction.sender_role_name",
+          receiver_id: "$transaction.receiver_id",
+          receiver_name: "$transaction.receiver_name",
+          receiver_role_name: "$transaction.receiver_role_name",
         },
       },
     ];
@@ -465,19 +540,19 @@ exports.getAllAdminDetails = async (req, res) => {
     // Apply sorting
     let sortOption = {};
     switch (sortBy) {
-      case 'asc':
+      case "asc":
         sortOption.name = 1;
         break;
-      case 'desc':
+      case "desc":
         sortOption.name = -1;
         break;
-      case 'recent':
+      case "recent":
         sortOption.created_at = -1;
         break;
-      case 'high-balance':
+      case "high-balance":
         sortOption.balance = -1;
         break;
-      case 'low-balance':
+      case "low-balance":
         sortOption.balance = 1;
         break;
       default:
@@ -491,7 +566,7 @@ exports.getAllAdminDetails = async (req, res) => {
     pipeline.push({ $skip: skip }, { $limit: limit });
 
     const admins = await User.aggregate(pipeline);
-    console.log('Aggregated Admins:', JSON.stringify(admins, null, 2));
+    console.log("Aggregated Admins:", JSON.stringify(admins, null, 2));
 
     // Determine online status using the latest LoginLog status
     const adminIds = admins.map((admin) => admin._id);
@@ -500,30 +575,30 @@ exports.getAllAdminDetails = async (req, res) => {
       { $sort: { login_time: -1 } },
       {
         $group: {
-          _id: '$user_id',
-          latestStatus: { $first: '$status' },
+          _id: "$user_id",
+          latestStatus: { $first: "$status" },
         },
       },
       { $match: { latestStatus: true } },
       { $project: { _id: 1 } },
     ]).then((results) => results.map((r) => r._id.toString()));
-    console.log('Active Users:', activeUsers);
+    console.log("Active Users:", activeUsers);
 
     // Format admins and calculate lastActive
     const formattedAdmins = admins.map((admin) => {
-      let lastActive = 'Unknown';
+      let lastActive = "Unknown";
       if (admin.loginLogs && admin.loginLogs.length > 0) {
-        const lastActiveTime = new Date(Math.max(...admin.loginLogs.map(log => new Date(log.login_time))));
+        const lastActiveTime = new Date(Math.max(...admin.loginLogs.map((log) => new Date(log.login_time))));
         const now = new Date();
         const diff = (now - lastActiveTime) / 1000 / 60; // Difference in minutes
         if (diff < 5) {
-          lastActive = 'Just now';
+          lastActive = "Just now";
         } else if (diff < 60) {
           lastActive = `${Math.floor(diff)} mins ago`;
         } else if (diff < 1440) {
           lastActive = `${Math.floor(diff / 60)} hours ago`;
         } else {
-          lastActive = lastActiveTime.toISOString().split('T')[0];
+          lastActive = lastActiveTime.toISOString().split("T")[0];
         }
       }
 
@@ -532,67 +607,73 @@ exports.getAllAdminDetails = async (req, res) => {
         name: admin.name,
         phone: admin.phone_number,
         balance: parseFloat(admin.balance.toString()),
-        status: activeUsers.includes(admin._id.toString()) ? 'Online' : 'Offline',
+        status: activeUsers.includes(admin._id.toString()) ? "Online" : "Offline",
         lastActive,
+        sender_id: admin.sender_id?.toString() || "Unknown",
+        sender_name: admin.sender_name || "Unknown",
+        sender_role_name: admin.sender_role_name || "Unknown",
+        receiver_id: admin.receiver_id?.toString() || "Unknown",
+        receiver_name: admin.receiver_name || "Unknown",
+        receiver_role_name: admin.receiver_role_name || "Unknown",
       };
     });
-    console.log('Formatted Admins:', JSON.stringify(formattedAdmins, null, 2));
+    console.log("Formatted Admins:", JSON.stringify(formattedAdmins, null, 2));
 
     // Apply status filter after formatting if needed
     let finalAdmins = formattedAdmins;
-    if (status !== 'all') {
+    if (status !== "all") {
       finalAdmins = formattedAdmins.filter((admin) => admin.status === status);
-      console.log('Filtered Admins by Status:', JSON.stringify(finalAdmins, null, 2));
+      console.log("Filtered Admins by Status:", JSON.stringify(finalAdmins, null, 2));
     }
 
     // Compute statistics
     const statsPipeline = [
       { $match: userQuery },
-      { $lookup: { from: 'admins', localField: '_id', foreignField: 'user_id', as: 'admin' } },
-      { $unwind: '$admin' },
+      { $lookup: { from: "admins", localField: "_id", foreignField: "user_id", as: "admin" } },
+      { $unwind: "$admin" },
       {
         $lookup: {
-          from: 'userbalances',
-          localField: '_id',
-          foreignField: 'user_id',
-          as: 'balance',
+          from: "userbalances",
+          localField: "_id",
+          foreignField: "user_id",
+          as: "balance",
         },
       },
-      { $unwind: { path: '$balance', preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: "$balance", preserveNullAndEmptyArrays: true } },
       {
         $lookup: {
-          from: 'loginlogs',
-          localField: '_id',
-          foreignField: 'user_id',
-          as: 'loginLogs',
+          from: "loginlogs",
+          localField: "_id",
+          foreignField: "user_id",
+          as: "loginLogs",
         },
       },
       {
         $project: {
-          balance: { $ifNull: ['$balance.balance', 0] },
+          balance: { $ifNull: ["$balance.balance", 0] },
           loginLogs: 1,
         },
       },
       {
         $group: {
-          _id: '$user_id',
-          balance: { $first: '$balance' },
-          latestStatus: { $first: { $max: '$loginLogs.status' } },
+          _id: "$user_id",
+          balance: { $first: "$balance" },
+          latestStatus: { $first: { $max: "$loginLogs.status" } },
         },
       },
       {
         $group: {
           _id: null,
           totalAdmins: { $sum: 1 },
-          totalBalance: { $sum: '$balance' },
-          onlineCount: { $sum: { $cond: [{ $eq: ['$latestStatus', true] }, 1, 0] } },
+          totalBalance: { $sum: "$balance" },
+          onlineCount: { $sum: { $cond: [{ $eq: ["$latestStatus", true] }, 1, 0] } },
         },
       },
     ];
 
     const statsResult = await User.aggregate(statsPipeline);
     const { totalAdmins = 0, totalBalance = 0, onlineCount = 0 } = statsResult[0] || {};
-    console.log('Stats:', { totalAdmins, totalBalance, onlineCount });
+    console.log("Stats:", { totalAdmins, totalBalance, onlineCount });
 
     res.json({
       admins: finalAdmins,
@@ -602,11 +683,10 @@ exports.getAllAdminDetails = async (req, res) => {
       totalPages: Math.ceil(totalAdmins / pageSize),
     });
   } catch (error) {
-    console.error('Error in /api/admins:', error);
-    res.status(500).json({ error: 'Server error', details: error.message });
+    console.error("Error in getAllAdminDetails:", error);
+    res.status(500).json({ error: "Server error", details: error.message });
   }
 };
-
 
 exports.getAdminTransactions = async (req, res) => {
   try {
@@ -643,8 +723,6 @@ exports.getAdminTransactions = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch admin transactions" });
   }
 };
-
-
 
 exports.getAdminDetails = async (req, res) => {
   try {

@@ -3,6 +3,7 @@ import Home from "@/Modules/User/pages/Landing/Home";
 import Mainpage from "@/Modules/User/pages/UserDasboardpage/Main/Mainpage";
 import { useAuth } from "@/context/AuthContext";
 
+
 export default function CustomerRoutes() {
   const { user } = useAuth();
 
@@ -15,6 +16,7 @@ export default function CustomerRoutes() {
         <Route path="/" element={<Home />} />
       )}
       <Route path="userdashboard" element={<Mainpage />} />
+     
     </Routes>
   );
 }

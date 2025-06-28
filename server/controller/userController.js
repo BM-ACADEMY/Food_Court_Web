@@ -19,16 +19,32 @@ const Transaction = require("../model/transactionModel");
 
 // Login function
 exports.loginUser = async (req, res) => {
-  const { emailOrPhone, password } = req.body;
+  const { emailOrPhone, password, role } = req.body; // include role from body
 
   try {
     // Find user by email or phone number
     const user = await User.findOne({
       $or: [{ email: emailOrPhone }, { phone_number: emailOrPhone }],
-    });
+    }).populate("role_id"); // to access role_id.role_id
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
+    }
+
+    const userRoleId = user.role_id?.role_id;
+
+    // Role-based access restriction
+    if (role === "admin") {
+      const allowedAdminRoles = ["role-1", "role-2", "role-3", "role-4"];
+      if (!allowedAdminRoles.includes(userRoleId)) {
+        return res.status(403).json({ message: "Unauthorized: Not an admin" });
+      }
+    } else if (role === "customer") {
+      if (userRoleId !== "role-5") {
+        return res.status(403).json({ message: "Unauthorized: Not a customer" });
+      }
+    } else {
+      return res.status(400).json({ message: "Invalid role context provided" });
     }
 
     // Verify password
@@ -39,7 +55,7 @@ exports.loginUser = async (req, res) => {
 
     // Generate JWT token
     const token = jwt.sign(
-      { id: user._id, role: user.role },
+      { id: user._id, role: user.role_id },
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
@@ -66,7 +82,7 @@ exports.loginUser = async (req, res) => {
   }
 };
 
-// Get current user
+
 // Get current user
 exports.getMe = async (req, res) => {
   const token = req.cookies.token;
@@ -359,7 +375,6 @@ exports.verifyOtp = async (req, res) => {
   }
 };
 
-
 exports.verifyMobileLoginOtp = async (req, res) => {
   try {
     const { phone_number, otp } = req.body;
@@ -448,6 +463,7 @@ exports.verifyMobileLoginOtp = async (req, res) => {
     });
   }
 }
+
 exports.sendOtpController = async (req, res) => {
   const { phone_number } = req.body;
 
@@ -830,7 +846,6 @@ exports.getUserById = async (req, res) => {
 };
 
 // Update user
-// Update user
 exports.updateUser = async (req, res) => {
   try {
     const userId = req.params.id;
@@ -1184,5 +1199,52 @@ exports.getTransactionDetails = async (req, res) => {
   } catch (error) {
     console.error("Get transaction details error:", error);
     res.status(500).json({ error: "Server error", details: error.message });
+  }
+};
+
+exports.verifyCredentials = async (req, res) => {
+  try {
+    const { emailOrPhone, password, user_id } = req.body;
+
+    // Validate required fields
+    if (!emailOrPhone || !password || !user_id) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    // Find user by email or phone number
+    const user = await User.findOne({
+      $or: [{ email: emailOrPhone }, { phone_number: emailOrPhone }],
+    }).populate("role_id"); // Populate role_id to get Role document
+
+    if (!user) {
+      return res.status(401).json({ error: "Invalid email or phone number" });
+    }
+
+    // Verify user_id matches
+    if (user._id.toString() !== user_id) {
+      return res.status(403).json({ error: "Unauthorized user" });
+    }
+
+    // Check role_id from Role model
+    if (!user.role_id || !["role-1", "role-2"].includes(user.role_id.role_id)) {
+      return res.status(403).json({
+        error: "Unauthorized: Only Master-Admin or Admin roles are allowed",
+      });
+    }
+
+    // Check password
+    const isMatch = await bcrypt.compare(password, user.password_hash);
+    if (!isMatch) {
+      return res.status(401).json({ error: "Invalid password" });
+    }
+
+    // Credentials and role are valid
+    res.status(200).json({ isValid: true });
+  } catch (error) {
+    console.error("Credential verification error:", error);
+    res.status(500).json({
+      error: "Failed to verify credentials",
+      details: error.message,
+    });
   }
 };

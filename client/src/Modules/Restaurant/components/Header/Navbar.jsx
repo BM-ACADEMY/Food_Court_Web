@@ -1,10 +1,7 @@
-"use client";
-
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import Pegasus from "@/assets/pegasus.png";
-
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -24,9 +21,14 @@ import { Button } from "@/components/ui/button";
 import { ChevronsUpDown, LogOut, User, Save } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import axios from "axios";
+import { io } from "socket.io-client";
+
+const socket = io(import.meta.env.VITE_BASE_URL,{
+   withCredentials: true,
+});
 
 const RestaurantNavbar = () => {
-  const { user, logout, setUser } = useAuth();
+  const { user, logout, setUser, fetchUser } = useAuth();
   const navigate = useNavigate();
 
   const [openAccount, setOpenAccount] = useState(false);
@@ -48,6 +50,30 @@ const RestaurantNavbar = () => {
       });
     }
   }, [user]);
+
+  useEffect(() => {
+    if (user?._id) {
+      socket.emit("joinRestaurantRoom", user._id.toString());
+      socket.on("connect", () => console.log("WebSocket connected"));
+      socket.on("newTransaction", async (data) => {
+        console.log("🔔 New transaction in RestaurantNavbar:", data);
+        try {
+          const balanceRes = await axios.get(
+            `${import.meta.env.VITE_BASE_URL}/user-balance/fetch-balance-by-id/${user._id}`,
+            { withCredentials: true }
+          );
+          setUser({ ...user, balance: balanceRes.data.data.balance || "0.00" });
+        } catch (error) {
+          console.error("Failed to fetch balance:", error);
+        }
+      });
+
+      return () => {
+        socket.off("newTransaction");
+        socket.off("connect");
+      };
+    }
+  }, [user?._id, setUser]);
 
   const handleSave = async () => {
     try {
@@ -91,7 +117,7 @@ const RestaurantNavbar = () => {
         phone_number: userResponse.data.data.phone_number,
         restaurant_id: restaurantResponse.data.data.restaurant_id,
       });
-
+      await fetchUser();
       setOpenAccount(false);
       toast.success("Details updated successfully!");
     } catch (err) {
@@ -107,7 +133,6 @@ const RestaurantNavbar = () => {
   return (
     <>
       <header className="w-full bg-[#000052] text-white px-6 py-4 flex items-center justify-between shadow-md">
-        {/* Left section: Logo & Name */}
         <div className="flex items-center gap-3">
           <button onClick={() => navigate("/restaurant")} className="focus:outline-none">
             <img src={Pegasus} alt="Pegasus Logo" className="w-10 h-10" />
@@ -146,20 +171,16 @@ const RestaurantNavbar = () => {
             </DropdownMenu>
           </div>
         </div>
-
-        {/* Right section: Balance */}
         <div className="text-right">
           <p className="text-xs sm:text-sm md:text-sm lg:text-base font-medium text-white/70">
             Your Balance
           </p>
           <p className="text-base sm:text-lg md:text-lg lg:text-2xl font-semibold">
-            ₹{" "}
-            {user.balance}
+            ₹ {user.balance}
           </p>
         </div>
       </header>
 
-      {/* Account Dialog */}
       <Dialog open={openAccount} onOpenChange={setOpenAccount}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -168,7 +189,6 @@ const RestaurantNavbar = () => {
               You can update your restaurant details here.
             </DialogDescription>
           </DialogHeader>
-
           <div className="space-y-3">
             <div>
               <label className="block text-sm font-medium mb-1">Restaurant Name</label>
@@ -203,7 +223,6 @@ const RestaurantNavbar = () => {
               <Input value={editData.restaurantId} disabled />
             </div>
           </div>
-
           <DialogFooter className="pt-4">
             <Button variant="default" onClick={handleSave}>
               <Save className="mr-2 h-4 w-4" />
@@ -213,7 +232,6 @@ const RestaurantNavbar = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Logout Confirmation Dialog */}
       <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
