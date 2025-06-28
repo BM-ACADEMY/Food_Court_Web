@@ -16,6 +16,8 @@ const { sendOtpSms } = require("../utils/sentSmsOtp");
 const LoginLog = require("../model/loginLogModel");
 const Role = require("../model/roleModel");
 const Transaction = require("../model/transactionModel");
+const sendEmail=require("../utils/sendEmail");
+const crypto = require("crypto");
 
 // Login function
 exports.loginUser = async (req, res) => {
@@ -1303,3 +1305,73 @@ exports.verifyCredentials = async (req, res) => {
     });
   }
 };
+
+
+exports.forgotPassword = async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const user = await User.findOne({ email });
+
+    if (!user)
+      return res.status(404).json({ message: "User not found with this email." });
+
+    // Generate token
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
+
+    // Set token + expiry
+    user.resetPasswordToken = hashedToken;
+    user.resetPasswordExpire = Date.now() + 15 * 60 * 1000; // 15 minutes
+    await user.save();
+
+    const resetUrl = `http://localhost:5173/customer/reset-password/${resetToken}`;
+    // const resetUrl = `${process.env.DEV_FRONTEND_URL}/reset-password/${resetToken}`;
+
+    // Send reset link
+    await sendEmail({
+      to: email,
+      subject: "Password Reset Request",
+      html: `<p>Click <a href="${resetUrl}">here</a> to reset your password. This link will expire in 15 minutes.</p>`,
+    });
+
+    res.status(200).json({ message: "Reset link sent to email." });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.resetPassword = async (req, res) => {
+  const { token } = req.params;
+  const { password, confirmPassword } = req.body;
+
+  if (password !== confirmPassword) {
+    return res.status(400).json({ message: "Passwords do not match." });
+  }
+
+  try {
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpire: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: "Token is invalid or has expired." });
+    }
+
+    // Reset password
+    user.password = password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save();
+
+    res.status(200).json({ message: "Password has been reset successfully." });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
