@@ -50,4 +50,10 @@ router.delete("/delete-user/:id", userController.deleteUser);
 // Add to existing routes
 router.get("/fetch-by-phone", userController.getUserByPhone);
 
+// routes/authRoutes.js
+router.post("/forgot-password", userController.forgotPassword);
+
+router.post("/reset-password/:token", userController.resetPassword);
+
+
 module.exports = router;

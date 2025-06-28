@@ -1008,7 +1008,7 @@ export default function TransactionHistory() {
 
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div>
-              <Label htmlFor="transactionType">Transaction Type</Label>
+              <Label htmlFor="transactionType" className="mb-3">Transaction Type</Label>
               <Select value={transactionType} onValueChange={setTransactionType}>
                 <SelectTrigger id="transactionType" className="w-full">
                   <SelectValue placeholder="Transaction Type" />
@@ -1024,7 +1024,7 @@ export default function TransactionHistory() {
             </div>
 
             <div>
-              <Label htmlFor="paymentMethod">Payment Method</Label>
+              <Label htmlFor="paymentMethod" className="mb-3">Payment Method</Label>
               <Select value={paymentMethod} onValueChange={setPaymentMethod}>
                 <SelectTrigger id="paymentMethod" className="w-full">
                   <SelectValue placeholder="Select payment method" />
@@ -1040,7 +1040,7 @@ export default function TransactionHistory() {
             </div>
 
             <div>
-              <Label htmlFor="userType">User Type</Label>
+              <Label htmlFor="userType" className="mb-3">User Type</Label>
               <Select value={userType} onValueChange={setUserType}>
                 <SelectTrigger id="userType" className="w-full">
                   <SelectValue placeholder="User Type" />
@@ -1057,7 +1057,7 @@ export default function TransactionHistory() {
             </div>
 
             <div>
-              <Label htmlFor="location">Location</Label>
+              <Label htmlFor="location" className="mb-3">Location</Label>
               <Select value={selectedLocation} onValueChange={setSelectedLocation}>
                 <SelectTrigger id="location" className="w-full">
                   <SelectValue placeholder="Select Location" />
@@ -1074,7 +1074,7 @@ export default function TransactionHistory() {
             </div>
 
             <div>
-              <Label htmlFor="sort">Sort</Label>
+              <Label htmlFor="sort" className="mb-3">Sort</Label>
               <Select
                 value={`${sortBy}-${sortOrder}`}
                 onValueChange={(value) => {
@@ -1096,7 +1096,7 @@ export default function TransactionHistory() {
             </div>
 
             <div>
-              <Label htmlFor="search">Search</Label>
+              <Label htmlFor="search" className="mb-3">Search</Label>
               <Input
                 id="search"
                 className="w-full"
@@ -1109,7 +1109,7 @@ export default function TransactionHistory() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1">
-              <Label htmlFor="from-date" className="text-sm">
+              <Label htmlFor="from-date" className="text-sm mb-3">
                 From Date
               </Label>
               <Popover open={openFrom} onOpenChange={setOpenFrom}>
@@ -1141,7 +1141,7 @@ export default function TransactionHistory() {
             </div>
 
             <div className="flex flex-col gap-1">
-              <Label htmlFor="to-date" className="text-sm">
+              <Label htmlFor="to-date" className="text-sm mb-3">
                 To Date
               </Label>
               <Popover open={openTo} onOpenChange={setOpenTo}>

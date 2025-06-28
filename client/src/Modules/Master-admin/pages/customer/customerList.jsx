@@ -245,7 +245,7 @@ export default function CustomerList() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           {/* Status */}
           <div className="flex flex-col gap-1">
-            <Label className="text-sm px-1">Status</Label>
+            <Label className="text-sm px-1 mb-3">Status</Label>
             <Select value={status} onValueChange={setStatus}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select status" />
@@ -260,7 +260,7 @@ export default function CustomerList() {
 
           {/* Registration Date */}
           <div className="flex flex-col gap-1">
-            <Label htmlFor="date" className="text-sm px-1">
+            <Label htmlFor="date" className="text-sm px-1 mb-3">
               Registration Date
             </Label>
             <Popover open={open} onOpenChange={setOpen}>
@@ -287,7 +287,7 @@ export default function CustomerList() {
             </Popover>
           </div>
           <div>
-            <Label className="text-sm px-1">Customer Registration Type</Label>
+            <Label className="text-sm px-1 mb-3">Customer Registration Type</Label>
             <Select value={registrationType} onValueChange={setRegistrationType}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Registration Type" />
@@ -301,7 +301,7 @@ export default function CustomerList() {
           </div>
           {/* Last Active */}
           <div className="flex flex-col gap-1">
-            <Label className="text-sm px-1">Last Active</Label>
+            <Label className="text-sm px-1 mb-3">Last Active</Label>
             <Select value={lastActive} onValueChange={setLastActive}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Last Active" />
@@ -317,7 +317,7 @@ export default function CustomerList() {
 
           {/* Sort */}
           <div className="flex flex-col gap-1">
-            <Label className="text-sm px-1">Sort</Label>
+            <Label className="text-sm px-1 mb-3" >Sort</Label>
             <Select
               value={sort}
               onValueChange={setSort}

@@ -1,30 +1,58 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { toast, Bounce } from "react-toastify";
 import axios from "axios";
+import { User, LogIn, LogOut, DollarSign, ChevronDown } from "lucide-react";
+import QRCode from "qrcode";
 
 const SessionHistory = () => {
-  const { user, getSessionHistory } = useAuth();
+  const { user } = useAuth();
+  const [users, setUsers] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [selectedUserId, setSelectedUserId] = useState("");
-  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [qrCodes, setQrCodes] = useState({});
+  const [qrLoading, setQrLoading] = useState(false);
 
   const isAdmin = user?.role_id?.name === "Master-Admin" || user?.role_id?.name === "Admin";
 
-  // Fetch all users for admin
+  // Fetch all users for admin dropdown
   const fetchUsers = async () => {
     if (!isAdmin) return;
     try {
-      const res = await axios.get(`${import.meta.env.VITE_BASE_URL}/users/fetch-users-for-history`, {
+      const res = await axios.get(`${import.meta.env.VITE_BASE_URL}/users/fetch-all-users`, {
         withCredentials: true,
       });
       setUsers(res.data.data || []);
@@ -39,6 +67,7 @@ const SessionHistory = () => {
     }
   };
 
+  // Fetch session history
   const fetchSessions = async () => {
     if (!user?._id) {
       toast.error("Please log in to view session history", {
@@ -51,12 +80,33 @@ const SessionHistory = () => {
     }
 
     setLoading(true);
+    setQrLoading(true);
     try {
-      const userId = isAdmin && selectedUserId ? selectedUserId : user._id;
-      const sessionData = await getSessionHistory(userId, startDate, endDate);
+      const params = { startDate, endDate };
+      if (isAdmin && selectedUserId) params.userId = selectedUserId;
+      const res = await axios.get(`${import.meta.env.VITE_BASE_URL}/users/fetch-users-for-history`, {
+        params,
+        withCredentials: true,
+        headers: { "Cache-Control": "no-cache" },
+      });
+
+      const sessionData = res.data.data || [];
       setSessions(sessionData);
+
+      // Generate QR codes for transactions
+      const qrPromises = sessionData.flatMap((user) =>
+        user.actions.map(async (action) => {
+          const qrUrl = await QRCode.toDataURL(
+            `${import.meta.env.VITE_BASE_URL}/users/fetch-users-for-transaction/${action.transaction_id}`
+          );
+          return { id: action.transaction_id, qrUrl };
+        })
+      );
+      const qrResults = await Promise.all(qrPromises);
+      const qrMap = qrResults.reduce((acc, { id, qrUrl }) => ({ ...acc, [id]: qrUrl }), {});
+      setQrCodes(qrMap);
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to fetch session history", {
+      toast.error(err.response?.data?.error || "Failed to fetch session history", {
         position: "top-center",
         autoClose: 5000,
         theme: "colored",
@@ -64,6 +114,7 @@ const SessionHistory = () => {
       });
     } finally {
       setLoading(false);
+      setQrLoading(false);
     }
   };
 
@@ -73,15 +124,19 @@ const SessionHistory = () => {
   }, [user, selectedUserId]);
 
   return (
-    <Card className="max-w-4xl mx-auto mt-8">
+    <Card className="max-w-5xl mx-auto mt-6 shadow-lg">
       <CardHeader>
-        <CardTitle className="text-[#00004D] font-bold">Session History</CardTitle>
+        <CardTitle className="text-[#00004d] font-bold text-2xl">
+          Session History
+        </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="flex gap-4 mb-4 flex-wrap">
+        <div className="flex gap-4 mb-6 flex-wrap">
           {isAdmin && (
-            <div>
-              <label htmlFor="userSelect" className="block text-sm font-medium">Select User</label>
+            <div className="w-48">
+              <label htmlFor="userSelect" className="block text-sm font-semibold">
+                Select User
+              </label>
               <Select value={selectedUserId} onValueChange={setSelectedUserId} disabled={loading}>
                 <SelectTrigger id="userSelect">
                   <SelectValue placeholder="All Users" />
@@ -90,15 +145,17 @@ const SessionHistory = () => {
                   <SelectItem value="">All Users</SelectItem>
                   {users.map((u) => (
                     <SelectItem key={u._id} value={u._id}>
-                      {u.name} ({u.role_id?.name || "Unknown"})
+                      {u.name} ({u.role || "Unknown"})
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           )}
-          <div>
-            <label htmlFor="startDate" className="block text-sm font-medium">Start Date</label>
+          <div className="w-40">
+            <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-1">
+              Start Date
+            </label>
             <Input
               id="startDate"
               type="date"
@@ -107,8 +164,10 @@ const SessionHistory = () => {
               disabled={loading}
             />
           </div>
-          <div>
-            <label htmlFor="endDate" className="block text-sm font-medium">End Date</label>
+          <div className="w-40">
+            <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-1">
+              End Date
+            </label>
             <Input
               id="endDate"
               type="date"
@@ -117,42 +176,123 @@ const SessionHistory = () => {
               disabled={loading}
             />
           </div>
-          <Button onClick={fetchSessions} disabled={loading} className="bg-[#00004D] mt-6">
+          <Button
+            onClick={fetchSessions}
+            disabled={loading}
+            className="bg-[#00004d] hover:bg-[#000066] mt-6"
+          >
             {loading ? "Loading..." : "Filter"}
           </Button>
         </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {isAdmin && <TableHead>User</TableHead>}
-              <TableHead>Login Time</TableHead>
-              <TableHead>Logout Time</TableHead>
-              <TableHead>Created At</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sessions.length > 0 ? (
-              sessions.map((session) => (
-                <TableRow key={session._id}>
-                  {isAdmin && (
-                    <TableCell>
-                      {session.user_id?.name || "Unknown"} ({session.user_id?.role_id?.name || "Unknown"})
-                    </TableCell>
-                  )}
-                  <TableCell>{new Date(session.login_time).toLocaleString()}</TableCell>
-                  <TableCell>
-                    {session.logout_time ? new Date(session.logout_time).toLocaleString() : "Active"}
-                  </TableCell>
-                  <TableCell>{new Date(session.created_at).toLocaleString()}</TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={isAdmin ? 4 : 3} className="text-center">No sessions found</TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+        {loading ? (
+          <p className="text-center text-gray-500">Loading sessions...</p>
+        ) : sessions.length > 0 ? (
+          <Accordion type="single" collapsible className="w-full">
+            {sessions.map((userSession) => (
+              <AccordionItem key={userSession._id} value={userSession._id}>
+                <AccordionTrigger className="hover:bg-gray-100 p-4 rounded-md">
+                  <div className="flex items-center gap-2 w-full">
+                    <User size={20} className="text-[#00004d]" />
+                    <span className="font-medium">
+                      {userSession.name} ({userSession.role || "Unknown"})
+                    </span>
+                    <span className="ml-auto text-sm text-gray-500">
+                      {userSession.session?.status === "Online" ? (
+                        <LogIn size={16} color="green" />
+                      ) : (
+                        <LogOut size={16} color="red" />
+                      )}
+                      {userSession.session?.status}
+                    </span>
+                    <ChevronDown size={16} className="ml-2" />
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="p-4">
+                  <div className="mb-4">
+                    <h4 className="font-semibold text-[#00004d] mb-2">Session Details</h4>
+                    <p>
+                      Email: {userSession.email || "N/A"} | Phone: {userSession.phone_number || "N/A"}
+                    </p>
+                    {userSession.session?.login_time ? (
+                      <div>
+                        <p>
+                          <LogIn size={16} className="inline mr-1" />
+                          Login: {new Date(userSession.session.login_time).toLocaleString()}
+                        </p>
+                        <p>
+                          {userSession.session.logout_time ? (
+                            <LogOut size={16} className="inline mr-1" />
+                          ) : (
+                            <LogIn size={16} className="inline mr-1" color="green" />
+                          )}
+                          {userSession.session.logout_time
+                            ? `Logout: ${new Date(userSession.session.logout_time).toLocaleString()}`
+                            : "Session Active"}
+                        </p>
+                      </div>
+                    ) : (
+                      <p>No active session</p>
+                    )}
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-[#00004d] mb-2">Actions</h4>
+                    {userSession.actions?.length > 0 ? (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Transaction ID</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Amount</TableHead>
+                            <TableHead>Role</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Time</TableHead>
+                            <TableHead>QR Code</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {userSession.actions.map((action) => (
+                            <TableRow key={action.transaction_id}>
+                              <TableCell>{action.transaction_id}</TableCell>
+                              <TableCell>
+                                <DollarSign size={16} className="inline mr-1" />
+                                {action.transaction_type}
+                              </TableCell>
+                              <TableCell>₹{action.amount.$numberDecimal}</TableCell>
+                              <TableCell>
+                                {action.sender_id === userSession._id ? "Sender" : "Receiver"}
+                              </TableCell>
+                              <TableCell>{action.status}</TableCell>
+                              <TableCell>
+                                {new Date(action.created_at).toLocaleString()}
+                              </TableCell>
+                              <TableCell>
+                                {qrCodes[action.transaction_id] ? (
+                                  <img
+                                    src={qrCodes[action.transaction_id]}
+                                    alt={`QR Code for ${action.transaction_id}`}
+                                    className="w-12 h-12"
+                                  />
+                                ) : qrLoading ? (
+                                  "Generating..."
+                                ) : (
+                                  "N/A"
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    ) : (
+                      <p>No actions in this session</p>
+                    )}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        ) : (
+          <p className="text-center text-gray-500">No sessions found</p>
+        )}
       </CardContent>
     </Card>
   );

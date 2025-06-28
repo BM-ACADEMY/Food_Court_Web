@@ -78,7 +78,11 @@ export function SiteHeader() {
 
   const [openAccountModal, setOpenAccountModal] = useState(false);
   const handleHistory = () => {
-    navigate('/master-admin/history')
+    if (user.role.role_id === "role-1") {
+      navigate('/master-admin/history')
+    } else {
+      navigate('/admin/history')
+    }
   }
 
   const handleHomePage = () => {
