@@ -94,7 +94,6 @@ exports.deleteCustomer = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
 exports.getAllCustomerDetails = async (req, res) => {
   try {
     const {
@@ -102,13 +101,20 @@ exports.getAllCustomerDetails = async (req, res) => {
       status = "all",
       lastActive = "all",
       regDate = "",
+      registration_type = "all",
       sortBy = "asc",
       page = 1,
       pageSize = 10,
     } = req.query;
 
+    const debug =
+      process.env.NODE_ENV !== "production" ? console.log : () => {};
+    debug("Query params:", { search, status, lastActive, regDate, registration_type, sortBy, page, pageSize });
+
+    // Find customer role
     const customerRole = await Role.findOne({ name: "Customer" }).select("_id");
     if (!customerRole) {
+      debug("Customer role not found");
       return res.json({
         customers: [],
         totalCustomers: 0,
@@ -122,23 +128,17 @@ exports.getAllCustomerDetails = async (req, res) => {
     let userQuery = { role_id: customerRoleId };
 
     // Handle search
-    if (search) {
+    if (search.trim()) {
       const customerMatches = await Customer.find({
-        $or: [
-          { customer_id: { $regex: search, $options: "i" } },
-          { phone_number: { $regex: search, $options: "i" } },
-        ],
+        customer_id: { $regex: search, $options: "i" },
       }).select("user_id");
-
       const customerUserIds = customerMatches.map((c) => c.user_id);
-      if (customerUserIds.length > 0) {
-        userQuery.$or = [
-          { name: { $regex: search, $options: "i" } },
-          { _id: { $in: customerUserIds } },
-        ];
-      } else {
-        userQuery.name = { $regex: search, $options: "i" };
-      }
+      userQuery.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { phone_number: { $regex: search, $options: "i" } },
+        { _id: { $in: customerUserIds } },
+      ];
+      debug("Search customerUserIds:", customerUserIds);
     }
 
     // Handle registration date
@@ -147,6 +147,7 @@ exports.getAllCustomerDetails = async (req, res) => {
       const endDate = new Date(startDate);
       endDate.setDate(startDate.getDate() + 1);
       userQuery.created_at = { $gte: startDate, $lt: endDate };
+      debug("Registration date filter:", { startDate, endDate });
     }
 
     // Handle lastActive filter
@@ -154,11 +155,11 @@ exports.getAllCustomerDetails = async (req, res) => {
       const now = new Date();
       let dateFilter;
       if (lastActive === "today") {
-        dateFilter = new Date(now.setHours(0, 0, 0, 0));
+        dateFilter = startOfDay(now);
       } else if (lastActive === "week") {
-        dateFilter = new Date(now.setDate(now.getDate() - 7));
+        dateFilter = subDays(now, 7);
       } else {
-        dateFilter = new Date(now.setMonth(now.getMonth() - 1));
+        dateFilter = subMonths(now, 1);
       }
 
       const recentLogUserIds = await LoginLog.find({
@@ -167,6 +168,7 @@ exports.getAllCustomerDetails = async (req, res) => {
       userQuery._id = recentLogUserIds.length
         ? { $in: recentLogUserIds }
         : { $in: [] };
+      debug("Last active user IDs:", recentLogUserIds);
     }
 
     // Build pipeline
@@ -180,7 +182,7 @@ exports.getAllCustomerDetails = async (req, res) => {
           as: "customer",
         },
       },
-      { $unwind: "$customer" },
+      { $unwind: { path: "$customer", preserveNullAndEmptyArrays: false } },
       {
         $lookup: {
           from: "userbalances",
@@ -198,36 +200,122 @@ exports.getAllCustomerDetails = async (req, res) => {
           as: "loginLogs",
         },
       },
+      // Lookup for transaction (get the most recent transaction)
+      {
+        $lookup: {
+          from: "transactions",
+          let: { userId: "$_id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $or: [
+                    { $eq: ["$sender_id", "$$userId"] },
+                    { $eq: ["$receiver_id", "$$userId"] },
+                  ],
+                },
+              },
+            },
+            { $sort: { created_at: -1 } },
+            { $limit: 1 },
+            {
+              $lookup: {
+                from: "users",
+                localField: "sender_id",
+                foreignField: "_id",
+                as: "sender",
+              },
+            },
+            { $unwind: { path: "$sender", preserveNullAndEmptyArrays: true } },
+            {
+              $lookup: {
+                from: "roles",
+                localField: "sender.role_id",
+                foreignField: "_id",
+                as: "sender_role",
+              },
+            },
+            { $unwind: { path: "$sender_role", preserveNullAndEmptyArrays: true } },
+            {
+              $lookup: {
+                from: "users",
+                localField: "receiver_id",
+                foreignField: "_id",
+                as: "receiver",
+              },
+            },
+            { $unwind: { path: "$receiver", preserveNullAndEmptyArrays: true } },
+            {
+              $lookup: {
+                from: "roles",
+                localField: "receiver.role_id",
+                foreignField: "_id",
+                as: "receiver_role",
+              },
+            },
+            { $unwind: { path: "$receiver_role", preserveNullAndEmptyArrays: true } },
+            {
+              $project: {
+                sender_id: "$sender._id",
+                sender_name: "$sender.name",
+                sender_role_name: "$sender_role.name",
+                sender_role_id: "$sender_role._id",
+                receiver_id: "$receiver._id",
+                receiver_name: "$receiver.name",
+                receiver_role_name: "$receiver_role.name",
+                receiver_role_id: "$receiver_role._id",
+              },
+            },
+          ],
+          as: "transaction",
+        },
+      },
+      { $unwind: { path: "$transaction", preserveNullAndEmptyArrays: true } },
       {
         $project: {
           user_id: "$_id",
           name: 1,
-          phone_number: 1, // ✅ from User model
+          phone_number: 1,
           is_flagged: 1,
           customer_id: "$customer.customer_id",
+          registration_type: "$customer.registration_type",
           balance: { $ifNull: ["$balance.balance", 0] },
           created_at: 1,
           loginLogs: 1,
-          isOnline: {
+          status: {
             $cond: [
               { $eq: [{ $max: "$loginLogs.status" }, true] },
-              true,
-              false,
+              "Online",
+              "Offline",
             ],
           },
           lastLogin: { $max: "$loginLogs.login_time" },
+          sender_id: "$transaction.sender_id",
+          sender_name: "$transaction.sender_name",
+          sender_role: "$transaction.sender_role_name",
+          sender_role_id: "$transaction.sender_role_id",
+          receiver_id: "$transaction.receiver_id",
+          receiver_name: "$transaction.receiver_name",
+          receiver_role: "$transaction.receiver_role_name",
+          receiver_role_id: "$transaction.receiver_role_id",
         },
       },
     ];
 
     // Sort
+    const validSortOptions = ["asc", "desc", "recent", "high-balance", "low-balance"];
+    if (!validSortOptions.includes(sortBy)) {
+      return res.status(400).json({
+        error: `Invalid sortBy: ${sortBy}. Must be one of: ${validSortOptions.join(", ")}`,
+      });
+    }
     const sortOption = {
       asc: { name: 1 },
       desc: { name: -1 },
       recent: { created_at: -1 },
       "high-balance": { balance: -1 },
       "low-balance": { balance: 1 },
-    }[sortBy] || { name: 1 };
+    }[sortBy];
 
     pipeline.push({ $sort: sortOption });
 
@@ -239,6 +327,7 @@ exports.getAllCustomerDetails = async (req, res) => {
     );
 
     const customers = await User.aggregate(pipeline);
+    debug("Aggregated customers:", customers.length);
 
     const formattedCustomers = customers.map((customer) => {
       let lastActive = "Unknown";
@@ -252,30 +341,36 @@ exports.getAllCustomerDetails = async (req, res) => {
           lastActive = `${Math.floor(diffMinutes)} mins ago`;
         else if (diffMinutes < 1440)
           lastActive = `${Math.floor(diffMinutes / 60)} hours ago`;
-        else lastActive = lastLogin.toISOString().split("T")[0];
+        else lastActive = format(lastLogin, "yyyy-MM-dd");
       }
 
       return {
-        user_id: customer.user_id?.toString(), // from _id
+        user_id: customer.user_id?.toString(),
         id: customer.customer_id,
         name: customer.name,
         phone: customer.phone_number,
+        registration_type: customer.registration_type || "Unknown",
         balance: parseFloat(customer.balance.toString()),
-        status: customer.isOnline ? "Online" : "Offline",
+        status: customer.status,
         lastActive,
         is_flagged: customer.is_flagged || false,
+        sender_id: customer.sender_id?.toString() || "Unknown",
+        sender_name: customer.sender_name || "Unknown",
+        sender_role: customer.sender_role || "Unknown",
+        sender_role_id: customer.sender_role_id?.toString() || "Unknown",
+        receiver_id: customer.receiver_id?.toString() || "Unknown",
+        receiver_name: customer.receiver_name || "Unknown",
+        receiver_role: customer.receiver_role || "Unknown",
+        receiver_role_id: customer.receiver_role_id?.toString() || "Unknown",
       };
     });
 
-    let finalCustomers = formattedCustomers;
-    if (status !== "all") {
-      finalCustomers = formattedCustomers.filter(
-        (c) => c.status.toLowerCase() === status.toLowerCase()
-      );
-    }
+    // Apply status filter after formatting
+    const filteredCustomers = status !== "all"
+      ? formattedCustomers.filter((c) => c.status.toLowerCase() === status.toLowerCase())
+      : formattedCustomers;
 
     // Stats pipeline
-    const recentLoginThreshold = new Date(Date.now() - 5 * 60 * 1000);
     const statsPipeline = [
       { $match: userQuery },
       {
@@ -297,35 +392,10 @@ exports.getAllCustomerDetails = async (req, res) => {
       },
       { $unwind: { path: "$balance", preserveNullAndEmptyArrays: true } },
       {
-        $lookup: {
-          from: "loginlogs",
-          let: { userId: "$_id" },
-          pipeline: [
-            {
-              $match: {
-                $expr: { $eq: ["$user_id", "$$userId"] },
-                login_time: { $gte: recentLoginThreshold },
-                status: true,
-                logout_time: { $exists: false },
-              },
-            },
-            { $limit: 1 },
-          ],
-          as: "loginLogs",
-        },
-      },
-      {
-        $project: {
-          balance: { $ifNull: ["$balance.balance", 0] },
-          isOnline: { $gt: [{ $size: "$loginLogs" }, 0] },
-        },
-      },
-      {
         $group: {
           _id: null,
           totalCustomers: { $sum: 1 },
-          totalBalance: { $sum: "$balance" },
-          onlineCount: { $sum: { $cond: ["$isOnline", 1, 0] } },
+          totalBalance: { $sum: "$balance.balance" },
         },
       },
     ];
@@ -334,11 +404,15 @@ exports.getAllCustomerDetails = async (req, res) => {
     const {
       totalCustomers = 0,
       totalBalance = 0,
-      onlineCount = 0,
     } = stats[0] || {};
 
+    // Online count
+    const onlineCount = filteredCustomers.filter(
+      (c) => c.status === "Online"
+    ).length;
+
     res.json({
-      customers: finalCustomers,
+      customers: filteredCustomers,
       totalCustomers,
       totalBalance: parseFloat(totalBalance.toString()),
       onlineCount,
@@ -349,7 +423,6 @@ exports.getAllCustomerDetails = async (req, res) => {
     res.status(500).json({ error: "Server error", details: error.message });
   }
 };
-
 exports.getCustomerByQrCode = async (req, res) => {
   try {
     const { qr_code } = req.query;
@@ -777,6 +850,52 @@ exports.getCustomerDetailsByQrCode = async (req, res) => {
     res.status(200).json({ success: true, data: response });
   } catch (err) {
     console.error("Error in getCustomerDetailsByQrCode:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// Get Customer by Customer ID
+exports.getCustomerByCustomerId = async (req, res) => {
+  try {
+    const { customer_id } = req.query;
+    if (!customer_id) {
+      return res.status(400).json({ success: false, message: "Customer ID is required" });
+    }
+
+    const customer = await Customer.findOne({ customer_id }).populate(
+      "user_id",
+      "name email phone_number"
+    );
+    if (!customer) {
+      return res.status(404).json({ success: false, message: "No customer found for this customer ID" });
+    }
+
+    res.status(200).json({ success: true, data: customer });
+  } catch (err) {
+    console.error("Error in getCustomerByCustomerId:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// Get Customer by User ID
+exports.getCustomerByUserId = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid user ID" });
+    }
+
+    const customer = await Customer.findOne({ user_id: id }).populate(
+      "user_id",
+      "name email phone_number"
+    );
+    if (!customer) {
+      return res.status(404).json({ success: false, message: "No customer found for this user ID" });
+    }
+
+    res.status(200).json({ success: true, data: customer });
+  } catch (err) {
+    console.error("Error in getCustomerByUserId:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };

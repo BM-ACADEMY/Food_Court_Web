@@ -9,7 +9,7 @@ import MobileLogin from "@/Modules/User/pages/Loginpage/MobileLogin";
 import MobileOtp from "@/Modules/User/pages/Loginpage/MobileOtp";
 import Header from "@/Modules/User/components/header/Navbar";
 import Footer from "@/Modules/User/components/footer/Footer";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 
 const Home = () => {
   const [showRegister, setShowRegister] = useState(false);
@@ -18,8 +18,19 @@ const Home = () => {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showMobileLogin, setShowMobileLogin] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [mode,setMode]=useState("");
+  const [mode, setMode] = useState("");
+  const [role, setRole] = useState('customer');
   const navigate = useNavigate();
+
+  const handleCustomer = () => {
+    setShowLogin(true)
+    setRole('customer');
+  }
+
+  const handleAdmin = () => {
+    setShowLogin(true)
+    setRole('admin');
+  }
 
   return (
     <>
@@ -40,7 +51,9 @@ const Home = () => {
           <div className="absolute top-2/3 right-16 w-36 h-36 bg-gray-300 rounded-full opacity-15 animate-pulse-slow"></div>
           <div className="absolute bottom-10 left-[20%] w-16 h-16 bg-gray-300 rounded-full opacity-25 animate-pulse-slow"></div>
         </div>
+        <div>
 
+        </div>
         {/* Heading */}
         <div className="z-10 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-2xl shadow-md px-4 py-6 md:px-8 md:py-10 w-full max-w-2xl md:max-w-4xl flex flex-col items-center">
           <h1 className="text-2xl md:text-4xl font-bold text-blue-900 mb-3 text-center">
@@ -70,23 +83,23 @@ const Home = () => {
               <Button
                 variant="outline"
                 className="w-full border-2 border-[#05025b] text-[#05025b] hover:bg-[#f0f0ff] text-base sm:text-lg py-6 px-6 flex items-center gap-4"
-                onClick={() => setShowLogin(true)}
+                onClick={handleCustomer}
               >
                 <LogIn className="h-7 w-7 sm:h-8 sm:w-8" />
                 <span className="whitespace-normal font-semibold">
                   Login as Customer
                 </span>
               </Button>
-              {/* <Button
+              <Button
                 variant="outline"
                 className="w-full border-2 border-[#05025b] text-[#05025b] hover:bg-[#f0f0ff] text-base sm:text-lg py-6 px-6 flex items-center gap-4"
-                onClick={() => navigate("/admin-login")} // Separate admin login route
+                onClick={handleAdmin} // Separate admin login route
               >
                 <LogIn className="h-7 w-7 sm:h-8 sm:w-8" />
                 <span className="whitespace-normal font-semibold">
                   Login as Admin
                 </span>
-              </Button> */}
+              </Button>
             </div>
           )}
 
@@ -119,6 +132,7 @@ const Home = () => {
         {showLogin && !showOtp && !showForgotPassword && !showMobileLogin && (
           <LoginForm
             onBack={() => setShowLogin(false)}
+            role={role}
             onForgotPassword={() => {
               setShowLogin(false);
               setShowForgotPassword(true);

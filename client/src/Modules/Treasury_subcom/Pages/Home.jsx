@@ -120,24 +120,24 @@ function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4 sm:p-6">
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4 sm:p-6 md:p-8">
       {authLoading ? (
         <p className="text-blue-500 text-sm">Loading user data...</p>
       ) : !user ? (
         <p className="text-red-500 text-sm">Please log in to access this page.</p>
       ) : !isSubmitted ? (
-        <div className="flex justify-center w-full max-w-md">
-          <Card className="flex flex-col items-center justify-center w-full max-w-[300px] min-h-[200px] p-4">
+        <div className="w-full max-w-md mx-auto">
+          <Card className="flex flex-col items-center justify-center w-full p-4 sm:p-6">
             <CardHeader className="flex flex-col items-center p-4">
-              <CardTitle className="text-base sm:text-lg font-semibold text-center">
+              <CardTitle className="text-lg sm:text-xl font-semibold text-center">
                 Select Options
               </CardTitle>
             </CardHeader>
-            <CardContent className="flex flex-col items-center gap-4 w-full p-4">
+            <CardContent className="flex flex-col items-center gap-4 w-full p-4 sm:p-6">
               {loading && <p className="text-blue-500 text-sm">Loading...</p>}
               {error && <p className="text-red-500 text-sm">{error}</p>}
               <Select onValueChange={setSelectedLocation} value={selectedLocation}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full max-w-xs">
                   <SelectValue placeholder="Select Location" />
                 </SelectTrigger>
                 <SelectContent>
@@ -149,7 +149,7 @@ function Home() {
                 </SelectContent>
               </Select>
               <Select onValueChange={setSelectedUpiId} value={selectedUpiId}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full max-w-xs">
                   <SelectValue placeholder="Select UPI ID" />
                 </SelectTrigger>
                 <SelectContent>
@@ -163,7 +163,7 @@ function Home() {
               <Button
                 onClick={handleSubmit}
                 disabled={!selectedLocation || !selectedUpiId || loading || authLoading}
-                className="w-full"
+                className="w-full max-w-xs"
               >
                 Submit
               </Button>
@@ -171,17 +171,17 @@ function Home() {
           </Card>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 max-w-7xl w-full">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8 max-w-7xl w-full mx-auto">
           {cards.map((card, index) => {
             const Icon = card.icon;
             return (
               <Card
                 key={index}
                 onClick={() => card.path && navigate(card.path)}
-                className={`flex flex-col items-center justify-center transform transition-transform hover:-translate-y-2 hover:shadow-lg cursor-pointer w-full max-w-[300px] min-h-[200px] p-4 ${card.path ? '' : 'cursor-not-allowed'}`}
+                className={`flex flex-col items-center justify-center transform transition-transform hover:-translate-y-2 hover:shadow-lg cursor-pointer w-full max-w-sm mx-auto min-h-[180px] sm:min-h-[200px] p-4 ${card.path ? '' : 'cursor-not-allowed'}`}
               >
                 <CardHeader className="flex flex-col items-center p-4">
-                  <Icon className={`h-8 w-8 ${card.color} mb-2`} />
+                  <Icon className={`h-8 w-8 sm:h-10 sm:w-10 ${card.color} mb-2`} />
                   <CardTitle className="text-base sm:text-lg font-semibold text-center whitespace-nowrap">
                     {card.title}
                   </CardTitle>

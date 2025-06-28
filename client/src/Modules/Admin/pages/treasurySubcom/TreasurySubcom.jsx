@@ -400,8 +400,20 @@ export default function TreasurySubcomList() {
                       <TableCell className="font-medium">#{subcom.id}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <Avatar name={subcom.name} />
-                          <span>{subcom.name}</span>
+                          <Avatar name={subcom.sender_name} />
+                          <div className="flex flex-col gap-1">
+                            <span>{subcom.sender_name}</span>
+                            <span className="text-[12px] text-gray-500">({subcom.sender_role_name})</span>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Avatar name={subcom.receiver_name} />
+                          <div className="flex flex-col gap-1">
+                            <span>{subcom.receiver_name}</span>
+                            <span className="text-[12px] text-gray-500">({subcom.receiver_role_name})</span>
+                          </div>
                         </div>
                       </TableCell>
 
@@ -409,10 +421,10 @@ export default function TreasurySubcomList() {
                       <TableCell>
                         <span
                           className={`font-medium ${subcom.balance > 10000
-                              ? "text-green-600"
-                              : subcom.balance > 0
-                                ? "text-yellow-600"
-                                : "text-red-600"
+                            ? "text-green-600"
+                            : subcom.balance > 0
+                              ? "text-yellow-600"
+                              : "text-red-600"
                             }`}
                         >
                           ₹{subcom.balance.toLocaleString()}

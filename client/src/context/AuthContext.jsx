@@ -81,8 +81,17 @@
 
 // export const useAuth = () => useContext(AuthContext);
 
+
+
 import { createContext, useContext, useState, useEffect } from "react";
 import axios from "axios";
+import { io } from "socket.io-client";
+import { toast } from "react-toastify";
+
+// ✅ Global socket instance
+const socket = io(import.meta.env.VITE_BASE_SOCKET_URL, {
+  withCredentials: true,
+});
 
 const AuthContext = createContext();
 
@@ -95,27 +104,39 @@ export const AuthProvider = ({ children }) => {
       const res = await axios.get(`${import.meta.env.VITE_BASE_URL}/users/me`, {
         withCredentials: true,
       });
-      console.log("fetchUser response:", res.data);
-      setUser(res.data.user); // Expect user object with role.name and balance
+
+      const fetchedUser = res.data.user;
+      console.log("✅ fetchUser:", fetchedUser);
+
+      // 🔁 Always set a new object to trigger re-render
+      setUser({ ...fetchedUser });
+
     } catch (err) {
-      console.error("fetchUser error:", err.response?.data || err.message);
+      console.error("❌ fetchUser error:", err.response?.data || err.message);
       setUser(null);
     } finally {
       setLoading(false);
     }
   };
 
-  const login = async (emailOrPhone, password) => {
+
+  useEffect(() => {
+    fetchUser(); // Run on mount
+  }, []);
+
+ 
+
+  const login = async (emailOrPhone, password, role) => {
     try {
       const res = await axios.post(
         `${import.meta.env.VITE_BASE_URL}/users/login`,
-        { emailOrPhone, password },
+        { emailOrPhone, password, role },
         { withCredentials: true }
       );
-      await fetchUser(); // Fetch user data after login
+      await fetchUser(); // Load user after login
       return res;
     } catch (err) {
-      console.error("Login failed:", err.response?.data || err.message);
+      console.error("❌ Login failed:", err.response?.data || err.message);
       throw err;
     }
   };
@@ -127,10 +148,10 @@ export const AuthProvider = ({ children }) => {
         { phone_number, otp },
         { withCredentials: true }
       );
-      setUser(res.data.user); // Update user state with role.name and balance
+      setUser(res.data.user);
       return res;
     } catch (err) {
-      console.error("OTP login failed:", err.response?.data || err.message);
+      console.error("❌ OTP login failed:", err.response?.data || err.message);
       throw err;
     }
   };
@@ -144,7 +165,7 @@ export const AuthProvider = ({ children }) => {
       );
       setUser(null);
     } catch (err) {
-      console.error("Logout failed:", err.response?.data || err.message);
+      console.error("❌ Logout failed:", err.response?.data || err.message);
     }
   };
 
@@ -159,18 +180,14 @@ export const AuthProvider = ({ children }) => {
       );
       return res.data.data;
     } catch (err) {
-      console.error("Fetch session history failed:", err.response?.data || err.message);
+      console.error("❌ Fetch session history failed:", err.response?.data || err.message);
       throw err;
     }
   };
 
-  useEffect(() => {
-    fetchUser(); // Fetch user on mount to persist session
-  }, []);
-
   return (
     <AuthContext.Provider
-      value={{ user, setUser, loading, login, loginWithOtp, logout, getSessionHistory }}
+      value={{ user, setUser, loading, login, loginWithOtp, logout, getSessionHistory,fetchUser }}
     >
       {children}
     </AuthContext.Provider>

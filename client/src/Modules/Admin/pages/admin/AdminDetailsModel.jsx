@@ -192,9 +192,9 @@ const AdminDetailsModal = ({ admin, isOpen, onClose }) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-full sm:max-w-4xl lg:max-w-6xl w-full">
+      <DialogContent className="max-w-[95vw] sm:max-w-[90vw] md:max-w-2xl lg:max-w-4xl xl:max-w-6xl w-full h-[90vh] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Admin Details - #{adminData?.id}</DialogTitle>
+          <DialogTitle className="text-lg sm:text-xl">Admin Details - #{adminData?.id}</DialogTitle>
         </DialogHeader>
         <Tabs defaultValue="info" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
@@ -313,9 +313,9 @@ const AdminDetailsModal = ({ admin, isOpen, onClose }) => {
 
           {/* Transaction History Tab */}
           <TabsContent value="transactions" className="space-y-4 w-full">
-            <div className="flex justify-end mb-4">
+           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
               <Select value={filter} onValueChange={setFilter}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-[150px] sm:w-[180px]">
                   <SelectValue placeholder="Filter transactions" />
                 </SelectTrigger>
                 <SelectContent>

@@ -145,10 +145,10 @@ exports.getAllRestaurantDetails = async (req, res) => {
       pageSize,
     });
 
-    const restaurantRole = await Role.findOne({ name: "Restaurant" }).select(
-      "_id"
-    );
+    // Find the Restaurant role
+    const restaurantRole = await Role.findOne({ name: "Restaurant" }).select("_id");
     if (!restaurantRole) {
+      debug("Restaurant role not found");
       return res.json({
         restaurants: [],
         totalRestaurants: 0,
@@ -161,6 +161,7 @@ exports.getAllRestaurantDetails = async (req, res) => {
     const restaurantRoleId = restaurantRole._id;
     let userQuery = { role_id: restaurantRoleId };
 
+    // Search filter
     if (search) {
       const restaurantIds = await Restaurant.find({
         $or: [
@@ -168,8 +169,8 @@ exports.getAllRestaurantDetails = async (req, res) => {
           { restaurant_name: { $regex: search, $options: "i" } },
         ],
       }).select("user_id");
-
       const restaurantUserIds = restaurantIds.map((r) => r.user_id);
+      debug("Search restaurantUserIds:", restaurantUserIds);
       if (restaurantUserIds.length > 0) {
         userQuery.$or = [
           { name: { $regex: search, $options: "i" } },
@@ -180,30 +181,35 @@ exports.getAllRestaurantDetails = async (req, res) => {
       }
     }
 
+    // Registration date filter
     if (regDate) {
       const startDate = new Date(regDate);
       const endDate = new Date(startDate);
       endDate.setDate(startDate.getDate() + 1);
       userQuery.created_at = { $gte: startDate, $lt: endDate };
+      debug("Registration date filter:", { startDate, endDate });
     }
 
+    // Last active filter
     if (["today", "week", "month"].includes(lastActive)) {
       const now = new Date();
       let dateFilter;
       if (lastActive === "today") {
-        dateFilter = new Date(now.setHours(0, 0, 0, 0));
+        dateFilter = startOfDay(now);
       } else if (lastActive === "week") {
-        dateFilter = new Date(now.setDate(now.getDate() - 7));
+        dateFilter = subDays(now, 7);
       } else if (lastActive === "month") {
-        dateFilter = new Date(now.setMonth(now.getMonth() - 1));
+        dateFilter = subMonths(now, 1);
       }
       const recentLogUserIds = await LoginLog.find({
         login_time: { $gte: dateFilter },
       }).distinct("user_id");
       userQuery._id =
         recentLogUserIds.length > 0 ? { $in: recentLogUserIds } : { $in: [] };
+      debug("Last active user IDs:", recentLogUserIds);
     }
 
+    // Main aggregation pipeline for restaurant details
     const pipeline = [
       { $match: userQuery },
       {
@@ -242,10 +248,78 @@ exports.getAllRestaurantDetails = async (req, res) => {
         },
       },
       {
+        $lookup: {
+          from: "transactions",
+          let: { user_id: "$_id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $or: [
+                    { $eq: ["$sender_id", "$$user_id"] },
+                    { $eq: ["$receiver_id", "$$user_id"] },
+                  ],
+                },
+              },
+            },
+            { $sort: { created_at: -1 } },
+            { $limit: 1 },
+            {
+              $lookup: {
+                from: "users",
+                localField: "sender_id",
+                foreignField: "_id",
+                as: "sender",
+              },
+            },
+            { $unwind: { path: "$sender", preserveNullAndEmptyArrays: true } },
+            {
+              $lookup: {
+                from: "roles",
+                localField: "sender.role_id",
+                foreignField: "_id",
+                as: "sender_role",
+              },
+            },
+            { $unwind: { path: "$sender_role", preserveNullAndEmptyArrays: true } },
+            {
+              $lookup: {
+                from: "users",
+                localField: "receiver_id",
+                foreignField: "_id",
+                as: "receiver",
+              },
+            },
+            { $unwind: { path: "$receiver", preserveNullAndEmptyArrays: true } },
+            {
+              $lookup: {
+                from: "roles",
+                localField: "receiver.role_id",
+                foreignField: "_id",
+                as: "receiver_role",
+              },
+            },
+            { $unwind: { path: "$receiver_role", preserveNullAndEmptyArrays: true } },
+            {
+              $project: {
+                sender_id: "$sender._id",
+                sender_name: "$sender.name",
+                sender_role_name: "$sender_role.name",
+                receiver_id: "$receiver._id",
+                receiver_name: "$receiver.name",
+                receiver_role_name: "$receiver_role.name",
+              },
+            },
+          ],
+          as: "transaction",
+        },
+      },
+      { $unwind: { path: "$transaction", preserveNullAndEmptyArrays: true } },
+      {
         $project: {
-          user_id: "$_id", // Rename _id to user_id
+          user_id: "$_id",
           name: 1,
-          is_flagged: 1, // Include this field from User
+          is_flagged: 1,
           restaurant_id: "$restaurant.restaurant_id",
           restaurant_name: "$restaurant.restaurant_name",
           category: "$location.city",
@@ -259,6 +333,12 @@ exports.getAllRestaurantDetails = async (req, res) => {
             ],
           },
           lastActive: { $max: "$loginLogs.login_time" },
+          sender_id: "$transaction.sender_id",
+          sender_name: "$transaction.sender_name",
+          sender_role_name: "$transaction.sender_role_name",
+          receiver_id: "$transaction.receiver_id",
+          receiver_name: "$transaction.receiver_name",
+          receiver_role_name: "$transaction.receiver_role_name",
         },
       },
     ];
@@ -282,6 +362,7 @@ exports.getAllRestaurantDetails = async (req, res) => {
     );
 
     const restaurants = await User.aggregate(pipeline);
+    debug("Aggregated restaurants:", restaurants.length);
 
     // Format data
     let formattedRestaurants = restaurants.map((r) => {
@@ -294,11 +375,11 @@ exports.getAllRestaurantDetails = async (req, res) => {
         if (diff < 5) lastActive = "Just now";
         else if (diff < 60) lastActive = `${Math.floor(diff)} mins ago`;
         else if (diff < 1440) lastActive = `${Math.floor(diff / 60)} hours ago`;
-        else lastActive = lastTime.toISOString().split("T")[0];
+        else lastActive = format(lastTime, "yyyy-MM-dd");
       }
 
       return {
-        user_id: r.user_id?.toString(), // renamed from _id
+        user_id: r.user_id?.toString(),
         id: r.restaurant_id,
         name: r.restaurant_name,
         category: r.category || "Unknown",
@@ -306,6 +387,12 @@ exports.getAllRestaurantDetails = async (req, res) => {
         status: r.status,
         lastActive,
         is_flagged: r.is_flagged || false,
+        sender_id: r.sender_id?.toString() || "Unknown",
+        sender_name: r.sender_name || "Unknown",
+        sender_role_name: r.sender_role_name || "Unknown",
+        receiver_id: r.receiver_id?.toString() || "Unknown",
+        receiver_name: r.receiver_name || "Unknown",
+        receiver_role_name: r.receiver_role_name || "Unknown",
       };
     });
 
@@ -341,7 +428,7 @@ exports.getAllRestaurantDetails = async (req, res) => {
     const statsResult = await User.aggregate(statsPipeline);
     const { totalRestaurants = 0, totalSales = 0 } = statsResult[0] || {};
 
-    // Online count (from already computed status)
+    // Online count
     const onlineCount = formattedRestaurants.filter(
       (r) => r.status === "Online"
     ).length;
@@ -354,11 +441,10 @@ exports.getAllRestaurantDetails = async (req, res) => {
       totalPages: Math.ceil(totalRestaurants / pageSizeNum),
     });
   } catch (error) {
-    console.error("Error in /api/restaurants:", error);
+    console.error("Error in getAllRestaurantDetails:", error);
     res.status(500).json({ error: "Server error", details: error.message });
   }
 };
-
 exports.getRestaurantDetails = async (req, res) => {
   try {
     const { restaurantId } = req.params;

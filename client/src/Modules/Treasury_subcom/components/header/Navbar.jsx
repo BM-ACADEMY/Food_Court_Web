@@ -19,7 +19,8 @@ import { Button } from "@/components/ui/button";
 import { ChevronsUpDown, LogOut, User, Save } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import axios from "axios";
-import { toast } from "react-toastify"; // Import toast
+import { toast } from "react-toastify"; // Import toast\
+import { useNavigate } from "react-router-dom";
 
 const TreasuryDashboardHeader = () => {
   const { user, setUser, logout } = useAuth();
@@ -27,6 +28,7 @@ const TreasuryDashboardHeader = () => {
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [editData, setEditData] = useState({});
   const [error, setError] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (user) {
@@ -39,6 +41,10 @@ const TreasuryDashboardHeader = () => {
       });
     }
   }, [user]);
+
+  const handleHome = () => {
+    navigate('/')
+  }
 
   const handleSave = async () => {
     console.log("handleSave: User ID:", user._id);
@@ -130,14 +136,14 @@ const TreasuryDashboardHeader = () => {
     <>
       <header className="w-full bg-[#000052] text-white px-6 py-4 flex items-center justify-between shadow-md">
         <div className="flex items-center gap-3">
-          <img src={Pegasus} alt="Pegasus Logo" className="w-10 h-10" />
+          <img src={Pegasus} alt="Pegasus Logo" className="w-10 h-10 cursor-pointer" onClick={handleHome} />
           <div>
-            <h1 className="text-base md:text-base font-bold tracking-wide">
+            <h1 className="text-base md:text-base font-bold tracking-wide cursor-pointer" onClick={handleHome}>
               PEGASUS 2K25
             </h1>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center text-sm md:text-xs font-medium text-white/80 hover:underline">
+                <button className="flex items-center text-sm md:text-xs font-medium text-white/80 hover:underline" >
                   {user.name}
                   <span className="ml-1 text-white/60">
                     ({user.role?.name || "User"})

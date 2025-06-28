@@ -96,6 +96,7 @@ export default function Dashboard() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState("xlsx");
   const itemsPerPage = 20; // Last 20 transactions
+  const [paymentMethod, setPaymentMethod] = useState("all");
 
   const totalPages = Math.ceil(totalRecords / itemsPerPage);
 
@@ -169,6 +170,7 @@ export default function Dashboard() {
         params: {
           transactionType: transactionType === "all" ? undefined : transactionType,
           userType: userType === "all" ? undefined : userType,
+           paymentMethod: paymentMethod === "all" ? undefined : paymentMethod,
           fromDate: fromDate ? format(fromDate, "yyyy-MM-dd") : undefined,
           toDate: toDate ? format(toDate, "yyyy-MM-dd") : undefined,
           page: currentPage,
@@ -185,23 +187,23 @@ export default function Dashboard() {
   };
 
   const fetchExportData = async () => {
-  try {
-    const response = await axios.get(`${API_BASE_URL}/dashboards/transactions`, {
-      params: {
-        transactionType: transactionType === "all" ? undefined : transactionType,
-        userType: userType === "all" ? undefined : userType,
-        fromDate: fromDate ? format(fromDate, "yyyy-MM-dd") : undefined,
-        toDate: toDate ? format(toDate, "yyyy-MM-dd") : undefined,
-        limit: 10000, // Large limit for exports
-        page: 1
-      }
-    });
-    return response.data.transactions || [];
-  } catch (error) {
-    console.error("Error fetching export data:", error);
-    throw error;
-  }
-};
+    try {
+      const response = await axios.get(`${API_BASE_URL}/dashboards/transactions`, {
+        params: {
+          transactionType: transactionType === "all" ? undefined : transactionType,
+          userType: userType === "all" ? undefined : userType,
+          fromDate: fromDate ? format(fromDate, "yyyy-MM-dd") : undefined,
+          toDate: toDate ? format(toDate, "yyyy-MM-dd") : undefined,
+          limit: 10000, // Large limit for exports
+          page: 1
+        }
+      });
+      return response.data.transactions || [];
+    } catch (error) {
+      console.error("Error fetching export data:", error);
+      throw error;
+    }
+  };
 
 
   useEffect(() => {
@@ -257,102 +259,102 @@ export default function Dashboard() {
     if (page >= 1 && page <= totalPages) setCurrentPage(page);
   };
 
- const exportToExcel = (data) => {
-  const formattedData = data.map((item) => ({
-    "Transaction ID": item.id || "N/A",
-    "Time": item.time || "N/A",
-    "Type": item.type || "N/A",
-    "From": item.from || "Unknown",
-    "To": item.to || "Unknown",
-    "Amount": item.amount || "₹0",
-    "Status": item.status || "N/A",
-  }));
+  const exportToExcel = (data) => {
+    const formattedData = data.map((item) => ({
+      "Transaction ID": item.id || "N/A",
+      "Time": item.time || "N/A",
+      "Type": item.type || "N/A",
+      "From": item.from || "Unknown",
+      "To": item.to || "Unknown",
+      "Amount": item.amount || "₹0",
+      "Status": item.status || "N/A",
+    }));
 
-  const ws = XLSX.utils.json_to_sheet(formattedData);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Transactions");
-  XLSX.writeFile(wb, `transactions_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
-};
+    const ws = XLSX.utils.json_to_sheet(formattedData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Transactions");
+    XLSX.writeFile(wb, `transactions_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+  };
 
-const exportToCSV = (data) => {
-  const formattedData = data.map((item) => ({
-    "Transaction ID": item.id || "N/A",
-    "Time": item.time || "N/A",
-    "Type": item.type || "N/A",
-    "From": item.from || "Unknown",
-    "To": item.to || "Unknown",
-    "Amount": item.amount || "₹0",
-    "Status": item.status || "N/A",
-  }));
+  const exportToCSV = (data) => {
+    const formattedData = data.map((item) => ({
+      "Transaction ID": item.id || "N/A",
+      "Time": item.time || "N/A",
+      "Type": item.type || "N/A",
+      "From": item.from || "Unknown",
+      "To": item.to || "Unknown",
+      "Amount": item.amount || "₹0",
+      "Status": item.status || "N/A",
+    }));
 
-  const ws = XLSX.utils.json_to_sheet(formattedData);
-  const csv = XLSX.utils.sheet_to_csv(ws);
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  saveAs(blob, `transactions_${format(new Date(), "yyyy-MM-dd")}.csv`);
-};
+    const ws = XLSX.utils.json_to_sheet(formattedData);
+    const csv = XLSX.utils.sheet_to_csv(ws);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    saveAs(blob, `transactions_${format(new Date(), "yyyy-MM-dd")}.csv`);
+  };
 
-const exportToPDF = (data) => {
-  const doc = new jsPDF();
-  
-  doc.setFontSize(16);
-  doc.text("Transaction Report", 14, 15);
-  
-  doc.setFontSize(10);
-  doc.text(`Generated on: ${format(new Date(), "yyyy-MM-dd HH:mm")}`, 14, 22);
-  
-  const tableData = data.map((item) => [
-    item.id || "N/A",
-    item.time || "N/A",
-    item.type || "N/A",
-    item.from || "Unknown",
-    item.to || "Unknown",
-    item.amount || "₹0",
-    item.status || "N/A",
-  ]);
+  const exportToPDF = (data) => {
+    const doc = new jsPDF();
 
-  autoTable(doc, {
-    startY: 30,
-    head: [["ID", "Time", "Type", "From", "To", "Amount", "Status"]],
-    body: tableData,
-    theme: "grid",
-    styles: { fontSize: 8 },
-    headStyles: { fillColor: [0, 0, 77] },
-  });
+    doc.setFontSize(16);
+    doc.text("Transaction Report", 14, 15);
 
-  doc.save(`transactions_${format(new Date(), "yyyy-MM-dd")}.pdf`);
-};
+    doc.setFontSize(10);
+    doc.text(`Generated on: ${format(new Date(), "yyyy-MM-dd HH:mm")}`, 14, 22);
+
+    const tableData = data.map((item) => [
+      item.id || "N/A",
+      item.time || "N/A",
+      item.type || "N/A",
+      item.from || "Unknown",
+      item.to || "Unknown",
+      item.amount || "₹0",
+      item.status || "N/A",
+    ]);
+
+    autoTable(doc, {
+      startY: 30,
+      head: [["ID", "Time", "Type", "From", "To", "Amount", "Status"]],
+      body: tableData,
+      theme: "grid",
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [0, 0, 77] },
+    });
+
+    doc.save(`transactions_${format(new Date(), "yyyy-MM-dd")}.pdf`);
+  };
 
   const handleExport = async () => {
-  try {
-    setIsLoading(true);
-    const data = await fetchExportData();
-    
-    if (!data || data.length === 0) {
-      alert("No data available to export");
-      return;
-    }
+    try {
+      setIsLoading(true);
+      const data = await fetchExportData();
 
-    switch (exportFormat) {
-      case "xlsx":
-        exportToExcel(data);
-        break;
-      case "csv":
-        exportToCSV(data);
-        break;
-      case "pdf":
-        exportToPDF(data);
-        break;
-      default:
-        console.error("Invalid export format");
+      if (!data || data.length === 0) {
+        alert("No data available to export");
+        return;
+      }
+
+      switch (exportFormat) {
+        case "xlsx":
+          exportToExcel(data);
+          break;
+        case "csv":
+          exportToCSV(data);
+          break;
+        case "pdf":
+          exportToPDF(data);
+          break;
+        default:
+          console.error("Invalid export format");
+      }
+    } catch (error) {
+      console.error("Export failed:", error);
+      alert("Export failed. Please try again.");
+    } finally {
+      setIsLoading(false);
+      setIsExportModalOpen(false);
     }
-  } catch (error) {
-    console.error("Export failed:", error);
-    alert("Export failed. Please try again.");
-  } finally {
-    setIsLoading(false);
-    setIsExportModalOpen(false);
-  }
-};
+  };
 
   return (
     <div className="p-6 space-y-6 font-sans">
@@ -479,6 +481,25 @@ const exportToPDF = (data) => {
                 </PopoverContent>
               </Popover>
             </div>
+            <div className="space-y-2 w-full sm:w-64">
+              <label className="text-sm font-medium text-gray-700">Payment Method</label>
+              <Select
+                value={paymentMethod}
+                onValueChange={(value) => setPaymentMethod(value)}
+              >
+                <SelectTrigger className="w-full h-10 text-sm">
+                  <SelectValue placeholder="Select Payment Method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="Cash">Cash</SelectItem>
+                  <SelectItem value="Gpay">Gpay</SelectItem>
+                  <SelectItem value="Mess bill">Mess bill</SelectItem>
+                  <SelectItem value="Balance Deduction">Balance Deduction</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
           </div>
 
           <div className="overflow-x-auto">
@@ -521,28 +542,34 @@ const exportToPDF = (data) => {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Avatar name={tx.from} />
-                        <span>{tx.from || "Unknown"}</span>
+                        <div className="flex flex-col gap-1">
+                          <span>{tx.from || "Unknown"}</span>
+                          <span className="text-gray-600 text-[12px]">({tx.fromRoleName || "Unknown"})</span>
+                        </div>
                       </div>
                     </TableCell>
 
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Avatar name={tx.to} />
-                        <span>{tx.to || "Unknown"}</span>
+                        <div className="flex flex-col gap-1">
+                          <span>{tx.to || "Unknown"}</span>
+                          <span className="text-gray-600 text-[12px]">({tx.toRoleName || "Unknown"})</span>
+                        </div>
                       </div>
                     </TableCell>
 
                     <TableCell>
                       <span
                         className={`font-semibold ${tx.type === "Credit"
-                            ? "text-green-600"
-                            : tx.type === "TopUp"
-                              ? "text-purple-600"
-                              : tx.type === "Refund"
-                                ? "text-yellow-600"
-                                : tx.type === "Transfer"
-                                  ? "text-blue-600"
-                                  : "text-gray-600"
+                          ? "text-green-600"
+                          : tx.type === "TopUp"
+                            ? "text-purple-600"
+                            : tx.type === "Refund"
+                              ? "text-yellow-600"
+                              : tx.type === "Transfer"
+                                ? "text-blue-600"
+                                : "text-gray-600"
                           }`}
                       >
                         {tx.amount || "₹0"}
@@ -729,41 +756,41 @@ const exportToPDF = (data) => {
       </div>
 
       <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>
-    <DialogContent>
-      <DialogHeader>
-        <DialogTitle>Export Transactions</DialogTitle>
-      </DialogHeader>
-      <div className="py-4">
-        <Label className="text-sm font-medium">Select Export Format</Label>
-        <RadioGroup 
-          value={exportFormat} 
-          onValueChange={setExportFormat} 
-          className="mt-2"
-        >
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="xlsx" id="xlsx" />
-            <Label htmlFor="xlsx">Excel (xlsx)</Label>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Export Transactions</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <Label className="text-sm font-medium">Select Export Format</Label>
+            <RadioGroup
+              value={exportFormat}
+              onValueChange={setExportFormat}
+              className="mt-2"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="xlsx" id="xlsx" />
+                <Label htmlFor="xlsx">Excel (xlsx)</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="csv" id="csv" />
+                <Label htmlFor="csv">CSV</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="pdf" id="pdf" />
+                <Label htmlFor="pdf">PDF</Label>
+              </div>
+            </RadioGroup>
           </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="csv" id="csv" />
-            <Label htmlFor="csv">CSV</Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="pdf" id="pdf" />
-            <Label htmlFor="pdf">PDF</Label>
-          </div>
-        </RadioGroup>
-      </div>
-      <DialogFooter>
-        <Button variant="outline" onClick={() => setIsExportModalOpen(false)}>
-          Cancel
-        </Button>
-        <Button onClick={handleExport} disabled={isLoading}>
-          {isLoading ? "Exporting..." : "Export"}
-        </Button>
-      </DialogFooter>
-    </DialogContent>
-  </Dialog>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsExportModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleExport} disabled={isLoading}>
+              {isLoading ? "Exporting..." : "Export"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -229,9 +229,9 @@ const TreasurySubcomDetailsModal = ({ subcom, isOpen, onClose }) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-full max-w-[95vw] sm:max-w-[90vw] md:max-w-4xl lg:max-w-6xl p-4 sm:p-6">
+     <DialogContent className="max-w-[95vw] sm:max-w-[90vw] md:max-w-2xl lg:max-w-4xl xl:max-w-6xl w-full h-[90vh] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-lg sm:text-xl">Treasury Subcom Details - #{subcomData?.id}</DialogTitle>
+<DialogTitle className="text-lg sm:text-xl">Treasury Subcom Details - #{subcomData?.id}</DialogTitle>
         </DialogHeader>
         <Tabs defaultValue="info" className="w-full">
           <TabsList className="flex flex-col sm:flex-row w-full gap-2 mb-4">
@@ -241,7 +241,7 @@ const TreasurySubcomDetailsModal = ({ subcom, isOpen, onClose }) => {
 
           {/* User Information Tab */}
           <TabsContent value="info" className="space-y-4 overflow-y-hidden">
-            <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-4 mb-4">
+           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
               <Avatar className="h-12 w-12 sm:h-16 sm:w-16">
                 <AvatarImage src={subcomData.avatar || undefined} />
                 <AvatarFallback className="bg-blue-700 text-white text-sm sm:text-base">
@@ -347,7 +347,7 @@ const TreasurySubcomDetailsModal = ({ subcom, isOpen, onClose }) => {
             {/* Filters */}
             <div className="flex flex-col sm:flex-row sm:justify-end gap-3 mb-4">
               <Select value={filter} onValueChange={setFilter}>
-                <SelectTrigger className="w-full sm:w-[160px] text-xs sm:text-sm">
+                <SelectTrigger className="w-[150px] sm:w-[180px]">
                   <SelectValue placeholder="Filter transactions" />
                 </SelectTrigger>
                 <SelectContent>
@@ -398,7 +398,7 @@ const TreasurySubcomDetailsModal = ({ subcom, isOpen, onClose }) => {
               <>
                 <div className="overflow-y-auto min-h-[200px]">
                   {/* Mobile View: Card-like layout */}
-                  <div className="sm:hidden flex flex-col gap-4">
+                  {/* <div className="sm:hidden flex flex-col gap-4">
                     {currentTransactions.map((transaction) => (
                       <div key={transaction.id} className="border rounded-lg p-4 bg-white shadow-sm">
                         <div className="flex flex-col gap-2">
@@ -437,10 +437,10 @@ const TreasurySubcomDetailsModal = ({ subcom, isOpen, onClose }) => {
                         </div>
                       </div>
                     ))}
-                  </div>
+                  </div> */}
 
                   {/* Desktop View: Table layout */}
-                  <Table className="hidden sm:table min-w-[600px] text-xs sm:text-sm">
+                 <Table className="min-w-[600px] sm:min-w-[800px] md:min-w-full table-fixed">
                     <TableHeader>
                       <TableRow>
                         <TableHead className="whitespace-nowrap">Transaction ID</TableHead>

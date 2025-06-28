@@ -8,7 +8,7 @@ const Admin =require('../model/adminModel');
 const TreasurySubcom=require('../model/treasurySubcomModel')
 const User = require("../model/userModel");
 const Customer = require("../model/customerModel");
-
+const { getIO } = require("../config/socket");
 
 
 
@@ -277,6 +277,13 @@ exports.processPayment = async (req, res) => {
     console.log("Updated receiver balance:", updatedReceiverBalance.balance);
 
     await session.commitTransaction();
+
+      const io = getIO();
+    io.to(receiver_id.toString()).emit("newTransaction", {
+      transaction,
+      balance: updatedReceiverBalance?.balance,
+    });
+
     res.status(200).json({
       success: true,
       message: `Payment successful! New customer balance: ₹${(senderBalanceAmount - deductAmount).toFixed(2)}`,
@@ -361,23 +368,56 @@ exports.getAllTransactions = async (req, res) => {
 
 exports.getAllRecentTransaction = async (req, res) => {
   try {
+    const debug =
+      process.env.NODE_ENV !== "production" ? console.log : () => {};
+    debug("Fetching recent transactions...");
+
     const transactions = await Transaction.find()
-
-      .sort({ created_at: -1 }) 
-      .limit(5)              
-      .populate("sender_id", "name phone_number")   
-      .populate("receiver_id", "name phone_number") 
-      // .populate("location_id", "name")
-
       .sort({ created_at: -1 })
       .limit(5)
-      .populate("sender_id", "name phone_number")
-      .populate("receiver_id", "name phone_number")
-
+      .populate({
+        path: "sender_id",
+        select: "name phone_number role_id",
+        populate: {
+          path: "role_id",
+          model: "Role",
+          select: "name _id",
+        },
+      })
+      .populate({
+        path: "receiver_id",
+        select: "name phone_number role_id",
+        populate: {
+          path: "role_id",
+          model: "Role",
+          select: "name _id",
+        },
+      })
       .populate("edited_by_id", "name");
 
-    res.status(200).json({ success: true, data: transactions });
+    debug("Raw transactions:", transactions);
+
+    // Format the response to handle null/undefined values
+    const formattedTransactions = transactions.map((transaction) => ({
+      ...transaction.toObject(),
+      sender_id: transaction.sender_id?._id?.toString() || "Unknown",
+      sender_name: transaction.sender_id?.name || "Unknown",
+      sender_phone: transaction.sender_id?.phone_number || "Unknown",
+      sender_role: transaction.sender_id?.role_id?.name || "Unknown",
+      sender_role_id: transaction.sender_id?.role_id?._id?.toString() || "Unknown",
+      receiver_id: transaction.receiver_id?._id?.toString() || "Unknown",
+      receiver_name: transaction.receiver_id?.name || "Unknown",
+      receiver_phone: transaction.receiver_id?.phone_number || "Unknown",
+      receiver_role: transaction.receiver_id?.role_id?.name || "Unknown",
+      receiver_role_id: transaction.receiver_id?.role_id?._id?.toString() || "Unknown",
+      edited_by_name: transaction.edited_by_id?.name || "Unknown",
+    }));
+
+    debug("Formatted transactions:", formattedTransactions);
+
+    res.status(200).json({ success: true, data: formattedTransactions });
   } catch (err) {
+    console.error("Error in getAllRecentTransaction:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
@@ -780,12 +820,17 @@ const buildDateFilter = (quickFilter, fromDate, toDate) => {
   return filter;
 };
 
+
+
 exports.getTransactionHistory = async (req, res) => {
   try {
     const {
       transactionType = "all",
       userType = "all",
       location = "all",
+      paymentMethod = "all",
+      sortBy = "date", // New: default to sort by date
+      sortOrder = "desc", // New: default to descending
       fromDate,
       toDate,
       quickFilter,
@@ -807,13 +852,27 @@ exports.getTransactionHistory = async (req, res) => {
       filter.location_id = mongoose.Types.ObjectId.createFromHexString(location);
     }
 
+    // Payment method filter with validation
+    if (paymentMethod !== "all") {
+      const validPaymentMethods = ["Cash", "Gpay", "Mess bill", "Balance Deduction"];
+      if (!validPaymentMethods.includes(paymentMethod)) {
+        return res.status(400).json({
+          error: `Invalid payment method: ${paymentMethod}. Must be one of: ${validPaymentMethods.join(", ")}`,
+        });
+      }
+      filter.payment_method = paymentMethod;
+    } else {
+      filter.payment_method = { $in: ["Cash", "Gpay", "Mess bill", "Balance Deduction", null, undefined] };
+    }
+
     // Date filter
     const dateFilter = buildDateFilter(quickFilter, fromDate, toDate);
     if (dateFilter.created_at) {
-      filter = { ...filter, ...dateFilter };
+      filter.created_at = dateFilter.created_at;
     }
 
-    // User type filter
+    // User type and search filters
+    const userFilters = [];
     if (userType !== "all") {
       const role = await Role.findOne({ name: userType });
       if (!role) {
@@ -821,14 +880,14 @@ exports.getTransactionHistory = async (req, res) => {
       }
       const usersWithRole = await User.find({ role_id: role._id }).select("_id");
       const userIds = usersWithRole.map((user) => user._id);
-      filter.$or = [
-        { sender_id: { $in: userIds } },
-        { receiver_id: { $in: userIds } },
-      ];
+      userFilters.push({
+        $or: [
+          { sender_id: { $in: userIds } },
+          { receiver_id: { $in: userIds } },
+        ],
+      });
     }
 
-    // Search by name or phone number
-    let userIds = [];
     if (search.trim()) {
       const users = await User.find({
         $or: [
@@ -836,12 +895,38 @@ exports.getTransactionHistory = async (req, res) => {
           { phone_number: { $regex: search, $options: "i" } },
         ],
       }).select("_id");
-      userIds = users.map((user) => user._id);
-      filter.$or = [
-        { sender_id: { $in: userIds } },
-        { receiver_id: { $in: userIds } },
-      ];
+      const userIds = users.map((user) => user._id);
+      userFilters.push({
+        $or: [
+          { sender_id: { $in: userIds } },
+          { receiver_id: { $in: userIds } },
+        ],
+      });
     }
+
+    if (userFilters.length > 0) {
+      filter.$and = userFilters;
+    }
+
+    // Sort validation and mapping
+    const validSortFields = {
+      date: "created_at",
+      amount: "amount",
+    };
+    const validSortOrders = ["asc", "desc"];
+    if (!validSortFields[sortBy]) {
+      return res.status(400).json({
+        error: `Invalid sortBy field: ${sortBy}. Must be one of: ${Object.keys(validSortFields).join(", ")}`,
+      });
+    }
+    if (!validSortOrders.includes(sortOrder)) {
+      return res.status(400).json({
+        error: `Invalid sortOrder: ${sortOrder}. Must be one of: ${validSortOrders.join(", ")}`,
+      });
+    }
+    const sortField = validSortFields[sortBy];
+    const sortDirection = sortOrder === "asc" ? 1 : -1;
+    const sort = { [sortField]: sortDirection };
 
     // Pagination
     const skip = (page - 1) * limit;
@@ -858,6 +943,7 @@ exports.getTransactionHistory = async (req, res) => {
         select: "name phone_number role_id",
         populate: { path: "role_id", select: "name" },
       })
+      .sort(sort)
       .skip(skip)
       .limit(parseInt(limit))
       .lean();
@@ -1079,6 +1165,7 @@ exports.getTransactionHistory = async (req, res) => {
       description: txn.remarks || `${txn.transaction_type} transaction`,
       location: txn.location_id?.name || "Unknown",
       amount: parseFloat(txn.amount),
+      paymentMethod: txn.payment_method || "Unknown",
     }));
 
     // Format statistics
@@ -1114,10 +1201,9 @@ exports.getTransactionHistory = async (req, res) => {
     });
   } catch (error) {
     console.error("Error in getTransactionHistory:", error);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "Internal server error", details: error.message });
   }
 };
-
 exports.getTransactionTreasuryRestaurantHistory = async (req, res) => {
   try {
     const {
@@ -1443,109 +1529,109 @@ exports.getTransactionHistoryByUserId = async (req, res) => {
   }
 };
 
-exports.exportTransactionHistoryByUserId = async (req, res) => {
-  try {
-    const {
-      search = "",
-      quickFilter,
-      fromDate,
-      toDate,
-    } = req.query;
-    const { userId } = req.params;
+// exports.exportTransactionHistoryByUserId = async (req, res) => {
+//   try {
+//     const {
+//       search = "",
+//       quickFilter,
+//       fromDate,
+//       toDate,
+//     } = req.query;
+//     const { userId } = req.params;
 
-    // Validate userId
-    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
-      console.error("Invalid userId received:", userId);
-      return res.status(400).json({ success: false, message: "Invalid or missing userId" });
-    }
+//     // Validate userId
+//     if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+//       console.error("Invalid userId received:", userId);
+//       return res.status(400).json({ success: false, message: "Invalid or missing userId" });
+//     }
 
-    // Build filter object
-    let filter = {
-      status: "Success",
-      $or: [
-        { sender_id: mongoose.Types.ObjectId.createFromHexString(userId) },
-        { receiver_id: mongoose.Types.ObjectId.createFromHexString(userId) },
-      ],
-    };
+//     // Build filter object
+//     let filter = {
+//       status: "Success",
+//       $or: [
+//         { sender_id: mongoose.Types.ObjectId.createFromHexString(userId) },
+//         { receiver_id: mongoose.Types.ObjectId.createFromHexString(userId) },
+//       ],
+//     };
 
-    // Date filter
-    const dateFilter = buildDateFilter(quickFilter, fromDate, toDate);
-    if (dateFilter.created_at) {
-      filter = { ...filter, ...dateFilter };
-    }
+//     // Date filter
+//     const dateFilter = buildDateFilter(quickFilter, fromDate, toDate);
+//     if (dateFilter.created_at) {
+//       filter = { ...filter, ...dateFilter };
+//     }
 
-    // Search filter
-    if (search.trim()) {
-      const users = await User.find({
-        $or: [
-          { name: { $regex: search, $options: "i" } },
-          { phone_number: { $regex: search, $options: "i" } },
-        ],
-      }).select("_id");
-      const userIds = users.map((user) => user._id);
-      filter.$or = [
-        { sender_id: { $in: userIds } },
-        { receiver_id: { $in: userIds } },
-      ];
-    }
+//     // Search filter
+//     if (search.trim()) {
+//       const users = await User.find({
+//         $or: [
+//           { name: { $regex: search, $options: "i" } },
+//           { phone_number: { $regex: search, $options: "i" } },
+//         ],
+//       }).select("_id");
+//       const userIds = users.map((user) => user._id);
+//       filter.$or = [
+//         { sender_id: { $in: userIds } },
+//         { receiver_id: { $in: userIds } },
+//       ];
+//     }
 
-    // Fetch all transactions (no pagination)
-    const transactions = await Transaction.find(filter)
-      .populate({
-        path: "sender_id",
-        select: "name phone_number role_id",
-        populate: { path: "role_id", select: "name" },
-      })
-      .populate({
-        path: "receiver_id",
-        select: "name phone_number role_id",
-        populate: { path: "role_id", select: "name" },
-      })
-      .lean();
+//     // Fetch all transactions (no pagination)
+//     const transactions = await Transaction.find(filter)
+//       .populate({
+//         path: "sender_id",
+//         select: "name phone_number role_id",
+//         populate: { path: "role_id", select: "name" },
+//       })
+//       .populate({
+//         path: "receiver_id",
+//         select: "name phone_number role_id",
+//         populate: { path: "role_id", select: "name" },
+//       })
+//       .lean();
 
-    // Format transactions
-    const formattedTransactions = await Promise.all(
-      transactions.map(async (txn) => {
-        let user = txn.sender_id;
-        let amount = parseFloat(txn.amount);
-        let customer_id = "N/A";
+//     // Format transactions
+//     const formattedTransactions = await Promise.all(
+//       transactions.map(async (txn) => {
+//         let user = txn.sender_id;
+//         let amount = parseFloat(txn.amount);
+//         let customer_id = "N/A";
 
-        // Determine if the logged-in user is sender or receiver
-        if (txn.receiver_id._id.toString() === userId) {
-          user = txn.receiver_id;
-          amount = amount; // Incoming
-        } else if (txn.sender_id._id.toString() === userId) {
-          amount = -amount; // Outgoing
-        }
+//         // Determine if the logged-in user is sender or receiver
+//         if (txn.receiver_id._id.toString() === userId) {
+//           user = txn.receiver_id;
+//           amount = amount; // Incoming
+//         } else if (txn.sender_id._id.toString() === userId) {
+//           amount = -amount; // Outgoing
+//         }
 
-        // Fetch customer_id
-        const customer = await Customer.findOne({ user_id: user._id }).select("customer_id").lean();
-        customer_id = customer?.customer_id || `CUST${txn.transaction_id.slice(-3)}`;
+//         // Fetch customer_id
+//         const customer = await Customer.findOne({ user_id: user._id }).select("customer_id").lean();
+//         customer_id = customer?.customer_id || `CUST${txn.transaction_id.slice(-3)}`;
 
-        return {
-          id: txn.transaction_id,
-          user: {
-            name: user.name || "Unknown",
-            type: user.role_id?.name || "Unknown",
-          },
-          customer_id,
-          amount,
-          datetime: txn.created_at,
-          status: txn.status,
-        };
-      })
-    );
+//         return {
+//           id: txn.transaction_id,
+//           user: {
+//             name: user.name || "Unknown",
+//             type: user.role_id?.name || "Unknown",
+//           },
+//           customer_id,
+//           amount,
+//           datetime: txn.created_at,
+//           status: txn.status,
+//         };
+//       })
+//     );
 
-    // Send response
-    res.status(200).json({
-      success: true,
-      transactions: formattedTransactions,
-    });
-  } catch (error) {
-    console.error("Error in exportTransactionHistoryByUserId:", error);
-    res.status(500).json({ success: false, message: "Internal server error" });
-  }
-};
+//     // Send response
+//     res.status(200).json({
+//       success: true,
+//       transactions: formattedTransactions,
+//     });
+//   } catch (error) {
+//     console.error("Error in exportTransactionHistoryByUserId:", error);
+//     res.status(500).json({ success: false, message: "Internal server error" });
+//   }
+// };
 
 exports.getUserTransactionHistory = async (req, res) => {
   try {
@@ -1845,3 +1931,147 @@ exports.getTransactionTreasuryRestaurantHistory = async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 };
+exports.exportTransactionHistoryByUserId = async (req, res) => {
+  try {
+    const { search = "", quickFilter, fromDate, toDate } = req.query;
+    const { userId } = req.params;
+
+    // Validate userId
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      console.error("Invalid userId received:", userId);
+      return res.status(400).json({ success: false, message: "Invalid or missing userId" });
+    }
+
+    // Build filter object
+    let filter = {
+      status: "Success",
+      $or: [
+        { sender_id: new mongoose.Types.ObjectId(userId) },
+        { receiver_id: new mongoose.Types.ObjectId(userId) },
+      ],
+    };
+
+    // Apply date filter
+    const dateFilter = buildDateFilter(quickFilter, fromDate, toDate);
+    if (dateFilter.created_at) {
+      filter = { ...filter, ...dateFilter };
+    }
+
+    // Apply search filter
+    if (search.trim()) {
+      try {
+        const users = await User.find({
+          $or: [
+            { name: { $regex: search, $options: "i" } },
+            { phone_number: { $regex: search, $options: "i" } },
+          ],
+        }).select("_id");
+        const userIds = users.map((user) => user._id);
+        if (userIds.length === 0) {
+          console.log(`No users found for search term: ${search}`);
+          return res.status(200).json({ success: true, transactions: [] });
+        }
+        filter.$or = [
+          { sender_id: { $in: userIds } },
+          { receiver_id: { $in: userIds } },
+        ];
+      } catch (searchError) {
+        console.error("Search query error:", searchError.message, searchError.stack);
+        return res.status(500).json({
+          success: false,
+          message: "Failed to process search query",
+          error: searchError.message,
+        });
+      }
+    }
+
+    console.log("Export filter:", JSON.stringify(filter, null, 2));
+
+    // Fetch transactions with error handling
+    let transactions;
+    try {
+      transactions = await Transaction.find(filter)
+        .populate({
+          path: "sender_id",
+          select: "name phone_number role_id",
+          populate: { path: "role_id", select: "name" },
+        })
+        .populate({
+          path: "receiver_id",
+          select: "name phone_number role_id",
+          populate: { path: "role_id", select: "name" },
+        })
+        .lean();
+      console.log(`Fetched ${transactions.length} transactions for userId: ${userId}`);
+    } catch (dbError) {
+      console.error("Database query error:", dbError.message, dbError.stack);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to fetch transactions",
+        error: dbError.message,
+      });
+    }
+
+    if (!transactions || transactions.length === 0) {
+      console.log(`No transactions found for userId: ${userId}`);
+      return res.status(200).json({ success: true, transactions: [] });
+    }
+
+    // Format transactions with robust error handling
+    const formattedTransactions = await Promise.all(
+      transactions.map(async (txn) => {
+        let user = txn.sender_id || {};
+        let amount = parseFloat(txn.amount) || 0;
+        let customer_id = "N/A";
+
+        // Determine if the logged-in user is sender or receiver
+        const isReceiver = txn.receiver_id?._id?.toString() === userId;
+        const isSender = txn.sender_id?._id?.toString() === userId;
+
+        if (isReceiver) {
+          user = txn.receiver_id || {};
+          amount = amount; // Incoming
+        } else if (isSender) {
+          amount = -amount; // Outgoing
+        }
+
+        // Fetch customer_id
+        try {
+          if (user._id) {
+            const customer = await Customer.findOne({ user_id: user._id }).select("customer_id").lean();
+            customer_id = customer?.customer_id || `CUST${txn.transaction_id?.slice(-3) || "000"}`;
+          } else {
+            console.warn(`No valid user._id for transaction ${txn.transaction_id || "N/A"}`);
+            customer_id = `CUST${txn.transaction_id?.slice(-3) || "000"}`;
+          }
+        } catch (customerErr) {
+          console.warn(`Failed to fetch customer_id for user ${user._id || "unknown"} in transaction ${txn.transaction_id || "N/A"}:`, customerErr.message);
+          customer_id = `CUST${txn.transaction_id?.slice(-3) || "000"}`;
+        }
+
+        return {
+          id: txn.transaction_id || "N/A",
+          user: {
+            name: user.name || "Unknown",
+            type: user.role_id?.name || "Unknown",
+          },
+          customer_id,
+          amount,
+          datetime: txn.created_at || new Date(),
+          status: txn.status || "N/A",
+        };
+      })
+    );
+
+    console.log(`Exported ${formattedTransactions.length} transactions for userId: ${userId}`);
+    return res.status(200).json({ success: true, transactions: formattedTransactions });
+  } catch (error) {
+    console.error("Error in exportTransactionHistoryByUserId:", error.message, error.stack);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+

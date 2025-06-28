@@ -30,7 +30,7 @@ const gradientPool = [
 // Single icon for all restaurants
 const restaurantIcon = <ShoppingCart size={48} />;
 
-const FoodStalls = () => {
+const FoodStalls = ({ handlePayNow }) => {
   const [search, setSearch] = useState("");
   const [restaurants, setRestaurants] = useState([]);
   const [amount, setAmount] = useState("");
@@ -41,6 +41,7 @@ const FoodStalls = () => {
   const [resultMessage, setResultMessage] = useState("");
   const [isSuccess, setIsSuccess] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false); // Prevent multiple submissions
   const [error, setError] = useState(null);
   const { user, loading: authLoading } = useAuth();
 
@@ -82,7 +83,7 @@ const FoodStalls = () => {
     return restaurants.map((restaurant, index) => ({
       ...restaurant,
       gradient: gradientPool[index % gradientPool.length],
-      icon: restaurantIcon, // Use single icon
+      icon: restaurantIcon,
     }));
   }, [restaurants]);
 
@@ -117,89 +118,72 @@ const FoodStalls = () => {
     setShowPaymentDialog(true);
   };
 
-  // Handle payment submission
+  // Handle payment submission (adapted from QrScanner's handlePaymentSubmit)
   const handlePayment = async () => {
+    if (!user || user.role?.role_id !== "role-5" || !user._id) {
+      setResultMessage("Please log in as a customer to make payments.");
+      setIsSuccess(false);
+      setShowResultDialog(true);
+      setShowPaymentDialog(false);
+      return;
+    }
+
     if (!selectedRestaurant?.user_id) {
       setResultMessage("Invalid restaurant selected.");
       setIsSuccess(false);
       setShowResultDialog(true);
+      setShowPaymentDialog(false);
       return;
     }
 
     const paymentAmount = parseFloat(amount);
-    if (isNaN(paymentAmount) || paymentAmount <= 0) {
-      setResultMessage("Please enter a valid amount greater than 0.");
+    if (isNaN(paymentAmount) || paymentAmount <= 0 || !/^\d*\.?\d{0,2}$/.test(amount)) {
+      setResultMessage("Please enter a valid amount greater than 0 (e.g., 10.00).");
       setIsSuccess(false);
       setShowResultDialog(true);
       return;
     }
 
-    try {
-      const customerBalanceResponse = await axios.get(
-        `${import.meta.env.VITE_BASE_URL}/user-balance/fetch-balance-by-id/${user._id}`,
-        { withCredentials: true }
-      );
-      const customerBalance = parseFloat(customerBalanceResponse.data.data.balance || "0.00");
-      if (paymentAmount > customerBalance) {
-        setResultMessage(`Insufficient balance. Current balance: ₹${customerBalance.toFixed(2)}`);
-        setIsSuccess(false);
-        setShowResultDialog(true);
-        return;
-      }
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
+    try {
       const formattedAmount = paymentAmount.toFixed(2);
-      const transactionPayload = {
+      console.log("Initiating payment:", {
+        amount: formattedAmount,
         sender_id: user._id,
         receiver_id: selectedRestaurant.user_id,
-        amount: formattedAmount,
-        transaction_type: "Transfer",
-        payment_method: "Gpay",
-        status: "Success",
-        remarks: `Payment from ${user.name} to ${selectedRestaurant.restaurant_name}`,
-      };
+      });
 
-      await axios.post(
-        `${import.meta.env.VITE_BASE_URL}/transactions/create-transaction`,
-        transactionPayload,
-        { withCredentials: true }
-      );
-
-      const newCustomerBalance = (customerBalance - paymentAmount).toFixed(2);
-      await axios.post(
-        `${import.meta.env.VITE_BASE_URL}/user-balance/create-or-update-balance`,
+      const response = await axios.post(
+        `${import.meta.env.VITE_BASE_URL}/transactions/process-payment`,
         {
-          user_id: user._id,
-          balance: newCustomerBalance,
+          sender_id: user._id,
+          receiver_id: selectedRestaurant.user_id,
+          amount: formattedAmount,
+          transaction_type: "Transfer",
+          payment_method: "Gpay",
+          status: "Success",
+          remarks: `Payment from ${user.name} to ${selectedRestaurant.restaurant_name}`,
         },
         { withCredentials: true }
       );
 
-      const restaurantBalanceResponse = await axios.get(
-        `${import.meta.env.VITE_BASE_URL}/user-balance/fetch-balance-by-id/${selectedRestaurant.user_id}`,
-        { withCredentials: true }
-      );
-      const currentRestaurantBalance = parseFloat(restaurantBalanceResponse.data.data.balance || "0.00");
-      const newRestaurantBalance = (currentRestaurantBalance + paymentAmount).toFixed(2);
-      await axios.post(
-        `${import.meta.env.VITE_BASE_URL}/user-balance/create-or-update-balance`,
-        {
-          user_id: selectedRestaurant.user_id,
-          balance: newRestaurantBalance,
-        },
-        { withCredentials: true }
-      );
-
-      setAmount("");
+      console.log("Payment response:", response.data);
       setShowPaymentDialog(false);
-      setResultMessage(`Payment successful! Amount: ₹${formattedAmount} to ${selectedRestaurant.restaurant_name}`);
+      setResultMessage(
+        `You have successfully sent ₹${formattedAmount} to ${selectedRestaurant.restaurant_name}. New balance: ₹${response.data.senderBalance.balance}`
+      );
       setIsSuccess(true);
       setShowResultDialog(true);
+      setAmount(""); // Reset amount
     } catch (err) {
-      console.error("Payment error:", err.response?.data, err.message);
-      const errorMessage = err.response?.data?.message || "Failed to process payment. Please try again.";
-      setResultMessage(`Error: ${errorMessage}`);
+      console.error("Payment failed:", err.response?.data || err.message);
+      setResultMessage(err.response?.data?.message || "Payment failed. Please try again.");
       setIsSuccess(false);
       setShowResultDialog(true);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -259,7 +243,7 @@ const FoodStalls = () => {
         <div className="flex flex-col items-center justify-center text-center text-gray-500 py-12">
           <Search className="w-12 h-12 mb-4 text-gray-400" />
           <p className="text-lg font-semibold">No restaurants found</p>
-          <p className="text-sm">Try a Productionsdifferent search term or check back later.</p>
+          <p className="text-sm">Try a different search term or check back later.</p>
         </div>
       )}
 
@@ -345,7 +329,7 @@ const FoodStalls = () => {
               <Input
                 id="paymentAmount"
                 type="number"
-                min="0"
+                min="0.01"
                 step="0.01"
                 className="h-10 px-3 text-sm rounded-lg border-gray-300 focus:ring-2 focus:ring-[#00004d]"
                 placeholder="Enter amount"
@@ -364,9 +348,9 @@ const FoodStalls = () => {
             <Button
               onClick={handlePayment}
               className="w-full sm:w-auto bg-[#000066] hover:bg-[#000080] text-white transition-colors"
-              disabled={!amount || !user || user.role?.role_id !== "role-5"}
+              disabled={!amount || !user || user.role?.role_id !== "role-5" || isSubmitting}
             >
-              Pay Now
+              {isSubmitting ? "Processing..." : "Pay Now"}
             </Button>
           </DialogFooter>
         </DialogContent>

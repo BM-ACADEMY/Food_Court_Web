@@ -362,12 +362,13 @@ export default function AdminList() {
               <Download className="mr-2 h-4 w-4" /> Export List
             </Button>
           </div>
-          <div className="overflow-x-auto">
-            <Table>
+          <div className="w-full overflow-x-auto">
+            <Table className="min-w-[1000px]"> {/* enforce min width */}
               <TableHeader>
                 <TableRow>
                   <TableHead>Admin ID</TableHead>
-                  <TableHead>Name</TableHead>
+                  <TableHead>Sender Name</TableHead>
+                  <TableHead>Receiver Name</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Balance</TableHead>
                   <TableHead>Status</TableHead>
@@ -378,7 +379,7 @@ export default function AdminList() {
               <TableBody>
                 {admins.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center">
+                    <TableCell colSpan={8} className="text-center">
                       No admins found
                     </TableCell>
                   </TableRow>
@@ -386,31 +387,48 @@ export default function AdminList() {
                   admins.map((admin) => (
                     <TableRow key={admin.id}>
                       <TableCell className="font-medium">#{admin.id}</TableCell>
-                      <TableCell className="flex items-center gap-2">
-                        <Avatar name={admin.name} />
-                        <span className="font-medium">{admin.name}</span>
+
+                      {/* Sender Name */}
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Avatar name={admin.sender_name} />
+                          <div className="flex flex-col">
+                            <span className="font-medium">{admin.sender_name}</span>
+                            <span className="text-xs text-gray-500">{admin.sender_role_name}</span>
+                          </div>
+                        </div>
+                      </TableCell>
+
+                      {/* Receiver Name */}
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Avatar name={admin.receiver_name} />
+                          <div className="flex flex-col">
+                            <span className="font-medium">{admin.receiver_name}</span>
+                            <span className="text-xs text-gray-500">{admin.receiver_role_name}</span>
+                          </div>
+                        </div>
                       </TableCell>
 
                       <TableCell>{admin.phone}</TableCell>
                       <TableCell>
                         <span
                           className={`font-medium ${admin.balance > 10000
-                            ? "text-green-600"
-                            : admin.balance > 0
-                              ? "text-yellow-600"
-                              : "text-red-600"
+                              ? "text-green-600"
+                              : admin.balance > 0
+                                ? "text-yellow-600"
+                                : "text-red-600"
                             }`}
                         >
                           ₹{admin.balance.toLocaleString()}
                         </span>
                       </TableCell>
-
                       <TableCell>
                         <Badge
                           variant="ghost"
                           className={`text-white ${admin.status.toLowerCase() === "online"
-                            ? "bg-green-500"
-                            : "bg-red-500"
+                              ? "bg-green-500"
+                              : "bg-red-500"
                             }`}
                         >
                           {admin.status}
@@ -425,13 +443,6 @@ export default function AdminList() {
                         >
                           <Eye className="mr-1 h-4 w-4" /> View
                         </Button>
-                        {/* <Button
-                          variant="link"
-                          className="text-green-600 p-0 h-auto text-sm"
-                          onClick={() => handleTransactionEdit(admin)}
-                        >
-                          <Pencil className="mr-1 h-4 w-4" /> Edit
-                        </Button> */}
                       </TableCell>
                     </TableRow>
                   ))
@@ -439,6 +450,7 @@ export default function AdminList() {
               </TableBody>
             </Table>
           </div>
+
         </div>
       )}
 

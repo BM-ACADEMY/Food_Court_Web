@@ -11,6 +11,7 @@ import { LocationManager } from "@/Modules/Admin/pages/locations/locationPage";
 import { UpiManager } from "@/Modules/Admin/pages/upi/UpiPage";
 import GenerateQr from "@/Modules/Admin/pages/offlineQrcode/OfflineQrcode";
 import PointExchange from "@/Modules/Admin/pages/points/PointExchange";
+import AddDeleteAccess from "@/Modules/Admin/pages/users/AddDeleteAccess";
 
 export default function AdminRoutes() {
   return (
@@ -23,6 +24,7 @@ export default function AdminRoutes() {
         <Route path="restaurant/restaurant-list" element={<RestaurantList />} />  
         <Route path="admin/admin-list" element={<AdminList />} />  
          <Route path="points/point-exchange" element={<PointExchange />} />
+          <Route path="adddelete/add-new-user" element={<AddDeleteAccess />} />
         <Route path="history" element={<SessionHistory />} />  
         <Route path="locations" element={<LocationManager />} />  
         <Route path="upi" element={<UpiManager />} />  

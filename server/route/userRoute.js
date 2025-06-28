@@ -9,6 +9,8 @@ const authMiddleware= require("../middleware/authMiddleware")
 // login function
 router.post("/login", userController.loginUser);
 
+router.post("/verify-credentials", userController.verifyCredentials);
+
 //logout function
 router.post("/logout", authMiddleware, userController.logoutUser);
 
@@ -44,5 +46,8 @@ router.put("/update-user/:id", userController.updateUser);
 
 // DELETE /api/users/delete/:id
 router.delete("/delete-user/:id", userController.deleteUser);
+
+// Add to existing routes
+router.get("/fetch-by-phone", userController.getUserByPhone);
 
 module.exports = router;
