@@ -15,7 +15,6 @@ export default function AppRoutes() {
 
   if (loading) return <div>Loading...</div>;
 
-  // Redirect logged-in user away from / or /login
   if (user && (location.pathname === "/" || location.pathname === "/login")) {
 
     switch (user.role.role_id) {
