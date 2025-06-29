@@ -27,16 +27,15 @@ const QrScanner = () => {
   const [parsedData, setParsedData] = useState({ name: "", store: "", restaurant_id: "" });
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showResultDialog, setShowResultDialog] = useState(false);
+  const [showScannerModal, setShowScannerModal] = useState(false);
   const [resultMessage, setResultMessage] = useState("");
   const [isSuccess, setIsSuccess] = useState(true);
   const [amount, setAmount] = useState("");
-  // const [manualQrCode, setManualQrCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user, loading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    console.log("Current user:", user);
     if (!loading && !user) {
       setResultMessage("Please log in to make payments.");
       setIsSuccess(false);
@@ -55,16 +54,17 @@ const QrScanner = () => {
       return;
     }
 
-    const html5QrCode = new Html5Qrcode("qr-reader");
+    const html5QrCode = new Html5Qrcode("qr-reader-modal");
     html5QrCodeRef.current = html5QrCode;
 
     try {
       await html5QrCode.start(
         { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 300, height: 350 } },
+        { fps: 10, qrbox: { width: 300, height: 250 } },
         async (decodedText) => {
           await validateQrCode(decodedText);
           stopScanner();
+          setShowScannerModal(false);
         },
         (error) => {
           console.warn("QR scan error:", error);
@@ -112,23 +112,6 @@ const QrScanner = () => {
     }
   };
 
-  // const handleManualQrSubmit = async () => {
-  //   if (!isCustomer) {
-  //     setResultMessage(user ? "Only customers can make payments." : "Please log in to make payments.");
-  //     setIsSuccess(false);
-  //     setShowResultDialog(true);
-  //     return;
-  //   }
-
-  //   if (manualQrCode.trim()) {
-  //     await validateQrCode(manualQrCode);
-  //   } else {
-  //     setResultMessage("Please enter a valid QR code.");
-  //     setIsSuccess(false);
-  //     setShowResultDialog(true);
-  //   }
-  // };
-
   const handlePaymentSubmit = async () => {
     if (!isCustomer || !user?._id) {
       setResultMessage(user ? "Only customers can make payments." : "Please log in to make payments.");
@@ -157,8 +140,6 @@ const QrScanner = () => {
 
     try {
       const paymentAmount = parseFloat(amount).toFixed(2);
-      console.log("Initiating payment:", { amount: paymentAmount, sender_id: user._id, receiver_id: parsedData.restaurant_id });
-
       const response = await axios.post(
         `${import.meta.env.VITE_BASE_URL}/transactions/process-payment`,
         {
@@ -173,23 +154,15 @@ const QrScanner = () => {
         { withCredentials: true }
       );
 
-      console.log("Payment response:", response.data);
       setShowPaymentDialog(false);
-      // Always include the payment amount and store name in the success message
       setResultMessage(
-        `You have successfully sent ₹${paymentAmount} to ${parsedData.store}. ${
-          response.data.message.includes("New customer balance")
-            ? response.data.message
-            : ""
+        `You have successfully sent ₹${paymentAmount} to ${parsedData.store}. ${response.data.message.includes("New customer balance") ? response.data.message : ""
         }`
       );
       setIsSuccess(true);
       setShowResultDialog(true);
-      setManualQrCode("");
       setAmount("");
     } catch (err) {
-      consolefrancais
-      console.error("Payment failed:", err.response?.data || err.message);
       setResultMessage(err.response?.data?.message || "Payment failed. Please try again.");
       setIsSuccess(false);
       setShowResultDialog(true);
@@ -216,100 +189,88 @@ const QrScanner = () => {
     return () => stopScanner();
   }, []);
 
-  if (loading) {
-    return <div>Loading...</div>;
-  }
+  if (loading) return <div>Loading...</div>;
 
   return (
     <>
       <Card className="mt-10 w-full max-w-6xl p-8 rounded-2xl shadow-md bg-white mx-auto">
-        <h2 className="text-2xl font-bold text-[#00004d] mb-6 text-left">
-          QR Code Scanner
-        </h2>
+        <h2 className="text-2xl font-bold text-[#00004d] mb-6 text-left">QR Code Scanner</h2>
 
-        <div className="flex flex-col lg:flex-row gap-8">
-          <div className="flex-1 flex flex-col items-center">
-            <div className="relative w-full max-w-sm border-2 border-dashed border-[#000052] rounded-xl p-4 bg-[#f5f6fb] shadow-inner">
-              <p className="absolute -top-4 left-4 text-xs font-medium bg-white px-2 py-0.5 rounded shadow text-[#000052]">
-                Scan or Enter QR
-              </p>
+        <div className="flex flex-col items-center mb-6">
+          <Button
+            onClick={() => {
+              setShowScannerModal(true);
+              setTimeout(startScanner, 300);
+            }}
+            className="bg-white text-[#000066] border border-[#000066] hover:bg-[#000066] hover:text-white transition-colors duration-200 flex items-center justify-center gap-3
+               w-64 px-6 py-3 text-base
+               sm:w-72 sm:px-10 sm:py-5 sm:text-2xl
+               md:w-80 md:px-12 md:py-6 md:text-3xl"
+            disabled={!isCustomer}
+          >
+            <QrCode className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8" />
 
-              <div className="w-full h-56 rounded-md overflow-hidden relative">
-                {!scanning && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <ScanLine className="w-40 h-40 text-[#00004d] opacity-90" />
-                  </div>
-                )}
-                <div id="qr-reader" ref={qrRef} className={`w-full h-full ${!scanning ? 'opacity-0' : 'opacity-100'}`} />
-              </div>
+            Open Scanner
+          </Button>
+        </div>
 
-              {/* <div className="mt-4 w-full">
-                <Input
-                  type="text"
-                  value={manualQrCode}
-                  onChange={(e) => setManualQrCode(e.target.value)}
-                  placeholder="Enter QR Code"
-                  className="text-sm mb-2"
-                  disabled={!isCustomer}
-                />
-                <Button
-                  onClick={handleManualQrSubmit}
-                  className="w-full bg-[#000066] hover:bg-[#000080] text-white text-sm"
-                  disabled={!isCustomer}
-                >
-                  Validate QR Code
-                </Button>
-              </div> */}
-            </div>
 
-            <div className="mt-6 w-full flex justify-center">
-              {!scanning ? (
-                <Button
-                  onClick={startScanner}
-                  className="bg-[#000066] hover:bg-[#000080] text-white text-sm flex items-center gap-2"
-                  disabled={!isCustomer}
-                >
-                  <Play className="w-4 h-4" />
-                  Start Scanner
-                </Button>
-              ) : (
-                <Button
-                  onClick={stopScanner}
-                  className="bg-red-600 hover:bg-red-700 text-white text-sm flex items-center gap-2"
-                >
-                  <Square className="w-4 h-4" />
-                  Stop Scanner
-                </Button>
-              )}
-            </div>
+
+
+        <div className="bg-white/50 backdrop-blur-lg border border-gray-200 rounded-xl p-6 shadow-sm max-h-[calc(50vh-100px)] overflow-y-auto">
+          <div className="flex items-center gap-3 mb-4">
+            <QrCode className="w-6 h-6 text-[#00004d]" />
+            <h3 className="text-lg font-semibold text-[#00004d]">How to Pay</h3>
           </div>
-
-         <div className="flex-1 bg-white/50 backdrop-blur-lg border border-gray-200 rounded-xl p-6 shadow-sm max-h-[calc(50vh-100px)] overflow-y-auto">
-            <div className="flex items-center gap-3 mb-4">
-              <QrCode className="w-6 h-6 text-[#00004d]" />
-              <h3 className="text-lg font-semibold text-[#00004d]">
-                How to Pay
-              </h3>
-            </div>
-
-            <ul className="space-y-4 text-gray-700 text-sm">
-              {[
-                "Scan the vendor's QR code or enter it manually.",
-                "Confirm the amount and vendor details.",
-                "Complete your payment.",
-              ].map((text, index) => (
-                <li key={index} className="flex gap-3 items-start">
-                  <span className="bg-[#000066] text-white min-w-6 min-h-6 rounded-full flex items-center justify-center text-xs font-bold mt-1">
-                    {index + 1}
-                  </span>
-                  <span className="flex-1">{text}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+          <ul className="space-y-4 text-gray-700 text-sm">
+            {[
+              "Scan the vendor's QR code or enter it manually.",
+              "Confirm the amount and vendor details.",
+              "Complete your payment.",
+            ].map((text, index) => (
+              <li key={index} className="flex gap-3 items-start">
+                <span className="bg-[#000066] text-white min-w-6 min-h-6 rounded-full flex items-center justify-center text-xs font-bold mt-1">
+                  {index + 1}
+                </span>
+                <span className="flex-1">{text}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       </Card>
 
+      {/* Scanner Modal */}
+      <Dialog open={showScannerModal} onOpenChange={setShowScannerModal}>
+        <DialogContent className="max-w-[90vw] sm:max-w-lg md:max-w-xl lg:max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-lg sm:text-xl md:text-2xl">QR Scanner</DialogTitle>
+            <DialogDescription className="text-sm sm:text-base">
+              Scan the QR code to proceed with the payment.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="w-full h-64 rounded-md overflow-hidden relative">
+            {!scanning && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <ScanLine className="w-40 h-40 text-[#00004d] opacity-90" />
+              </div>
+            )}
+            <div id="qr-reader-modal" ref={qrRef} className={`w-full h-full ${!scanning ? "opacity-0" : "opacity-100"}`} />
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                stopScanner();
+                setShowScannerModal(false);
+              }}
+              className="bg-gray-500 hover:bg-gray-600 text-sm sm:text-base"
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment Dialog */}
       <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
         <DialogContent className="max-w-[90vw] sm:max-w-lg md:max-w-xl lg:max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -318,18 +279,15 @@ const QrScanner = () => {
               Enter the payment amount and confirm details.
             </DialogDescription>
           </DialogHeader>
-
           <div className="bg-[#f4f6ff] border text-sm sm:text-base text-gray-700 px-4 py-2 rounded mb-4 space-y-1">
             {parsedData.name && (
               <p>
-                <span className="font-medium text-[#00004d]">Name:</span>{" "}
-                {parsedData.name}
+                <span className="font-medium text-[#00004d]">Name:</span> {parsedData.name}
               </p>
             )}
             {parsedData.store && (
               <p>
-                <span className="font-medium text-[#00004d]">Store:</span>{" "}
-                {parsedData.store}
+                <span className="font-medium text-[#00004d]">Store:</span> {parsedData.store}
               </p>
             )}
             <p>
@@ -337,7 +295,6 @@ const QrScanner = () => {
               {result.length > 50 ? result.slice(0, 50) + "..." : result}
             </p>
           </div>
-
           <div className="flex flex-col gap-4">
             <label className="text-sm sm:text-base text-gray-600">Amount (₹)</label>
             <Input
@@ -350,7 +307,6 @@ const QrScanner = () => {
               className="text-sm sm:text-base"
             />
           </div>
-
           <DialogFooter>
             <Button
               onClick={() => setShowPaymentDialog(false)}
@@ -369,15 +325,12 @@ const QrScanner = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Result Dialog */}
       <Dialog open={showResultDialog} onOpenChange={setShowResultDialog}>
         <DialogContent className="max-w-[90vw] sm:max-w-lg md:max-w-md lg:max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <div className={`flex items-center gap-3 ${isSuccess ? 'text-green-600' : 'text-red-600'}`}>
-              {isSuccess ? (
-                <CheckCircle2 className="w-6 h-6" />
-              ) : (
-                <XCircle className="w-6 h-6" />
-              )}
+            <div className={`flex items-center gap-3 ${isSuccess ? "text-green-600" : "text-red-600"}`}>
+              {isSuccess ? <CheckCircle2 className="w-6 h-6" /> : <XCircle className="w-6 h-6" />}
               <DialogTitle className="text-lg sm:text-xl md:text-2xl">
                 {isSuccess ? "Payment Successful" : "Payment Failed"}
               </DialogTitle>
@@ -410,9 +363,9 @@ const QrScanner = () => {
           <DialogFooter>
             <Button
               onClick={() => setShowResultDialog(false)}
-              className={`w-full ${isSuccess ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'} text-sm sm:text-base`}
+              className={`w-full ${isSuccess ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"} text-sm sm:text-base`}
             >
-              {isSuccess ? 'Continue' : 'Close'}
+              {isSuccess ? "Continue" : "Close"}
             </Button>
           </DialogFooter>
         </DialogContent>

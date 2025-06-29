@@ -91,7 +91,7 @@ const AdminDetailsModal = ({ admin, isOpen, onClose }) => {
           admin.id
         }/transactions`
       );
-      console.log("Transactions data:", response.data.data); // Debug: Log transaction data
+
       setTransactions(response.data.data || []);
       setError(null);
     } catch (err) {

@@ -49,7 +49,7 @@ export default function EditAccountModal({ open, onClose }) {
           headers: { "Content-Type": "application/json" },
         }
       );
-      console.log(response,"updated");
+
       
       if (response) {
         // Update user context with new data

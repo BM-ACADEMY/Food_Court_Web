@@ -304,22 +304,7 @@ const FoodStalls = ({ handlePayNow }) => {
               Pay to {selectedRestaurant?.restaurant_name}
             </DialogTitle>
           </DialogHeader>
-          {/* <div className="bg-[#f4f6ff] border text-sm text-gray-700 px-4 py-2 rounded mb-4 space-y-1">
-            <p>
-              <span className="font-medium text-[#00004d]">Store:</span>{" "}
-              {selectedRestaurant?.restaurant_name || "N/A"}
-            </p>
-            <p>
-              <span className="font-medium text-[#00004d]">Owner:</span>{" "}
-              {selectedRestaurant?.owner_name || "N/A"}
-            </p>
-            <p>
-              <span className="font-medium text-[#00004d]">QR Code:</span>{" "}
-              {selectedRestaurant?.qr_code?.length > 50
-                ? selectedRestaurant.qr_code.slice(0, 50) + "..."
-                : selectedRestaurant?.qr_code || "N/A"}
-            </p>
-          </div> */}
+          
           <div className="space-y-2">
             <label htmlFor="paymentAmount" className="text-sm font-medium text-gray-700">
               Amount to Pay
@@ -337,6 +322,22 @@ const FoodStalls = ({ handlePayNow }) => {
                 onChange={(e) => setAmount(e.target.value)}
               />
             </div>
+            <div className="bg-[#f4f6ff] border text-sm text-gray-700 px-4 py-2 rounded mb-4 space-y-1">
+            <p>
+              <span className="font-medium text-[#00004d]">Store:</span>{" "}
+              {selectedRestaurant?.restaurant_name || "N/A"}
+            </p>
+            <p>
+              <span className="font-medium text-[#00004d]">Owner:</span>{" "}
+              {selectedRestaurant?.owner_name || "N/A"}
+            </p>
+            <p>
+              <span className="font-medium text-[#00004d]">QR Code:</span>{" "}
+              {selectedRestaurant?.qr_code?.length > 50
+                ? selectedRestaurant.qr_code.slice(0, 50) + "..."
+                : selectedRestaurant?.qr_code || "N/A"}
+            </p>
+          </div>
           </div>
           <DialogFooter className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
             {/* <Button

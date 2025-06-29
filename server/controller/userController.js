@@ -167,7 +167,7 @@ exports.logoutUser = async (req, res) => {
   try {
     // Get user ID from middleware
     const userId = req.user?.id;
-    console.log("Logout attempt for userId:", userId);
+
 
     // Validate userId
     if (!userId) {
@@ -187,7 +187,7 @@ exports.logoutUser = async (req, res) => {
     if (!updatedLog) {
       console.warn(`No open login log found for user ${userId}`);
     } else {
-      console.log("Updated login log:", updatedLog);
+
     }
 
     // Clear token cookie
@@ -286,7 +286,7 @@ exports.createUser = async (req, res) => {
     // Hash password
     const password_hash = await bcrypt.hash(password, 10);
     const otpres = sendOtpSms(phone_number, otp);
-    console.log(otpres, "otp");
+  
 
     // Create user
     const newUser = new User({
@@ -522,7 +522,7 @@ exports.sendOtpController = async (req, res) => {
     // Send OTP via ChennaiSMS
     try {
       const smsResponse = await sendOtpSms(phone_number, otp);
-      console.log(smsResponse,"sms");
+   
       
       if (smsResponse) {
         return res.status(200).json({
@@ -878,14 +878,7 @@ exports.updateUser = async (req, res) => {
     const userId = req.params.id;
     const { name, email, phone_number, is_flagged } = req.body;
 
-    console.log("updateUser: Request payload:", {
-      userId,
-      name,
-      email,
-      phone_number,
-      is_flagged,
-    });
-
+ 
     if (!mongoose.isValidObjectId(userId)) {
       console.error(`updateUser: Invalid user ID format: ${userId}`);
       return res.status(400).json({ message: "Invalid user ID format" });
@@ -972,7 +965,7 @@ exports.updateUser = async (req, res) => {
       treasurySubcom = await TreasurySubcom.findOne({
         user_id: updatedUser._id,
       }).lean();
-      console.log("updateUser: TreasurySubcom:", treasurySubcom);
+
     }
 
     const userObj = {
@@ -997,7 +990,7 @@ exports.updateUser = async (req, res) => {
         : "N/A",
     };
 
-    console.log("updateUser: Success, user updated:", userObj);
+   
     res.json({ data: userObj, message: "User updated successfully" });
   } catch (err) {
     console.error("updateUser error:", err.message, err.stack);
@@ -1009,7 +1002,7 @@ exports.updateUserFlag = async (req, res) => {
     const userId = req.params.id;
     const { is_flagged } = req.body;
 
-    console.log("updateUserFlag: Request payload:", { userId, is_flagged });
+
 
     if (!mongoose.isValidObjectId(userId)) {
       return res.status(400).json({ message: "Invalid user ID format" });
@@ -1029,7 +1022,7 @@ exports.updateUserFlag = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    console.log("updateUserFlag: Success:", updatedUser);
+
 
     res.json({success:true, message: "User flag status updated", data: updatedUser });
   } catch (err) {

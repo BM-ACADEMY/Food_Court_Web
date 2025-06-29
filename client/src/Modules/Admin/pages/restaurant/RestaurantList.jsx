@@ -223,7 +223,7 @@ export default function RestaurantList() {
   };
 
   const handleToggleRestrict = async (user) => {
-    console.log(user, 'res');
+
 
     try {
       const updated = await axios.put(`${import.meta.env.VITE_BASE_URL}/users/update-user/${user.user_id}`, {

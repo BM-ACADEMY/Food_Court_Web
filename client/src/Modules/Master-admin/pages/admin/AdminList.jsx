@@ -113,7 +113,6 @@ export default function AdminList() {
     setIsDetailsModalOpen(true);
   };
   const handleTransactionEdit = (admin) => {
-    console.log(admin, "transaction");
 
   };
 

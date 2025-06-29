@@ -24,11 +24,13 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 
 export default function CustomerHistory() {
   const [showDetails, setShowDetails] = useState(false);
+  const [userId,setUserId]=useState('');
   const [scannedData, setScannedData] = useState(null);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [cameraError, setCameraError] = useState("");
@@ -43,6 +45,7 @@ export default function CustomerHistory() {
   const [searchInput, setSearchInput] = useState(""); // New state for search input
   const qrRef = useRef(null);
   const html5QrCodeRef = useRef(null);
+  const [paymentMethod, setPaymentMethod] = useState("all");
 
   const BASE_URL = import.meta.env.VITE_BASE_URL || "http://localhost:4000/api";
 
@@ -94,7 +97,6 @@ export default function CustomerHistory() {
     }
 
     const qrString = decodedText.trim();
-    console.log("Scanned QR string:", qrString);
     setLoading(true);
     setError("");
 
@@ -121,7 +123,6 @@ export default function CustomerHistory() {
         }
       }
 
-      console.log("Customer response:", customerResponse.data);
 
       if (!customerResponse?.data?.success) {
         throw new Error(customerResponse?.data?.message || "Customer not found.");
@@ -129,7 +130,6 @@ export default function CustomerHistory() {
 
       const { customer_id, user_id, status, registration_type, created_at } = customerResponse.data.data;
 
-      console.log("User ID from QR scan:", user_id._id);
 
       let detailsResponse;
       retries = 3;
@@ -151,7 +151,7 @@ export default function CustomerHistory() {
         }
       }
 
-      console.log("Customer details response:", detailsResponse.data);
+
 
       if (!detailsResponse?.data?.success) {
         throw new Error(detailsResponse?.data?.message || "Customer details not found.");
@@ -178,7 +178,7 @@ export default function CustomerHistory() {
         userId: user_id._id,
       };
 
-      console.log("Scanned customer data:", newScannedData);
+
       setShowDetails(true);
       setScannedData(newScannedData);
       setScannerOpen(false);
@@ -212,18 +212,20 @@ export default function CustomerHistory() {
     }
   };
 
-  // Fetch transaction history for the user
-  const fetchTransactions = async (userId, page = 1, dateFilterValue = dateFilter) => {
+const fetchTransactions = async (userId, page = 1, dateFilterValue = dateFilter, paymentMethodValue = paymentMethod) => {
     try {
-      console.log("Fetching transactions for userId:", userId, "with dateFilter:", dateFilterValue);
+      console.log("Fetching transactions for userId:", userId, "with dateFilter:", dateFilterValue, "and paymentMethod:", paymentMethodValue);
 
       if (!userId || typeof userId !== "string") {
         throw new Error("User ID is missing or invalid.");
       }
-
+      setUserId(userId)
       let queryParams = `page=${page}&limit=${pagination.limit}`;
       if (dateFilterValue !== "all") {
         queryParams += `&quickFilter=${dateFilterValue}`;
+      }
+      if (paymentMethodValue !== "all") {
+        queryParams += `&payment_method=${encodeURIComponent(paymentMethodValue)}`;
       }
 
       let response;
@@ -278,8 +280,14 @@ export default function CustomerHistory() {
       setTransactions([]);
       setFilteredTransactions([]);
     }
+  }
+  const handlePaymentMethodChange = (value) => {
+    setPaymentMethod(value);
+    fetchTransactions(userId, 1, dateFilter, value);
   };
 
+  // Handle date filter change (existing logic, example)
+ 
   // Handle search by customer_id or phone number
   const handleSearch = async () => {
     if (!searchInput.trim()) {
@@ -714,6 +722,18 @@ export default function CustomerHistory() {
                       setFilteredTransactions(filtered);
                     }}
                   />
+                  <Select value={paymentMethod} onValueChange={handlePaymentMethodChange}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Select payment method" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Payment Methods</SelectItem>
+            <SelectItem value="Cash">Cash</SelectItem>
+            <SelectItem value="Gpay">Gpay</SelectItem>
+            <SelectItem value="Mess bill">Mess bill</SelectItem>
+            <SelectItem value="Balance Deduction">Balance Deduction</SelectItem>
+          </SelectContent>
+        </Select>
                   <select
                     className="border px-3 py-1 text-sm rounded-md"
                     value={dateFilter}

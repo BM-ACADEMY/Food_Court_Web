@@ -108,7 +108,7 @@ const PointExchange = () => {
     const [selectedReceiver, setSelectedReceiver] = useState(null);
     const [openModal, setOpenModal] = useState(false);
     const transactionRef = useRef(null);
-    console.log(loggedInUser,"use");
+
     
 
     const scrollToTransactions = () => {
