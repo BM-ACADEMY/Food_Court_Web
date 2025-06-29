@@ -49,7 +49,7 @@ function TopUpSuccess({ data, onNewTopUp, customer }) {
   } catch (err) {
   console.error('Back to Home error:', {
     message: err.message,
-    response: err.response?.data, // Log the full response
+    response: err.response?.data, 
     status: err.response?.status,
     customer: customer,
   });
