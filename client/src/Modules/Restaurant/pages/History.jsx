@@ -59,6 +59,8 @@ export default function History() {
   const { user } = useAuth();
   const [transactions, setTransactions] = useState([]);
   const [currentBalance, setCurrentBalance] = useState("0.00");
+    const [todayBalance, setTodayBalance] = useState("0.00");
+    const [transactionCount, setTransactionCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
