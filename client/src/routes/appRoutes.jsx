@@ -1,3 +1,4 @@
+
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import MasterAdminRoutes from "./masterAdmin";
@@ -7,7 +8,7 @@ import TreasuryRoutes from "./treasury";
 import AdminRoutes from "./adminRoute";
 import Login from "@/Modules/User/pages/Landing/Home";
 import { ProtectedRoute } from "@/context/ProtectedRoute";
-// import NotFound from "@/Modules/NotFound";
+
 
 export default function AppRoutes() {
   const { user, loading } = useAuth();
@@ -15,6 +16,7 @@ export default function AppRoutes() {
 
   if (loading) return <div>Loading...</div>;
 
+  // Redirect logged-in user away from / or /login
   if (user && (location.pathname === "/" || location.pathname === "/login")) {
 
     switch (user.role.role_id) {
@@ -88,3 +90,4 @@ export default function AppRoutes() {
     </Routes>
   );
 }
+
