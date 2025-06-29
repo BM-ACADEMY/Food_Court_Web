@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { Button } from "@/components/ui/button";
-import { ScanLine, Play, Square, CheckCircle2, XCircle, AlertCircle,ScanQrCode  } from "lucide-react";
+import { QrCode, ScanLine, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -19,6 +19,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import axios from "axios";
 import { useAuth } from "@/context/AuthContext";
@@ -28,7 +29,6 @@ export default function Refund() {
   const html5QrCodeRef = useRef(null);
   const [scanning, setScanning] = useState(false);
   const [cameraError, setCameraError] = useState("");
-  // const [manualQrCode, setManualQrCode] = useState("");
   const [customer, setCustomer] = useState({
     name: "",
     id: "",
@@ -37,6 +37,7 @@ export default function Refund() {
   });
   const [amount, setAmount] = useState("");
   const [showResultDialog, setShowResultDialog] = useState(false);
+  const [showScannerModal, setShowScannerModal] = useState(false);
   const [resultMessage, setResultMessage] = useState("");
   const [isSuccess, setIsSuccess] = useState(true);
   const { user } = useAuth();
@@ -93,6 +94,9 @@ export default function Refund() {
     } catch (err) {
       console.error("Camera start failed:", err);
       setCameraError("Failed to access camera. Please check permissions or use manual QR input.");
+      setShowResultDialog(true);
+      setIsSuccess(false);
+      setResultMessage("Failed to access camera. Please check permissions.");
       html5QrCodeRef.current = null;
     }
   };
@@ -118,29 +122,20 @@ export default function Refund() {
         balance,
       });
       stopScanner();
+      setShowScannerModal(false);
     } catch (err) {
-      console.error("QR fetch error:", err);
+      console.error("QR fetch error:", err.response?.data || err.message);
       setResultMessage("Failed to fetch customer details. Please scan a valid customer QR.");
       setIsSuccess(false);
       setShowResultDialog(true);
     }
   };
 
-  // const handleManualQrSubmit = async () => {
-  //   if (!manualQrCode) {
-  //     setResultMessage("Please enter a valid QR code.");
-  //     setIsSuccess(false);
-  //     setShowResultDialog(true);
-  //     return;
-  //   }
-  //   await handleScanSuccess(manualQrCode);
-  //   setManualQrCode("");
-  // };
-
   const stopScanner = async () => {
     if (html5QrCodeRef.current) {
       try {
         await html5QrCodeRef.current.stop();
+        await html5QrCodeRef.current.clear();
         setScanning(false);
       } catch (err) {
         console.error("Stop failed:", err);
@@ -159,8 +154,19 @@ export default function Refund() {
       return;
     }
 
+    if (!customer.id || !user?._id) {
+      setResultMessage("Invalid customer or user data. Please try scanning again.");
+      setIsSuccess(false);
+      setShowResultDialog(true);
+      return;
+    }
+
     try {
-      console.log("Initiating refund:", { refundAmount, customerId: customer.id, restaurantId: user._id });
+      console.log("Initiating refund:", {
+        refundAmount,
+        customerId: customer.id,
+        restaurantId: user._id,
+      });
       const formattedAmount = refundAmount.toFixed(2);
       const response = await axios.post(
         `${import.meta.env.VITE_BASE_URL}/transactions/process-payment`,
@@ -170,6 +176,7 @@ export default function Refund() {
           amount: formattedAmount,
           transaction_type: "Refund",
           payment_method: "Gpay",
+          status: "Success", // Added to ensure compatibility with backend
           remarks: `Refund to ${customer.name} from restaurant`,
         },
         { withCredentials: true }
@@ -182,11 +189,13 @@ export default function Refund() {
         balance: parseFloat(newCustomerBalance),
       }));
       setAmount("");
-      setResultMessage(response.data.message);
+      setResultMessage(
+        `Successfully refunded ₹${formattedAmount} to ${customer.name}. ${response.data.message}`
+      );
       setIsSuccess(true);
       setShowResultDialog(true);
     } catch (err) {
-      console.error("Refund error:", err);
+      console.error("Refund error:", err.response?.data || err.message);
       const errorMessage = err.response?.data?.message || "Failed to process refund. Please try again.";
       setResultMessage(`Error: ${errorMessage}`);
       setIsSuccess(false);
@@ -209,133 +218,122 @@ export default function Refund() {
           Refund QRCode Scanner
         </h2>
 
-        <div className="flex flex-col lg:flex-row gap-8">
-          <div className="flex-1 flex flex-col items-center">
-            <div className="relative w-full max-w-sm border-2 border-dashed border-[#000052] rounded-xl p-4 bg-[#f5f6fb] shadow-inner">
-              <p className="absolute -top-4 left-4 text-xs font-medium bg-white px-2 py-0.5 rounded shadow text-[#000052]">
-                Scan Live QR
-              </p>
+        <div className="flex flex-col items-center mb-6">
+          <Button
+            onClick={() => {
+              setShowScannerModal(true);
+              setTimeout(startScanner, 300);
+            }}
+            className="bg-white text-[#000066] border border-[#000066] hover:bg-[#000066] hover:text-white transition-colors duration-200 flex items-center justify-center gap-3
+              w-64 px-6 py-3 text-base
+              sm:w-72 sm:px-10 sm:py-5 sm:text-2xl
+              md:w-80 md:px-12 md:py-6 md:text-3xl"
+          >
+            <QrCode className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8" />
+            Open Scanner
+          </Button>
+        </div>
 
-              <div className="w-full h-56 rounded-md overflow-hidden relative">
-                {!scanning && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <ScanQrCode className="w-40 h-40 text-[red] opacity-90" />
-                  </div>
-                )}
-                <div
-                  id="qr-reader"
-                  ref={qrRef}
-                  className={`w-full h-full bg-gray-100 ${!scanning ? 'opacity-0' : 'opacity-100'}`}
-                />
-              </div>
-              {cameraError && (
-                <p className="text-red-500 text-sm mt-2 text-center">{cameraError}</p>
-              )}
-            </div>
+        <div className="flex-1">
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle className="text-lg sm:text-xl md:text-2xl">Customer Details</CardTitle>
+              <CardDescription className="text-sm sm:text-base">
+                Scan or enter QR to fetch customer details and refund Amounts.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+             <div className="mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-6 sm:gap-8">
+  <div className="flex-1">
+    <p className="font-semibold text-lg sm:text-xl lg:text-2xl text-[#000052]">
+      Name: {customer.name || "Not scanned"}
+    </p>
+    <p className="text-sm sm:text-base lg:text-lg text-gray-500">
+      Customer ID: {customer.customer_id || "Not scanned"}
+    </p>
+  </div>
 
-            {/* <div className="mt-4 w-full max-w-sm">
-              <Label htmlFor="manualQrCode" className="text-sm">
-                Enter QR Code Manually
-              </Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="manualQrCode"
-                  type="text"
-                  className="h-8 px-3 text-sm"
-                  placeholder="Enter customer QR code"
-                  value={manualQrCode}
-                  onChange={e => setManualQrCode(e.target.value)}
-                />
-                <Button
-                  onClick={handleManualQrSubmit}
-                  className="bg-[#000052] hover:bg-[#000052cb] text-white text-sm"
-                >
-                  Submit QR
-                </Button>
-              </div>
-            </div> */}
+  <div className="text-left sm:text-right">
+    <p className="text-sm sm:text-base lg:text-lg text-gray-500">Balance</p>
+    <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-blue-700">
+      ₹{customer.balance.toFixed(2)}
+    </p>
+  </div>
+</div>
 
-            <div className="mt-6 w-full flex justify-center">
-              {!scanning ? (
-                <Button
-                  onClick={startScanner}
-                  className="bg-[#000052] hover:bg-[#000052cb] text-white text-sm flex items-center gap-2"
-                >
-                  <Play className="w-4 h-4" />
-                  Start Scanner
-                </Button>
-              ) : (
-                <Button
-                  onClick={stopScanner}
-                  className="bg-red-600 hover:bg-red-700 text-white text-sm flex items-center gap-2"
-                >
-                  <Square className="w-4 h-4" />
-                  Stop Scanner
-                </Button>
-              )}
-            </div>
-          </div>
 
-          <div className="flex-1">
-            <Card className="h-full">
-              <CardHeader>
-                <CardTitle>Customer Details</CardTitle>
-                <CardDescription>
-                  Scan or enter QR to fetch customer details and refund points.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="mb-6 flex justify-between items-center">
-                  <div>
-                    <p className="font-semibold text-lg">
-                      Name: {customer.name || "Not scanned"}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Customer ID: {customer.customer_id || "Not scanned"}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-gray-500">Balance</p>
-                    <p className="text-xl font-bold text-blue-700">
-                      ₹{customer.balance.toFixed(2)}
-                    </p>
-                  </div>
+              <div className="space-y-1">
+                <Label htmlFor="refundAmount" className="text-sm sm:text-base">
+                  Refund Amount
+                </Label>
+                <div className="flex items-center gap-2">
+                  <span className="text-base sm:text-lg pt-1">₹</span>
+                  <Input
+                    id="refundAmount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    className="h-8 px-3 text-sm sm:text-base"
+                    placeholder="Amount to refund"
+                    value={amount}
+                    onChange={e => setAmount(e.target.value)}
+                    disabled={!customer.id}
+                  />
                 </div>
-
-                <div className="space-y-1">
-                  <Label htmlFor="refundAmount" className="text-sm">
-                    Refund Amount
-                  </Label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-base pt-1">₹</span>
-                    <Input
-                      id="refundAmount"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      className="h-8 px-3 text-sm"
-                      placeholder="Amount to refund"
-                      value={amount}
-                      onChange={e => setAmount(e.target.value)}
-                      disabled={!customer.id}
-                    />
-                  </div>
-                  <Button
-                    onClick={handleRefund}
-                    disabled={!customer.id || !amount}
-                    className="w-full mt-2 h-8 px-3 py-1 text-xs bg-[#1a2f87] text-white"
-                  >
-                    Refund Points
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                <Button
+                  onClick={handleRefund}
+                  disabled={!customer.id || !amount}
+                  className="w-full mt-2 h-8 px-3 py-1 text-xs sm:text-sm bg-[#1a2f87] text-white"
+                >
+                  Refund Amounts
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </Card>
 
+      {/* Scanner Modal */}
+      <Dialog open={showScannerModal} onOpenChange={setShowScannerModal}>
+        <DialogContent className="max-w-[90vw] sm:max-w-lg md:max-w-xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-lg sm:text-xl md:text-2xl">QR Scanner</DialogTitle>
+            <DialogDescription className="text-sm sm:text-base">
+              Scan the QR code to fetch customer details.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="w-full h-64 rounded-md overflow-hidden relative">
+            {!scanning && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <ScanLine className="w-40 h-40 text-[#000052] opacity-90" />
+              </div>
+            )}
+            <div
+              id="qr-reader"
+              ref={qrRef}
+              className={`w-full h-full ${!scanning ? 'opacity-0' : 'opacity-100'}`}
+            />
+            {cameraError && (
+              <p className="text-red-500 text-sm mt-2 text-center">{cameraError}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                stopScanner();
+                setShowScannerModal(false);
+              }}
+              className="bg-gray-500 hover:bg-gray-600 text-sm sm:text-base"
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Result Dialog */}
       <Dialog open={showResultDialog} onOpenChange={setShowResultDialog}>
-        <DialogContent className="max-w-[90vw] sm:max-w-lg md:max-w-md lg:max-w-lg max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-[90vw] sm:max-w-lg md:max-w-md max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <div className={`flex items-center gap-3 ${isSuccess ? 'text-green-600' : 'text-red-600'}`}>
               {isSuccess ? (
@@ -343,7 +341,7 @@ export default function Refund() {
               ) : (
                 <XCircle className="w-6 h-6" />
               )}
-              <DialogTitle className="text-lg">
+              <DialogTitle className="text-lg sm:text-xl md:text-2xl">
                 {isSuccess ? "Refund Successful" : "Refund Failed"}
               </DialogTitle>
             </div>
@@ -356,7 +354,7 @@ export default function Refund() {
                 </div>
                 <div>
                   <p className="text-gray-700 font-medium text-sm sm:text-base">{resultMessage}</p>
-                  <p className="text-sm text-gray-500 mt-2">
+                  <p className="text-sm sm:text-base text-gray-500 mt-2">
                     Transaction completed successfully
                   </p>
                 </div>
@@ -368,7 +366,7 @@ export default function Refund() {
                 </div>
                 <div>
                   <p className="text-gray-700 font-medium text-sm sm:text-base">{resultMessage}</p>
-                  <p className="text-sm text-gray-500 mt-2">
+                  <p className="text-sm sm:text-base text-gray-500 mt-2">
                     Please try again or contact support
                   </p>
                 </div>
@@ -378,7 +376,7 @@ export default function Refund() {
           <DialogFooter>
             <Button
               onClick={() => setShowResultDialog(false)}
-              className="bg-[#000052] hover:bg-[#000052cb] text-white text-sm"
+              className="bg-[#000052] hover:bg-[#000052cb] text-white text-sm sm:text-base"
             >
               Close
             </Button>

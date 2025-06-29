@@ -121,7 +121,7 @@ export default function RestaurantDetailsModal({ isOpen, onClose, restaurant }) 
   }, [isOpen, restaurant, filter, currentPage, activeTab]);
 
   const handleEdit = (edit) => {
-    console.log(edit, "edit");
+
     setIsEditing(true);
     setIsEditingId(edit.user_id);
     setFormData({

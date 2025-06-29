@@ -344,8 +344,7 @@ const CustomerDetailsModal = ({ customer, isOpen, onClose }) => {
   };
 
   const handleEdit = (edit) => {
-    console.log(edit,"edit");
-    
+
     setIsEditing(true);
     setIsEditingId(edit.user_id)
     setFormData({

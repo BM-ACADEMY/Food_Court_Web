@@ -134,8 +134,7 @@ export default function UserList() {
     }, [page, search, roleFilter]);
 
     const handleEdit = async (user) => {
-        console.log(user, "updated");
-
+    
         try {
             const roleKey = user.role_key;
             let roleDetails = {};
@@ -182,7 +181,7 @@ export default function UserList() {
     };
 
     const handleDelete = async (user) => {
-        console.log(user, "delete");
+
 
         try {
             // Step 1: Delete from User model
@@ -286,7 +285,7 @@ export default function UserList() {
             if (isEdit) {
                 const userUpdateRes = await axios.put(`${import.meta.env.VITE_BASE_URL}/users/update-user/${formData.user_id._id}`, userPayload);
                 userId = userUpdateRes.data.data._id;
-                console.log(userUpdateRes, "update");
+
 
                 roleKey = userUpdateRes.data.data.role_id.role_id;
             } else {

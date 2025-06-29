@@ -33,8 +33,10 @@ function TopUpOnline({ customer }) {
   };
 
   const fetchBalance = async (userId) => {
+    console.log(userId,"fetch");
+    
     const response = await axios.get(
-      `${import.meta.env.VITE_BASE_URL}/user-balance/fetch-balance-by-id/${userId}`,
+      `${import.meta.env.VITE_BASE_URL}/user-balance/fetch-balance-by-id/${userId._id}`,
       { withCredentials: true }
     );
 
@@ -55,10 +57,10 @@ function TopUpOnline({ customer }) {
       return setError("User or customer ID is missing.");
     }
 
-    const idFormat = /^[0-9a-fA-F]{24}$/;
-    if (!idFormat.test(user._id) || !idFormat.test(customer.user_id)) {
-      return setError("Invalid ID format.");
-    }
+    // const idFormat = /^[0-9a-fA-F]{24}$/;
+    // if ( !idFormat.test(customer.user_id)) {
+    //   return setError("Invalid ID format.");
+    // }
 
     setLoading(true);
     setError(null);

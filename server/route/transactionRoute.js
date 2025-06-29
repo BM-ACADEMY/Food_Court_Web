@@ -38,5 +38,5 @@ router.get("/history/user/:userId/export", controller.exportTransactionHistoryBy
 router.get("/history/user/:userId/detailed", controller.getUserTransactionHistory);
 router.get("/types", controller.getTransactionTypes);
 router.get("/fetch-treasury-subcom-restaurant-history", controller.getTransactionTreasuryRestaurantHistory);
-
+router.get("/today-balance/:userId", controller.getTodayBalance);
 module.exports = router;

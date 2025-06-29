@@ -55,12 +55,13 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import TreasurySubcomDetailsModal from "./TreasurySubcomDetailsModel";
+import SessionDetailsModal from "./TreasurySubcomDetailsModel";
 
 export default function TreasurySubcomList() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [lastActive, setLastActive] = useState("all");
+  const [paymentMethod, setPaymentMethod] = useState("all");
   const [sortBy, setSortBy] = useState("asc");
   const [regDate, setRegDate] = useState("");
   const [open, setOpen] = useState(false);
@@ -68,8 +69,8 @@ export default function TreasurySubcomList() {
   const [page, setPage] = useState(1);
   const [pageSize] = useState(10);
   const [data, setData] = useState({
-    treasurySubcoms: [],
-    totalTreasurySubcoms: 0,
+    loginSessions: [],
+    totalLoginSessions: 0,
     totalBalance: 0,
     onlineCount: 0,
     totalPages: 0,
@@ -78,34 +79,12 @@ export default function TreasurySubcomList() {
   const [error, setError] = useState(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState("xlsx");
-  const [selectedSubcom, setSelectedSubcom] = useState(null);
+  const [selectedSession, setSelectedSession] = useState(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
-
-
-  const getRandomColor = () => {
-    const colors = ["#FF6B6B", "#4ECDC4", "#556270", "#C7F464", "#FFA500"];
-    return colors[Math.floor(Math.random() * colors.length)];
-  };
-
-  const Avatar = ({ name = "" }) => {
-    const initials = name
-      ? name.split(" ").map((word) => word[0]?.toUpperCase()).slice(0, 2).join("")
-      : "U";
-    const color = getRandomColor();
-
-    return (
-      <div
-        className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold"
-        style={{ backgroundColor: color }}
-      >
-        {initials}
-      </div>
-    );
-  };
 
   // Fetch data from backend
   useEffect(() => {
-    const fetchTreasurySubcoms = async () => {
+    const fetchLoginSessions = async () => {
       setLoading(true);
       try {
         const response = await axios.get(
@@ -115,6 +94,7 @@ export default function TreasurySubcomList() {
               search,
               status,
               lastActive,
+              payment_method: paymentMethod !== "all" ? paymentMethod : undefined,
               regDate: regDate ? format(new Date(regDate), "yyyy-MM-dd") : "",
               sortBy,
               page,
@@ -125,94 +105,109 @@ export default function TreasurySubcomList() {
         setData(response.data);
         setError(null);
       } catch (err) {
-        console.error("Error fetching treasury subcoms:", err);
+        console.error("Error fetching login sessions:", err);
         setError("Failed to load data. Please try again.");
       } finally {
         setLoading(false);
       }
     };
-    fetchTreasurySubcoms();
-  }, [search, status, lastActive, regDate, sortBy, page, pageSize]);
+    fetchLoginSessions();
+  }, [search, status, lastActive, paymentMethod, regDate, sortBy, page, pageSize]);
 
-  const { treasurySubcoms, totalTreasurySubcoms, totalBalance, onlineCount, totalPages } = data;
+  const { loginSessions, totalLoginSessions, totalBalance, onlineCount, totalPages } = data;
 
-  // Memoized filtered data for rendering
-  const paginatedTreasurySubcoms = useMemo(() => treasurySubcoms, [treasurySubcoms]);
+  // Memoized filtered data
+  const paginatedLoginSessions = useMemo(() => loginSessions, [loginSessions]);
 
-  // Handle View and Edit
-  const handleView = (subcom) => {
-    setSelectedSubcom(subcom);
-    setIsDetailsModalOpen(true);
-  };
-
-  const handleEdit = (subcom) => {
-    setSelectedSubcom(subcom);
+  // Handle View
+  const handleView = (session) => {
+    setSelectedSession(session);
     setIsDetailsModalOpen(true);
   };
 
   // Export functions
   const exportToExcel = () => {
-    const data = paginatedTreasurySubcoms.map((subcom) => ({
-      "Treasury Subcom ID": subcom.id,
-      Name: subcom.name,
-      Phone: subcom.phone,
-      Balance: `₹${subcom.balance.toLocaleString()}`,
-      Status: subcom.status,
-      "Last Active": subcom.lastActive,
+    const data = paginatedLoginSessions.map((session) => ({
+      "Session ID": session.session_id,
+      "Treasury Name": session.treasury_name,
+      "Login Time": session.login_time,
+      "Logout Time": session.logout_time,
+      Duration: session.duration,
+      Location: session.location,
+      UPI: session.upi,
+      "Gpay Amount": `₹${session.gpay_amount}`,
+      "Cash Amount": `₹${session.cash_amount}`,
+      "Mess Bill Amount": `₹${session.mess_bill_amount}`,
+      Status: session.status,
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "TreasurySubcoms");
+    XLSX.utils.book_append_sheet(wb, ws, "LoginSessions");
     const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
     const file = new Blob([excelBuffer], { type: "application/octet-stream" });
-    saveAs(file, `treasury_subcoms_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+    saveAs(file, `login_sessions_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
   };
 
   const exportToCSV = () => {
-    const data = paginatedTreasurySubcoms.map((subcom) => ({
-      "Treasury Subcom ID": subcom.id,
-      Name: subcom.name,
-      Phone: subcom.phone,
-      Balance: `₹${subcom.balance.toLocaleString()}`,
-      Status: subcom.status,
-      "Last Active": subcom.lastActive,
+    const data = paginatedLoginSessions.map((session) => ({
+      "Session ID": session.session_id,
+      "Treasury Name": session.treasury_name,
+      "Login Time": session.login_time,
+      "Logout Time": session.logout_time,
+      Duration: session.duration,
+      Location: session.location,
+      UPI: session.upi,
+      "Gpay Amount": `₹${session.gpay_amount}`,
+      "Cash Amount": `₹${session.cash_amount}`,
+      "Mess Bill Amount": `₹${session.mess_bill_amount}`,
+      Status: session.status,
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const csv = XLSX.utils.sheet_to_csv(ws);
     const file = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    saveAs(file, `treasury_subcoms_${format(new Date(), "yyyy-MM-dd")}.csv`);
+    saveAs(file, `login_sessions_${format(new Date(), "yyyy-MM-dd")}.csv`);
   };
 
   const exportToPDF = () => {
     try {
       const doc = new jsPDF();
-      doc.text("Treasury Subcom List", 14, 20);
+      doc.text("Login Sessions List", 14, 20);
       autoTable(doc, {
         startY: 30,
         head: [
           [
-            "Treasury Subcom ID",
-            "Name",
-            "Phone",
-            "Balance",
+            "Session ID",
+            "Treasury Name",
+            "Login Time",
+            "Logout Time",
+            "Duration",
+            "Location",
+            "UPI",
+            "Gpay Amount",
+            "Cash Amount",
+            "Mess Bill Amount",
             "Status",
-            "Last Active",
           ],
         ],
-        body: paginatedTreasurySubcoms.map((subcom) => [
-          subcom.id || "N/A",
-          subcom.name || "Unknown",
-          subcom.phone || "N/A",
-          `₹${subcom.balance.toLocaleString()}` || "₹0",
-          subcom.status || "N/A",
-          subcom.lastActive || "N/A",
+        body: paginatedLoginSessions.map((session) => [
+          session.session_id,
+          session.treasury_name,
+          session.login_time,
+          session.logout_time,
+          session.duration,
+          session.location,
+          session.upi,
+          `₹${session.gpay_amount}`,
+          `₹${session.cash_amount}`,
+          `₹${session.mess_bill_amount}`,
+          session.status,
         ]),
         theme: "grid",
         styles: { fontSize: 8 },
         headStyles: { fillColor: [0, 0, 77], textColor: [255, 255, 255] },
         margin: { top: 30 },
       });
-      doc.save(`treasury_subcoms_${format(new Date(), "yyyy-MM-dd")}.pdf`);
+      doc.save(`login_sessions_${format(new Date(), "yyyy-MM-dd")}.pdf`);
     } catch (error) {
       console.error("Error exporting to PDF:", error);
       setError("Failed to export PDF. Please try again.");
@@ -238,7 +233,7 @@ export default function TreasurySubcomList() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-3xl font-bold text-[#00004D]">Treasury Subcom Check</h2>
+      <h2 className="text-3xl font-bold text-[#00004D]">Treasury Subcom Sessions</h2>
 
       {/* Filters */}
       <div className="bg-white p-4 rounded-lg shadow-sm space-y-4">
@@ -246,16 +241,12 @@ export default function TreasurySubcomList() {
           <div className="relative flex flex-1/3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground size-4" />
             <Input
-              placeholder="Search by name, ID or phone number..."
+              placeholder="Search by name or ID..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"
             />
           </div>
-          {/* <Button className="bg-[#00004D] text-white flex items-center gap-2 flex-1/5">
-            <QrCode className="size-4" />
-            Scan QR Code
-          </Button> */}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           <div className="flex flex-col gap-1">
@@ -265,7 +256,7 @@ export default function TreasurySubcomList() {
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Treasury Subcoms</SelectItem>
+                <SelectItem value="all">All Sessions</SelectItem>
                 <SelectItem value="Online">Online</SelectItem>
                 <SelectItem value="Offline">Offline</SelectItem>
               </SelectContent>
@@ -311,17 +302,16 @@ export default function TreasurySubcomList() {
             </Select>
           </div>
           <div className="flex flex-col gap-1">
-            <Label className="text-sm px-1">Sort By</Label>
-            <Select value={sortBy} onValueChange={setSortBy}>
+            <Label className="text-sm px-1">Payment Method</Label>
+            <Select value={paymentMethod} onValueChange={setPaymentMethod}>
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Sort By" />
+                <SelectValue placeholder="Filter by payment method" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="asc">Name (A-Z)</SelectItem>
-                <SelectItem value="desc">Name (Z-A)</SelectItem>
-                <SelectItem value="recent">Most Recent</SelectItem>
-                <SelectItem value="high-balance">Balance (High–Low)</SelectItem>
-                <SelectItem value="low-balance">Balance (Low–High)</SelectItem>
+                <SelectItem value="all">All Payment Methods</SelectItem>
+                <SelectItem value="Cash">Cash</SelectItem>
+                <SelectItem value="Gpay">Gpay</SelectItem>
+                <SelectItem value="Mess bill">Mess bill</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -338,10 +328,9 @@ export default function TreasurySubcomList() {
           <Card className="border-l-4 border-green-400">
             <CardContent className="p-4 flex items-center justify-between">
               <div>
-                <CardTitle className="text-muted-foreground text-sm">Total Treasury Subcoms</CardTitle>
-                <div className="text-2xl font-bold mt-1">{totalTreasurySubcoms}</div>
+                <CardTitle className="text-muted-foreground text-sm">Total Sessions</CardTitle>
+                <div className="text-2xl font-bold mt-1">{totalLoginSessions}</div>
               </div>
-              <Users className="bg-green-100 text-green-500 rounded-full p-2 size-10" />
             </CardContent>
           </Card>
           <Card className="border-l-4 border-blue-400">
@@ -350,118 +339,82 @@ export default function TreasurySubcomList() {
                 <CardTitle className="text-muted-foreground text-sm">Online Now</CardTitle>
                 <div className="text-2xl font-bold mt-1">{onlineCount}</div>
               </div>
-              <Wifi className="bg-blue-100 text-blue-500 rounded-full p-2 size-10" />
             </CardContent>
           </Card>
           <Card className="border-l-4 border-purple-400">
             <CardContent className="p-4 flex items-center justify-between">
               <div>
-                <CardTitle className="text-muted-foreground text-sm">Total Balance</CardTitle>
+                <CardTitle className="text-muted-foreground text-sm">Total Transaction Amount</CardTitle>
                 <div className="text-2xl font-bold mt-1">₹{totalBalance.toLocaleString()}</div>
               </div>
-              <Wallet className="bg-purple-100 text-purple-500 rounded-full p-2 size-10" />
             </CardContent>
           </Card>
         </div>
       )}
 
-      {/* Treasury Subcom List */}
+      {/* Session List */}
       {!loading && !error && (
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold">Treasury Subcom List</h2>
+            <h2 className="text-xl font-bold">Session List</h2>
             <Button className="bg-[#00004D] text-white" onClick={() => setIsExportModalOpen(true)}>
               <Download className="mr-2 h-4 w-4" /> Export List
             </Button>
           </div>
-        <div className="overflow-x-auto">
+          <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Treasury Subcom ID</TableHead>
-                  <TableHead>Sender Name</TableHead>
-                  <TableHead>Receiver Name</TableHead>
-                  <TableHead>Balance</TableHead>
+                  <TableHead>Session ID</TableHead>
+                  <TableHead>Treasury Name</TableHead>
+                  <TableHead>Login Time</TableHead>
+                  <TableHead>Logout Time</TableHead>
+                  <TableHead>Duration</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead>UPI</TableHead>
+                  <TableHead>Gpay Amount</TableHead>
+                  <TableHead>Cash Amount</TableHead>
+                  <TableHead>Mess Bill Amount</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Last Active</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedTreasurySubcoms.length === 0 ? (
+                {paginatedLoginSessions.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center">
-                      No treasury subcoms found
+                    <TableCell colSpan={12} className="text-center">
+                      No sessions found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  paginatedTreasurySubcoms.map((subcom) => (
-                    <TableRow key={subcom.id}>
-                      <TableCell className="font-medium">#{subcom.id}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Avatar name={subcom.sender_name} />
-                          <div className="flex flex-col gap-1">
-                            <span>{subcom.sender_name}</span>
-                            <span className="text-[12px] text-gray-500">
-                              ({subcom.sender_role_name})
-                            </span>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Avatar name={subcom.receiver_name} />
-                          <div className="flex flex-col gap-1">
-                            <span>{subcom.receiver_name}</span>
-                            <span className="text-[12px] text-gray-500">
-                              ({subcom.receiver_role_name})
-                            </span>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={`font-medium ${subcom.balance > 10000
-                              ? "text-green-600"
-                              : subcom.balance > 0
-                                ? "text-yellow-600"
-                                : "text-red-600"
-                            }`}
-                        >
-                          ₹{subcom.balance.toLocaleString()}
-                        </span>
-                      </TableCell>
+                  paginatedLoginSessions.map((session) => (
+                    <TableRow key={session?.session_id}>
+                      <TableCell className="font-medium">#{session?.session_id}</TableCell>
+                      <TableCell>{session?.treasury_name}</TableCell>
+                      <TableCell>{session?.login_time}</TableCell>
+                      <TableCell>{session?.logout_time}</TableCell>
+                      <TableCell>{session?.duration}</TableCell>
+                      <TableCell>{session?.location}</TableCell>
+                      <TableCell>{session?.upi}</TableCell>
+                      <TableCell>₹{session?.gpay_amount}</TableCell>
+                      <TableCell>₹{session?.cash_amount}</TableCell>
+                      <TableCell>₹{session?.mess_bill_amount}</TableCell>
                       <TableCell>
                         <Badge
                           variant="ghost"
-                          className={`text-white ${subcom.status.toLowerCase() === "online"
-                              ? "bg-green-500"
-                              : "bg-red-500"
-                            }`}
+                          className={`text-white ${session.status.toLowerCase() === "online" ? "bg-green-500" : "bg-red-500"}`}
                         >
-                          {subcom.status}
+                          {session.status}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {subcom.lastActive }
-                        
-                      </TableCell>
-                      <TableCell className="flex gap-2">
                         <Button
                           variant="link"
                           className="text-blue-600 p-0 h-auto text-sm"
-                          onClick={() => handleView(subcom)}
+                          onClick={() => handleView(session)}
                         >
                           <Eye className="mr-1 h-4 w-4" /> View
                         </Button>
-                        {/* <Button
-                variant="link"
-                className="text-green-600 p-0 h-auto text-sm"
-                onClick={() => handleEdit(subcom)}
-              >
-                <Pencil className="mr-1 h-4 w-4" /> Edit
-              </Button> */}
                       </TableCell>
                     </TableRow>
                   ))
@@ -472,13 +425,13 @@ export default function TreasurySubcomList() {
         </div>
       )}
 
-      {/* Treasury Subcom Details Modal */}
-      <TreasurySubcomDetailsModal
-        subcom={selectedSubcom}
+      {/* Session Details Modal */}
+      <SessionDetailsModal
+        session={selectedSession}
         isOpen={isDetailsModalOpen}
         onClose={() => {
           setIsDetailsModalOpen(false);
-          setSelectedSubcom(null);
+          setSelectedSession(null);
         }}
       />
 
@@ -486,7 +439,7 @@ export default function TreasurySubcomList() {
       <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Export Treasury Subcoms</DialogTitle>
+            <DialogTitle>Export Session List</DialogTitle>
           </DialogHeader>
           <div className="py-4">
             <Label className="text-sm font-medium">Select Export Format</Label>
@@ -526,8 +479,8 @@ export default function TreasurySubcomList() {
         <div className="flex items-center justify-between mt-4">
           <p className="text-sm text-muted-foreground">
             Showing {(page - 1) * pageSize + 1} to{" "}
-            {Math.min(page * pageSize, totalTreasurySubcoms)} of{" "}
-            {totalTreasurySubcoms} treasury subcoms
+            {Math.min(page * pageSize, totalLoginSessions)} of{" "}
+            {totalLoginSessions} sessions
           </p>
           <div className="float-end">
             <Pagination>

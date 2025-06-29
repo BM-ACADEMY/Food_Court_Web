@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import Pegasus from "@/assets/pegasus.png";
 import {
@@ -19,20 +20,62 @@ import { Button } from "@/components/ui/button";
 import { ChevronsUpDown, LogOut, User, Save } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import axios from "axios";
-import { toast } from "react-toastify"; // Import toast\
+import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 
 const TreasuryDashboardHeader = () => {
   const { user, setUser, logout } = useAuth();
   const [openAccount, setOpenAccount] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [showSessionHistoryDialog, setShowSessionHistoryDialog] = useState(false);
+  const [report, setReport] = useState(null);
   const [editData, setEditData] = useState({});
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
+  // Fetch session report
+  const fetchSessionReport = async () => {
+    try {
+      if (!user?._id || typeof user._id !== "string") {
+        throw new Error("User ID is missing or invalid.");
+      }
+
+      const response = await axios.get(
+       `${import.meta.env.VITE_BASE_URL}/treasurySubcom/fetch-session-report/${user._id}`,
+        { withCredentials: true }
+      );
+
+      if (response?.data?.success) {
+        setReport(response.data.data);
+        setError(null);
+      } else {
+        setError("No active session found.");
+        setReport(null);
+      }
+    } catch (err) {
+      console.error("Session report fetch error:", {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+      });
+      const message = err.response?.data?.message || "Failed to fetch session history.";
+      setError(message);
+      toast.error(message, {
+        position: "top-center",
+        autoClose: 3000,
+      });
+    }
+  };
+
+  // Handle report button click
+  const handleReport = async () => {
+    await fetchSessionReport();
+    setShowSessionHistoryDialog(true);
+  };
+
   useEffect(() => {
     if (user) {
-      console.log("UserDashboardHeader: User data:", user);
+
       setEditData({
         name: user.name || "",
         email: user.email || "",
@@ -43,17 +86,11 @@ const TreasuryDashboardHeader = () => {
   }, [user]);
 
   const handleHome = () => {
-    navigate('/')
-  }
+    navigate("/");
+  };
 
   const handleSave = async () => {
-    console.log("handleSave: User ID:", user._id);
-    console.log("handleSave: Payload:", {
-      name: editData.name,
-      email: editData.email,
-      phone_number: editData.phone_number,
-    });
-
+  
     if (!editData.name || !editData.phone_number) {
       setError("Name and phone number are required");
       toast.error("Name and phone number are required", {
@@ -88,7 +125,6 @@ const TreasuryDashboardHeader = () => {
 
     try {
       setError(null);
-      console.log("handleSave: Sending request to:", `${import.meta.env.VITE_BASE_URL}/users/update-user/${user._id}`);
       const res = await axios.put(
         `${import.meta.env.VITE_BASE_URL}/users/update-user/${user._id}`,
         {
@@ -104,7 +140,7 @@ const TreasuryDashboardHeader = () => {
         position: "top-center",
         autoClose: 3000,
       });
-      console.log("handleSave: User updated:", res.data.data);
+
     } catch (err) {
       const message = err.response?.data?.message || "Failed to update account";
       console.error("handleSave: Error details:", {
@@ -121,14 +157,14 @@ const TreasuryDashboardHeader = () => {
   };
 
   const handleLogout = () => {
-    console.log("handleLogout: Logging out user");
+
     sessionStorage.removeItem("dropdownSubmitted");
     logout();
     setShowLogoutDialog(false);
   };
 
   if (!user) {
-    console.warn("UserDashboardHeader: No user data available");
+    console.warn("TreasuryDashboardHeader: No user data available");
     return null;
   }
 
@@ -143,7 +179,7 @@ const TreasuryDashboardHeader = () => {
             </h1>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center text-sm md:text-xs font-medium text-white/80 hover:underline" >
+                <button className="flex items-center text-sm md:text-xs font-medium text-white/80 hover:underline">
                   {user.name}
                   <span className="ml-1 text-white/60">
                     ({user.role?.name || "User"})
@@ -171,16 +207,22 @@ const TreasuryDashboardHeader = () => {
             </DropdownMenu>
           </div>
         </div>
-        <div className="text-right">
-          <p className="text-xs sm:text-sm md:text-sm lg:text-base font-medium text-white/70">
-            Your Balance
-          </p>
-          <p className="text-base sm:text-lg md:text-lg lg:text-2xl font-semibold">
-            ₹ {user.balance}
-          </p>
+        <div className="text-right flex gap-2 items-center">
+          <Button variant="secondary" className="cursor-pointer" onClick={handleReport}>
+            Report
+          </Button>
+          <div className="flex flex-col gap-2">
+            <p className="text-xs sm:text-sm md:text-sm lg:text-base font-medium text-white/70">
+              Your Balance
+            </p>
+            <p className="text-base sm:text-lg md:text-lg lg:text-2xl font-semibold">
+              ₹ {user.balance}
+            </p>
+          </div>
         </div>
       </header>
 
+      {/* Account Edit Dialog */}
       <Dialog open={openAccount} onOpenChange={setOpenAccount}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -189,11 +231,9 @@ const TreasuryDashboardHeader = () => {
               You can update your personal details here.
             </DialogDescription>
           </DialogHeader>
-
           {error && (
             <p className="text-red-500 text-sm mb-3">{error}</p>
           )}
-
           <div className="space-y-3">
             <div>
               <label className="block text-sm font-medium mb-1">Name</label>
@@ -233,7 +273,6 @@ const TreasuryDashboardHeader = () => {
               </div>
             )}
           </div>
-
           <DialogFooter className="pt-4">
             <Button variant="default" onClick={handleSave}>
               <Save className="mr-2 h-4 w-4" />
@@ -243,6 +282,7 @@ const TreasuryDashboardHeader = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Logout Dialog */}
       <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -263,6 +303,69 @@ const TreasuryDashboardHeader = () => {
               onClick={handleLogout}
             >
               <LogOut className="mr-2 h-4 w-4" /> Logout
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Session History Dialog */}
+      <Dialog open={showSessionHistoryDialog} onOpenChange={setShowSessionHistoryDialog}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Session History</DialogTitle>
+            <DialogDescription>
+              Summary of your current session activity.
+            </DialogDescription>
+          </DialogHeader>
+          {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
+          {report ? (
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-semibold text-lg">Session Details</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  <p><strong>Start Time:</strong> {report.session.start_time}</p>
+                  <p><strong>End Time:</strong> {report.session.end_time}</p>
+                  <p><strong>Duration:</strong> {report.session.duration}</p>
+                  <p><strong>Location:</strong> {report.session.location}</p>
+                  <p><strong>UPI ID:</strong> {report.session.upi_id}</p>
+                </div>
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg">Payment Methods</h3>
+                <ul className="list-disc pl-5">
+                  {report.payment_methods.map((pm) => (
+                    <li key={pm.method} className="text-gray-700">
+                      {pm.method}: {pm.amount}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg">Transaction Types</h3>
+                <ul className="list-disc pl-5">
+                  {report.transaction_types.map((tt) => (
+                    <li key={tt.type} className="text-gray-700">
+                      {tt.type}: {tt.count}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg">Transaction Summary</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  <p><strong>Total Outgoing:</strong> {report.total_outgoing}</p>
+                  <p><strong>Total Incoming:</strong> {report.total_incoming}</p>
+                  <p><strong>Refund Outgoing Count:</strong> {report.refund_outgoing_count}</p>
+                  <p><strong>TopUp Outgoing Count:</strong> {report.topup_outgoing_count}</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="text-gray-500">No session data available.</p>
+          )}
+          <DialogFooter className="pt-4">
+            <Button variant="outline" onClick={() => setShowSessionHistoryDialog(false)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

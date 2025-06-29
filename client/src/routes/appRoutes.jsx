@@ -9,6 +9,9 @@ import AdminRoutes from "./adminRoute";
 import Login from "@/Modules/User/pages/Landing/Home";
 import { ProtectedRoute } from "@/context/ProtectedRoute";
 
+import NotFound from "@/Modules/NotFound";
+
+
 
 export default function AppRoutes() {
   const { user, loading } = useAuth();
@@ -39,7 +42,7 @@ export default function AppRoutes() {
       {/* Public routes for unauthenticated users */}
       <Route path="/" element={<Login />} />
       <Route path="/login" element={<Login />} />
-      <Route path="/admin" element={<Login />} />
+
       {/* Protected routes */}
 
       <Route
@@ -86,8 +89,7 @@ export default function AppRoutes() {
 
       {/* Catch-all for unknown routes */}
 
-      {/* <Route path="*" element={<NotFound />} /> */}
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }
-
