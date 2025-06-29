@@ -56,23 +56,73 @@ const UserHistory = () => {
   const limit = 10;
   const [search, setSearch] = useState("");
   const [timeFilter, setTimeFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [transactionTypes, setTransactionTypes] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [exportFormat, setExportFormat] = useState("csv");
   const [noMoreData, setNoMoreData] = useState(false);
   const [isFirstFetch, setIsFirstFetch] = useState(true);
 
+  // Fetch transaction types
+  const fetchTransactionTypes = async () => {
+    try {
+      const response = await axios.get(`${import.meta.env.VITE_BASE_URL}/transactions/types`, {
+        withCredentials: true,
+      });
+      if (response.data.success) {
+        setTransactionTypes(response.data.data);
+      } else {
+        throw new Error(response.data.message || "Failed to fetch transaction types");
+      }
+    } catch (err) {
+      console.error("Fetch transaction types error:", err.message);
+      toast.error("Failed to fetch transaction types", {
+        position: "top-center",
+        autoClose: 3000,
+      });
+      setTransactionTypes(["Transfer", "TopUp", "Refund", "Credit", "Registration Fee"]);
+    }
+  };
+
+  // Fetch transactions
   const fetchTransactions = async () => {
-    if (!user?._id) return;
+    if (!user?._id) {
+      console.error("No user ID available");
+      toast.error("User not authenticated. Please log in again.", {
+        position: "top-center",
+        autoClose: 3000,
+      });
+      return;
+    }
 
     try {
+      console.log("Fetching transactions with params:", {
+        userId: user._id,
+        page,
+        limit,
+        search,
+        quickFilter: timeFilter,
+        type: typeFilter,
+      });
+
       const response = await axios.get(
         `${import.meta.env.VITE_BASE_URL}/transactions/history/user/${user._id}`,
         {
-          params: { page, limit, search, quickFilter: timeFilter },
+          params: { page, limit, search, quickFilter: timeFilter, type: typeFilter },
           withCredentials: true,
         }
       );
+
+      console.log("API response:", {
+        transactions: response.data.transactions,
+        pagination: response.data.pagination,
+      });
+
       const { transactions: fetchedTransactions, pagination } = response.data;
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Failed to fetch transactions");
+      }
 
       if (fetchedTransactions.length === 0 && page > 1) {
         setNoMoreData(true);
@@ -84,154 +134,169 @@ const UserHistory = () => {
       } else {
         setNoMoreData(false);
         setTransactions(fetchedTransactions);
+        setTotalTransactions(pagination.totalTransactions || 0);
         if (isFirstFetch) {
           setInitialTotalTransactions(pagination.totalTransactions || 0);
-          setTotalTransactions(pagination.totalTransactions || 0);
           setIsFirstFetch(false);
         }
       }
     } catch (err) {
       console.error("Fetch transactions error:", err.response?.data || err.message);
-      if ((err.response?.status === 404 || fetchedTransactions?.length === 0) && page > 1) {
-        setNoMoreData(true);
-        setTransactions([]);
-        toast.info("No more transactions available", {
-          position: "top-center",
-          autoClose: 3000,
-        });
-      } else {
-        toast.error("Failed to fetch transactions: " + (err.response?.data?.message || err.message), {
-          position: "top-center",
-          autoClose: 3000,
-        });
-      }
+      setTransactions([]);
+      setNoMoreData(true);
+      toast.error(`Failed to fetch transactions: ${err.response?.data?.message || err.message}`, {
+        position: "top-center",
+        autoClose: 3000,
+        toastId: "fetch-error",
+      });
     }
   };
 
+  // Fetch transaction types on mount
+  useEffect(() => {
+    fetchTransactionTypes();
+  }, []);
+
+  // Fetch transactions when dependencies change
+  useEffect(() => {
+    setPage(1); // Reset to page 1 when filters change
+    fetchTransactions();
+  }, [user, search, timeFilter, typeFilter]);
+
+  // Fetch transactions when page changes
   useEffect(() => {
     fetchTransactions();
-  }, [user, page, search, timeFilter]);
+  }, [page]);
 
   const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= Math.ceil(initialTotalTransactions / limit) && (!noMoreData || newPage < page)) {
+    if (newPage >= 1 && newPage <= Math.ceil(totalTransactions / limit) && !noMoreData) {
       setPage(newPage);
-      if (newPage > Math.ceil(initialTotalTransactions / limit)) {
-        setNoMoreData(true);
-      }
     }
   };
-const exportData = async () => {
-  if (!user?._id || typeof user._id !== "string" || user._id.trim() === "") {
-    toast.error("Invalid user ID. Please log in again.", {
-      position: "top-center",
-      autoClose: 3000,
-    });
-    return;
-  }
 
-  try {
-    toast.info("Exporting transactions...", {
-      position: "top-center",
-      autoClose: false,
-      toastId: "export-loading",
-    });
+  const handleTypeFilterChange = (value) => {
+    setTypeFilter(value);
+    setPage(1); // Reset page to 1 when type filter changes
+  };
 
-    const response = await axios.get(
-      `${import.meta.env.VITE_BASE_URL}/transactions/history/user/${user._id}/export`,
-      {
-        params: { search, quickFilter: timeFilter },
-        withCredentials: true,
-        timeout: 30000,
-      }
-    );
-
-    toast.dismiss("export-loading");
-
-    if (!response.data.success) {
-      throw new Error(response.data.message || "Export failed");
-    }
-
-    const exportTransactions = response.data.transactions;
-
-    if (!exportTransactions || exportTransactions.length === 0) {
-      toast.info("No transactions available for export", {
+  const exportData = async () => {
+    if (!user?._id || typeof user._id !== "string" || user._id.trim() === "") {
+      toast.error("Invalid user ID. Please log in again.", {
         position: "top-center",
         autoClose: 3000,
       });
       return;
     }
 
-    if (exportFormat === "csv") {
-      const csvData = exportTransactions.map((txn) => ({
-        "Transaction ID": txn.id || "N/A",
-        Customer: txn.customer_id || "N/A",
-        Amount: txn.amount ? (txn.amount > 0 ? `₹${txn.amount.toFixed(2)}` : `-₹${Math.abs(txn.amount).toFixed(2)}`) : "N/A",
-        "Date & Time": txn.datetime ? format(new Date(txn.datetime), "dd/MM/yyyy hh:mm a") : "N/A",
-        Status: txn.status || "N/A",
-      }));
-
-      const worksheet = XLSX.utils.json_to_sheet(csvData);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Transactions");
-      XLSX.writeFile(workbook, `transactions_${user._id}.csv`);
-    } else if (exportFormat === "excel") {
-      const excelData = exportTransactions.map((txn) => ({
-        "Transaction ID": txn.id || "N/A",
-        Customer: txn.customer_id || "N/A",
-        Amount: txn.amount ? (txn.amount > 0 ? `₹${txn.amount.toFixed(2)}` : `-₹${Math.abs(txn.amount).toFixed(2)}`) : "N/A",
-        "Date & Time": txn.datetime ? format(new Date(txn.datetime), "dd/MM/yyyy hh:mm a") : "N/A",
-        Status: txn.status || "N/A",
-      }));
-
-      const worksheet = XLSX.utils.json_to_sheet(excelData);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Transactions");
-      XLSX.writeFile(workbook, `transactions_${user._id}.xlsx`);
-    } else if (exportFormat === "pdf") {
-      const doc = new jsPDF();
-      doc.text("Transaction History", 14, 20);
-      doc.text(`User: ${user.name || "N/A"} (${user.customer_id || user.treasury_subcom_id || "N/A"})`, 14, 30);
-
-      const tableData = exportTransactions.map((txn) => [
-        txn.id || "N/A",
-        txn.customer_id || "N/A",
-        txn.amount ? (txn.amount > 0 ? `₹${txn.amount.toFixed(2)}` : `-₹${Math.abs(txn.amount).toFixed(2)}`) : "N/A",
-        txn.datetime ? format(new Date(txn.datetime), "dd/MM/yyyy hh:mm a") : "N/A",
-        txn.status || "N/A",
-      ]);
-
-      autoTable(doc, {
-        startY: 40,
-        head: [["Transaction ID", "Customer", "Amount", "Date & Time", "Status"]],
-        body: tableData,
+    try {
+      toast.info("Exporting transactions...", {
+        position: "top-center",
+        autoClose: false,
+        toastId: "export-loading",
       });
 
-      doc.save(`transactions_${user._id}.pdf`);
+      const response = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/transactions/history/user/${user._id}/export`,
+        {
+          params: { search, quickFilter: timeFilter, type: typeFilter },
+          withCredentials: true,
+          timeout: 30000,
+        }
+      );
+
+      toast.dismiss("export-loading");
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Export failed");
+      }
+
+      const exportTransactions = response.data.transactions;
+
+      console.log("Export transactions:", exportTransactions);
+
+      if (!exportTransactions || exportTransactions.length === 0) {
+        toast.info("No transactions available for export", {
+          position: "top-center",
+          autoClose: 3000,
+        });
+        return;
+      }
+
+      const totalCount = exportTransactions.length;
+
+      if (exportFormat === "csv" || exportFormat === "excel") {
+        const exportData = exportTransactions.map((txn, index) => ({
+          "S.No": index + 1,
+          "Transaction ID": txn.id || "N/A",
+          Customer: txn.customer_id || "N/A",
+          Amount: txn.amount ? (txn.amount > 0 ? `₹${txn.amount.toFixed(2)}` : `-₹${Math.abs(txn.amount).toFixed(2)}`) : "N/A",
+          "Transaction Type": txn.type || "N/A",
+          "Date & Time": txn.datetime ? format(new Date(txn.datetime), "dd/MM/yyyy hh:mm a") : "N/A",
+          Status: txn.status || "N/A",
+        }));
+
+        exportData.push({
+          "S.No": "",
+          "Transaction ID": "",
+          Customer: "",
+          Amount: "",
+          "Transaction Type": "",
+          "Date & Time": "Total Transactions",
+          Status: totalCount.toString(),
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(exportData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Transactions");
+        XLSX.writeFile(workbook, `transactions_${user._id}.${exportFormat === "csv" ? "csv" : "xlsx"}`);
+      } else if (exportFormat === "pdf") {
+        const doc = new jsPDF();
+        doc.text("Transaction History", 14, 20);
+
+        const tableData = exportTransactions.map((txn, index) => [
+          index + 1,
+          txn.id || "N/A",
+          txn.customer_id || "N/A",
+          txn.amount ? (txn.amount > 0 ? `₹${txn.amount.toFixed(2)}` : `-₹${Math.abs(txn.amount).toFixed(2)}`) : "N/A",
+          txn.type || "N/A",
+          txn.datetime ? format(new Date(txn.datetime), "dd/MM/yyyy hh:mm a") : "N/A",
+          txn.status || "N/A",
+        ]);
+
+        tableData.push(["", "", "", "", "", "Total Transactions", totalCount.toString()]);
+
+        autoTable(doc, {
+          startY: 40,
+          head: [["S.No", "Transaction ID", "Customer", "Amount", "Transaction Type", "Date & Time", "Status"]],
+          body: tableData,
+        });
+
+        doc.save(`transactions_${user._id}.pdf`);
+      }
+
+      toast.success("Transactions exported successfully!", {
+        position: "top-center",
+        autoClose: 3000,
+      });
+      setOpenDialog(false);
+    } catch (err) {
+      toast.dismiss("export-loading");
+      const errorMessage = err.response?.data?.message || err.message || "Unknown error occurred";
+      console.error("Export error:", {
+        status: err.response?.status,
+        data: err.response?.data,
+        message: err.message,
+        url: err.config?.url,
+        params: err.config?.params,
+      });
+      toast.error(`Failed to export transactions: ${errorMessage}`, {
+        position: "top-center",
+        autoClose: 5000,
+      });
     }
+  };
 
-    toast.success("Transactions exported successfully!", {
-      position: "top-center",
-      autoClose: 3000,
-    });
-    setOpenDialog(false);
-  } catch (err) {
-    toast.dismiss("export-loading");
-    const errorMessage = err.response?.data?.message || err.message || "Unknown error occurred";
-    console.error("Export error:", {
-      status: err.response?.status,
-      data: err.response?.data,
-      message: err.message,
-      url: err.config?.url,
-      params: err.config?.params,
-    });
-    toast.error(`Failed to export transactions: ${errorMessage}`, {
-      position: "top-center",
-      autoClose: 5000,
-    });
-  }
-};
-
-  const totalPages = Math.ceil(initialTotalTransactions / limit);
+  const totalPages = Math.ceil(totalTransactions / limit);
 
   const handleClose = () => {
     navigate(-1);
@@ -296,6 +361,19 @@ const exportData = async () => {
                 <SelectItem value="last7days">Last 7 Days</SelectItem>
               </SelectContent>
             </Select>
+         <Select value={typeFilter} onValueChange={handleTypeFilterChange}>
+  <SelectTrigger className="w-full sm:w-[180px] text-xs sm:text-sm">
+    <SelectValue placeholder="All Types" />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="all">All Types</SelectItem>
+    {transactionTypes.map((type) => (
+      <SelectItem key={type} value={type}>
+        {type}
+      </SelectItem>
+    ))}
+  </SelectContent>
+</Select>
             <Input
               className="w-full sm:w-[300px] text-xs sm:text-sm"
               placeholder="Search by name, ID, or customer ID"
@@ -315,38 +393,48 @@ const exportData = async () => {
             <table className="w-full text-xs sm:text-sm text-left text-gray-500 min-w-[600px]">
               <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                 <tr>
+                  <th className="px-2 sm:px-4 py-2">S.No</th>
                   <th className="px-2 sm:px-4 py-2">Transaction ID</th>
                   <th className="px-2 sm:px-4 py-2">Customer</th>
                   <th className="px-2 sm:px-4 py-2">Amount</th>
+                  <th className="px-2 sm:px-4 py-2">Transaction Type</th>
                   <th className="px-2 sm:px-4 py-2">Date & Time</th>
                   <th className="px-2 sm:px-4 py-2">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {transactions.length > 0 ? (
-                  transactions.map((transaction) => (
+                  transactions.map((transaction, index) => (
                     <tr key={transaction.id} className="bg-white border-b">
-                      <td className="px-2 sm:px-4 py-2">{transaction.id}</td>
-                      <td className="px-2 sm:px-4 py-2">{transaction.customer_id}</td>
+                      <td className="px-2 sm:px-4 py-2">{(page - 1) * limit + index + 1}</td>
+                      <td className="px-2 sm:px-4 py-2">{transaction.id || "N/A"}</td>
+                      <td className="px-2 sm:px-4 py-2">{transaction.customer_id || "N/A"}</td>
                       <td className="px-2 sm:px-4 py-2" style={{ color: transaction.amount > 0 ? 'green' : 'red' }}>
-                        {transaction.amount > 0
-                          ? `₹${transaction.amount.toFixed(2)}`
-                          : `-₹${Math.abs(transaction.amount).toFixed(2)}`}
+                        {transaction.amount !== undefined
+                          ? (transaction.amount > 0
+                              ? `₹${transaction.amount.toFixed(2)}`
+                              : `-₹${Math.abs(transaction.amount).toFixed(2)}`)
+                          : "N/A"}
                       </td>
+                      <td className="px-2 sm:px-4 py-2">{transaction.type || "N/A"}</td>
                       <td className="px-2 sm:px-4 py-2">
-                        {format(new Date(transaction.datetime), "dd/MM/yyyy hh:mm a")}
+                        {transaction.datetime
+                          ? format(new Date(transaction.datetime), "dd/MM/yyyy hh:mm a")
+                          : "N/A"}
                       </td>
                       <td className="px-2 sm:px-4 py-2">
                         <Badge className="bg-green-100 text-green-800 text-xs">
-                          {transaction.status}
+                          {transaction.status || "N/A"}
                         </Badge>
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} className="px-2 sm:px-4 py-2 text-center">
-                      {noMoreData ? "No more transactions available" : "No transactions found"}
+                    <td colSpan={7} className="px-2 sm:px-4 py-2 text-center">
+                      {noMoreData && page > 1
+                        ? "No more transactions available"
+                        : `No transactions found${typeFilter !== "all" ? ` for type "${transactionTypes.find(t => t.toLowerCase() === typeFilter) || typeFilter}"` : ""}`}
                     </td>
                   </tr>
                 )}
@@ -392,7 +480,6 @@ const exportData = async () => {
         </CardContent>
       </Card>
 
-      {/* Export Dialog */}
       <Dialog open={openDialog} onOpenChange={setOpenDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
