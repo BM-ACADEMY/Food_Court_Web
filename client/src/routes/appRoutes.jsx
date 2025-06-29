@@ -7,7 +7,7 @@ import TreasuryRoutes from "./treasury";
 import AdminRoutes from "./adminRoute";
 import Login from "@/Modules/User/pages/Landing/Home";
 import { ProtectedRoute } from "@/context/ProtectedRoute";
-// import NotFound from "@/Modules/NotFound";
+
 
 export default function AppRoutes() {
   const { user, loading } = useAuth();
