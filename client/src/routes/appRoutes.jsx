@@ -1,4 +1,3 @@
-
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import MasterAdminRoutes from "./masterAdmin";
@@ -17,9 +16,8 @@ export default function AppRoutes() {
   if (loading) return <div>Loading...</div>;
 
   // Redirect logged-in user away from / or /login
-  const isLoginPage = location.pathname === "/" || location.pathname === "/login";
+  if (user && (location.pathname === "/" || location.pathname === "/login")) {
 
-  if (user && isLoginPage) {
     switch (user.role.role_id) {
       case "role-1": return <Navigate to="/master-admin" replace />;
       case "role-2": return <Navigate to="/admin" replace />;
@@ -27,6 +25,8 @@ export default function AppRoutes() {
       case "role-4": return <Navigate to="/restaurant" replace />;
       case "role-5": return <Navigate to="/customer/userdashboard" replace />;
       default: return <Navigate to="/login" replace />;
+
+
     }
   }
 
@@ -89,4 +89,3 @@ export default function AppRoutes() {
     </Routes>
   );
 }
-
