@@ -1,3 +1,4 @@
+
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import MasterAdminRoutes from "./masterAdmin";
@@ -15,6 +16,7 @@ export default function AppRoutes() {
 
   if (loading) return <div>Loading...</div>;
 
+  // Redirect logged-in user away from / or /login
   if (user && (location.pathname === "/" || location.pathname === "/login")) {
 
     switch (user.role.role_id) {
@@ -88,3 +90,4 @@ export default function AppRoutes() {
     </Routes>
   );
 }
+
