@@ -14,58 +14,49 @@ function TopUpSuccess({ data, onNewTopUp, customer }) {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const handleBackToHome = async () => {
-    try {
-      // Validate customer data and IDs
-      if (!customer || !customer.receiver_id || !customer.sender_id) {
-        throw new Error('Customer data, receiver_id, or sender_id is missing.');
-      }
-      if (!user || !user._id) {
-        throw new Error('Authenticated user ID is missing.');
-      }
-
-      const objectIdPattern = /^[0-9a-fA-F]{24}$/;
-      if (!objectIdPattern.test(customer.receiver_id)) {
-        console.warn('Invalid receiver_id format:', customer.receiver_id);
-        navigate('/home');
-        return;
-      }
-
-      // Debug: Log sender_id and receiver_id
-      console.log("Sender ID vs Receiver ID:", {
-        senderId: customer.sender_id,
-        receiverId: customer.receiver_id,
-      });
-
-      const customerResponse = await axios.get(
-        `${import.meta.env.VITE_BASE_URL}/customers/fetch-all-customer-details`,
-      )
-
-      // Call the fee deduction endpoint
-      const response = await axios.post(
-        `${import.meta.env.VITE_BASE_URL}/fees/fee-deduction`,
-
-        {
-          sender_id: customer.sender_id,
-          receiver_id: customer.receiver_id,
-        },
-        { withCredentials: true }
-      );
-
-      console.log('Fee deduction response:', response.data);
-
-      if (response.data.success) {
-        console.log('Registration fee processed successfully, navigating to /home');
-        navigate('/');
-      } else {
-        throw new Error(response.data.message || 'Failed to process registration fee');
-      }
-    } catch (err) {
-      console.error('Back to Home error:', err);
-      alert(`Error processing registration fee: ${err.message || 'Unknown error'}`);
-      // Fallback navigation
+ const handleBackToHome = async () => {
+  try {
+    console.log('Customer data:', customer);
+    if (!customer || !customer.receiver_id || !customer.sender_id) {
+      throw new Error('Customer data, receiver_id, or sender_id is missing.');
     }
-  };
+    if (!user || !user._id) {
+      throw new Error('Authenticated user ID is missing.');
+    }
+
+    const objectIdPattern = /^[0-9a-fA-F]{24}$/;
+    if (!objectIdPattern.test(customer.receiver_id) || !objectIdPattern.test(customer.sender_id)) {
+      console.warn('Invalid ID format:', { receiver_id: customer.receiver_id, sender_id: customer.sender_id });
+      navigate('/home');
+      return;
+    }
+
+    const response = await axios.post(
+      `${import.meta.env.VITE_BASE_URL}/fees/fee-deduction`,
+      {
+        sender_id: customer.sender_id,
+        receiver_id: customer.receiver_id,
+      },
+      { withCredentials: true }
+    );
+
+    console.log('Fee deduction response:', response.data);
+    if (response.data.success) {
+      navigate('/');
+    } else {
+      throw new Error(response.data.message || 'Failed to process registration fee');
+    }
+  } catch (err) {
+  console.error('Back to Home error:', {
+    message: err.message,
+    response: err.response?.data, // Log the full response
+    status: err.response?.status,
+    customer: customer,
+  });
+  alert(`Error processing registration fee: ${err.response?.data?.message || err.message || 'Unknown error'}`);
+  navigate('/home');
+}
+};
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
