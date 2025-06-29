@@ -219,7 +219,7 @@ export default function Refund() {
               <div className="w-full h-56 rounded-md overflow-hidden relative">
                 {!scanning && (
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <ScanLine className="w-40 h-40 text-[#000052] opacity-90" />
+                    <ScanLine className="w-40 h-40 text-[red] opacity-90" />
                   </div>
                 )}
                 <div

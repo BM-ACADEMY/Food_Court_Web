@@ -192,9 +192,9 @@ const TreasurySubcomDetailsModal = ({ subcom, isOpen, onClose }) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-full sm:max-w-4xl lg:max-w-6xl w-full">
+      <DialogContent className="max-w-[95vw] sm:max-w-[90vw] md:max-w-2xl lg:max-w-4xl xl:max-w-6xl w-full h-[90vh] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Treasury Subcom Details - #{subcomData?.id}</DialogTitle>
+          <DialogTitle className="text-lg sm:text-xl">Treasury Subcom Details - #{subcomData?.id}</DialogTitle>
         </DialogHeader>
         <Tabs defaultValue="info" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
@@ -204,7 +204,7 @@ const TreasurySubcomDetailsModal = ({ subcom, isOpen, onClose }) => {
 
           {/* User Information Tab */}
           <TabsContent value="info" className="space-y-4 w-full">
-            <div className="flex items-center space-x-4 mb-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
               <Avatar className="h-15 w-15">
                 <AvatarImage src={subcomData.avatar || undefined} />
                 <AvatarFallback className="bg-blue-700 text-white">
@@ -315,7 +315,7 @@ const TreasurySubcomDetailsModal = ({ subcom, isOpen, onClose }) => {
           <TabsContent value="transactions" className="space-y-4 w-full">
             <div className="flex justify-end mb-4">
               <Select value={filter} onValueChange={setFilter}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-[150px] sm:w-[180px]">
                   <SelectValue placeholder="Filter transactions" />
                 </SelectTrigger>
                 <SelectContent>
@@ -332,7 +332,7 @@ const TreasurySubcomDetailsModal = ({ subcom, isOpen, onClose }) => {
             {!loading && !error && (
               <>
                 <div className="overflow-x-auto w-full">
-                  <Table className="min-w-[1000px] table-fixed">
+                  <Table className="min-w-[600px] sm:min-w-[800px] md:min-w-full table-fixed">
                     <TableHeader>
                       <TableRow>
                         <TableHead className="whitespace-nowrap">Transaction ID</TableHead>

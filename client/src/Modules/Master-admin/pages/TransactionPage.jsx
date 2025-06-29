@@ -775,88 +775,114 @@ export default function TransactionHistory() {
     }
   };
 
-  // Export functions
-  const exportToExcel = () => {
-    const data = transactions.map((txn) => ({
-      "Date & Time": txn.datetime,
-      "Transaction ID": txn.id,
-      "User Name": txn.user.name,
-      "User Type": txn.user.type,
-      Type: txn.type,
-      Description: txn.description,
-      Location: txn.location,
-      Amount: txn.amount < 0 ? `-₹${Math.abs(txn.amount)}` : `₹${txn.amount}`,
-    }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Transactions");
-    const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-    const file = new Blob([excelBuffer], { type: "application/octet-stream" });
-    saveAs(file, `transactions_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
-  };
 
-  const exportToCSV = () => {
-    const data = transactions.map((txn) => ({
-      "Date & Time": txn.datetime,
-      "Transaction ID": txn.id,
-      "User Name": txn.user.name,
-      "User Type": txn.user.type,
-      Type: txn.type,
-      Description: txn.description,
-      Location: txn.location,
-      Amount: txn.amount < 0 ? `-₹${Math.abs(txn.amount)}` : `₹${txn.amount}`,
-    }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    const csv = XLSX.utils.sheet_to_csv(ws);
-    const file = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    saveAs(file, `transactions_${format(new Date(), "yyyy-MM-dd")}.csv`);
-  };
+const fetchAllTransactions = async () => {
+  try {
+    const response = await axios.get(
+      `${import.meta.env.VITE_BASE_URL}/transactions/history`,
+      {
+        params: {
+          transactionType: "all",
+          userType: "all",
+          location: "all",
+          search: "",
+          page: 1,
+          limit: 10000,
+        },
+        withCredentials: true,
+      }
+    );
+    return response.data.transactions || [];
+  } catch (err) {
+    console.error("Error fetching all transactions for export:", err);
+    setError("Failed to fetch transactions for export.");
+    return [];
+  }
+};
 
-  const exportToPDF = () => {
-    try {
-      const doc = new jsPDF();
-      doc.text("Transaction History", 14, 20);
-      autoTable(doc, {
-        startY: 30,
-        head: [["Date & Time", "Transaction ID", "User Name", "User Type", "Type", "Description", "Location", "Amount"]],
-        body: transactions.map((txn) => [
-          txn.faktiskt || "N/A",
-          txn.id || "N/A",
-          txn.user?.name || "Unknown",
-          txn.user?.type || "Unknown",
-          txn.type || "N/A",
-          txn.description || "N/A",
-          txn.location || "N/A",
-          txn.amount < 0 ? `-₹${Math.abs(txn.amount) || 0}` : `₹${txn.amount || 0}`,
-        ]),
-        theme: "grid",
-        styles: { fontSize: 8 },
-        headStyles: { fillColor: [0, 0, 77], textColor: [255, 255, 255] },
-        margin: { top: 30 },
-      });
-      doc.save(`transactions_${format(new Date(), "yyyy-MM-dd")}.pdf`);
-    } catch (error) {
-      console.error("Error exporting to PDF:", error);
-      setError("Failed to export PDF. Please try again.");
-    }
-  };
+// Prepare export data
+const prepareExportData = (transactions) => {
+  return transactions.map((txn) => ({
+    "Date & Time": txn.datetime || format(new Date(), "yyyy-MM-dd HH:mm:ss"),
+    "Transaction ID": txn.id || "Unknown",
+    "User Name": txn.user?.name || "Unknown",
+    "User Type": txn.user?.type || "Unknown",
+    Type: txn.type || "Unknown",
+    Description: txn.description || txn.remarks || "No description",
+    Amount: txn.amount < 0 ? `-₹${Math.abs(txn.amount).toFixed(2)}` : `₹${txn.amount.toFixed(2)}`,
+  }));
+};
 
-  const handleExport = () => {
-    switch (exportFormat) {
-      case "xlsx":
-        exportToExcel();
-        break;
-      case "csv":
-        exportToCSV();
-        break;
-      case "pdf":
-        exportToPDF();
-        break;
-      default:
-        console.error("Invalid export format");
-    }
-    setIsExportModalOpen(false);
-  };
+// Export to Excel
+const exportToExcel = async () => {
+  const allTransactions = await fetchAllTransactions();
+  const data = prepareExportData(allTransactions);
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Transactions");
+  const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  const file = new Blob([excelBuffer], { type: "application/octet-stream" });
+  saveAs(file, `transactions_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+};
+
+// Export to CSV
+const exportToCSV = async () => {
+  const allTransactions = await fetchAllTransactions();
+  const data = prepareExportData(allTransactions);
+  const ws = XLSX.utils.json_to_sheet(data);
+  const csv = XLSX.utils.sheet_to_csv(ws);
+  const file = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  saveAs(file, `transactions_${format(new Date(), "yyyy-MM-dd")}.csv`);
+};
+
+// Export to PDF
+const exportToPDF = async () => {
+  try {
+    const allTransactions = await fetchAllTransactions();
+    const data = prepareExportData(allTransactions);
+    const doc = new jsPDF();
+    doc.text("Transaction History", 14, 20);
+    autoTable(doc, {
+      startY: 30,
+      head: [["Date & Time", "Transaction ID", "User Name", "User Type", "Type", "Description", "Amount"]],
+      body: data.map((txn) => [
+        txn["Date & Time"],
+        txn["Transaction ID"],
+        txn["User Name"],
+        txn["User Type"],
+        txn.Type,
+        txn.Description,
+        txn.Amount,
+      ]),
+      theme: "grid",
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [0, 0, 77], textColor: [255, 255, 255] },
+      margin: { top: 30 },
+    });
+    doc.save(`transactions_${format(new Date(), "yyyy-MM-dd")}.pdf`);
+  } catch (error) {
+    console.error("Error exporting to PDF:", error);
+    setError("Failed to export PDF. Please try again.");
+  }
+};
+
+// Handle export
+const handleExport = () => {
+  switch (exportFormat) {
+    case "xlsx":
+      exportToExcel();
+      break;
+    case "csv":
+      exportToCSV();
+      break;
+    case "pdf":
+      exportToPDF();
+      break;
+    default:
+      console.error("Invalid export format");
+  }
+  setIsExportModalOpen(false);
+};
 
   if (loading) {
     return <div className="p-6">Loading...</div>;
