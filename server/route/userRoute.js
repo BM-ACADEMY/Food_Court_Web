@@ -44,6 +44,8 @@ router.get("/fetch-user-by-id/:id", userController.getUserById);
 // PUT /api/users/update/:id
 router.put("/update-user/:id", userController.updateUser);
 
+router.put("/update-user-flag/:id", userController.updateUserFlag);
+
 // DELETE /api/users/delete/:id
 router.delete("/delete-user/:id", userController.deleteUser);
 

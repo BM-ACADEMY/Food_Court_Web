@@ -304,7 +304,7 @@ const FoodStalls = ({ handlePayNow }) => {
               Pay to {selectedRestaurant?.restaurant_name}
             </DialogTitle>
           </DialogHeader>
-          <div className="bg-[#f4f6ff] border text-sm text-gray-700 px-4 py-2 rounded mb-4 space-y-1">
+          {/* <div className="bg-[#f4f6ff] border text-sm text-gray-700 px-4 py-2 rounded mb-4 space-y-1">
             <p>
               <span className="font-medium text-[#00004d]">Store:</span>{" "}
               {selectedRestaurant?.restaurant_name || "N/A"}
@@ -319,7 +319,7 @@ const FoodStalls = ({ handlePayNow }) => {
                 ? selectedRestaurant.qr_code.slice(0, 50) + "..."
                 : selectedRestaurant?.qr_code || "N/A"}
             </p>
-          </div>
+          </div> */}
           <div className="space-y-2">
             <label htmlFor="paymentAmount" className="text-sm font-medium text-gray-700">
               Amount to Pay
@@ -339,12 +339,12 @@ const FoodStalls = ({ handlePayNow }) => {
             </div>
           </div>
           <DialogFooter className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
-            <Button
+            {/* <Button
               onClick={() => setShowPaymentDialog(false)}
               className="w-full sm:w-auto bg-gray-500 hover:bg-gray-600 text-white transition-colors"
             >
               Cancel
-            </Button>
+            </Button> */}
             <Button
               onClick={handlePayment}
               className="w-full sm:w-auto bg-[#000066] hover:bg-[#000080] text-white transition-colors"

@@ -34,7 +34,7 @@ function Home() {
     { title: "Customer History", icon: Users, color: "text-purple-600", path: "/treasury/customer-history" },
     { title: "Restaurant History", icon: Utensils, color: "text-red-600", path: "/treasury/restaurant-history" },
     { title: "User History", icon: User, color: "text-orange-600", path: "/treasury/user-history" },
-    // { title: "Generate QR", icon: QrCode, color: "text-indigo-600", path: "/treasury/generate-qr" },
+    { title: "Generate QR", icon: QrCode, color: "text-indigo-600", path: "/treasury/generate-qr" },
   ];
 
   // Fetch locations and UPI IDs from backend

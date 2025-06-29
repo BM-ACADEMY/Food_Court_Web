@@ -10,7 +10,8 @@ import {
   SquareTerminal,
   MapPin,
   QrCode,
-  FileText
+  FileText,
+  ArrowDownFromLine
 } from "lucide-react";
 
 import { NavMain } from "@/components/nav-main";
@@ -74,6 +75,11 @@ const masterAdminNavLinks = [
     url: "/master-admin/upi",
     icon: FileText,
   },
+  {
+    title: "Registration Fees",
+    url: "/master-admin/fees",
+    icon: ArrowDownFromLine,
+  },
 ];
 
 const adminNavLinks = [
@@ -131,6 +137,11 @@ const adminNavLinks = [
     title: "Offline Qrcode",
     url: "/admin/qrcode",
     icon: QrCode,
+  },
+   {
+    title: "Registration Fees",
+    url: "/admin/fees",
+    icon: ArrowDownFromLine,
   },
 ];
 

@@ -259,70 +259,144 @@ export default function Dashboard() {
     if (page >= 1 && page <= totalPages) setCurrentPage(page);
   };
 
-  const exportToExcel = (data) => {
-    const formattedData = data.map((item) => ({
-      "Transaction ID": item.id || "N/A",
-      "Time": item.time || "N/A",
-      "Type": item.type || "N/A",
-      "From": item.from || "Unknown",
-      "To": item.to || "Unknown",
-      "Amount": item.amount || "₹0",
-      "Status": item.status || "N/A",
-    }));
+const exportToExcel = (data) => {
+  // Add serial numbers and format data
+  const formattedData = data.map((item, index) => ({
+    "S.No": index + 1,
+    "Transaction ID": item.id || "N/A",
+    "Time": item.time || "N/A",
+    "Type": item.type || "N/A",
+    "From": item.from || "Unknown",
+    "To": item.to || "Unknown",
+    "Amount": item.amount ? parseFloat(item.amount.replace(/[^0-9.-]+/g,"")) : 0,
+    "Status": item.status || "N/A",
+  }));
 
-    const ws = XLSX.utils.json_to_sheet(formattedData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Transactions");
-    XLSX.writeFile(wb, `transactions_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
-  };
+  // Calculate total amount
+  const totalAmount = formattedData.reduce((sum, item) => sum + item.Amount, 0);
 
-  const exportToCSV = (data) => {
-    const formattedData = data.map((item) => ({
-      "Transaction ID": item.id || "N/A",
-      "Time": item.time || "N/A",
-      "Type": item.type || "N/A",
-      "From": item.from || "Unknown",
-      "To": item.to || "Unknown",
-      "Amount": item.amount || "₹0",
-      "Status": item.status || "N/A",
-    }));
+  // Add total row
+  formattedData.push({
+    "S.No": "TOTAL",
+    "Transaction ID": "",
+    "Time": "",
+    "Type": "",
+    "From": "",
+    "To": "",
+    "Amount": totalAmount,
+    "Status": "",
+  });
 
-    const ws = XLSX.utils.json_to_sheet(formattedData);
-    const csv = XLSX.utils.sheet_to_csv(ws);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    saveAs(blob, `transactions_${format(new Date(), "yyyy-MM-dd")}.csv`);
-  };
+  const ws = XLSX.utils.json_to_sheet(formattedData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Transactions");
 
-  const exportToPDF = (data) => {
-    const doc = new jsPDF();
+  // Style the total row
+  const totalRow = data.length + 2; // +2 because header is row 1 and data starts at row 2
+  ws[`A${totalRow}`].s = { font: { bold: true } };
+  ws[`G${totalRow}`].s = { font: { bold: true } };
 
-    doc.setFontSize(16);
-    doc.text("Transaction Report", 14, 15);
+  XLSX.writeFile(wb, `transactions_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+};
 
-    doc.setFontSize(10);
-    doc.text(`Generated on: ${format(new Date(), "yyyy-MM-dd HH:mm")}`, 14, 22);
+const exportToCSV = (data) => {
+  // Add serial numbers and format data
+  const formattedData = data.map((item, index) => ({
+    "S.No": index + 1,
+    "Transaction ID": item.id || "N/A",
+    "Time": item.time || "N/A",
+    "Type": item.type || "N/A",
+    "From": item.from || "Unknown",
+    "To": item.to || "Unknown",
+    "Amount": item.amount || "₹0",
+    "Status": item.status || "N/A",
+  }));
 
-    const tableData = data.map((item) => [
-      item.id || "N/A",
-      item.time || "N/A",
-      item.type || "N/A",
-      item.from || "Unknown",
-      item.to || "Unknown",
-      item.amount || "₹0",
-      item.status || "N/A",
-    ]);
+  // Calculate total amount
+  const totalAmount = formattedData.reduce((sum, item) => {
+    const amount = parseFloat(item.Amount.replace(/[^0-9.-]+/g,"")) || 0;
+    return sum + amount;
+  }, 0);
 
-    autoTable(doc, {
-      startY: 30,
-      head: [["ID", "Time", "Type", "From", "To", "Amount", "Status"]],
-      body: tableData,
-      theme: "grid",
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [0, 0, 77] },
-    });
+  // Add total row
+  formattedData.push({
+    "S.No": "TOTAL",
+    "Transaction ID": "",
+    "Time": "",
+    "Type": "",
+    "From": "",
+    "To": "",
+    "Amount": `₹${totalAmount.toFixed(2)}`,
+    "Status": "",
+  });
 
-    doc.save(`transactions_${format(new Date(), "yyyy-MM-dd")}.pdf`);
-  };
+  const ws = XLSX.utils.json_to_sheet(formattedData);
+  const csv = XLSX.utils.sheet_to_csv(ws);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  saveAs(blob, `transactions_${format(new Date(), "yyyy-MM-dd")}.csv`);
+};
+
+const exportToPDF = (data) => {
+  const doc = new jsPDF();
+  
+  // Title and date
+  doc.setFontSize(16);
+  doc.text("Transaction Report", 14, 15);
+  doc.setFontSize(10);
+  doc.text(`Generated on: ${format(new Date(), "yyyy-MM-dd HH:mm")}`, 14, 22);
+
+  // Prepare data with serial numbers
+  const tableData = data.map((item, index) => [
+    index + 1, // Serial number
+    item.id || "N/A",
+    item.time || "N/A",
+    item.type || "N/A",
+    item.from || "Unknown",
+    item.to || "Unknown",
+    item.amount || "₹0",
+    item.status || "N/A",
+  ]);
+
+  // Calculate total amount
+  const totalAmount = data.reduce((sum, item) => {
+    const amount = parseFloat(item.amount?.replace(/[^0-9.-]+/g,"") || 0);
+    return sum + amount;
+  }, 0);
+
+  autoTable(doc, {
+    startY: 30,
+    head: [["S.No", "ID", "Time", "Type", "From", "To", "Amount", "Status"]],
+    body: tableData,
+    foot: [["", "", "", "", "", "TOTAL", `₹${totalAmount.toFixed(2)}`, ""]],
+    theme: "grid",
+    styles: { fontSize: 8 },
+    headStyles: { 
+      fillColor: [0, 0, 77],
+      textColor: 255,
+      fontStyle: 'bold'
+    },
+    footStyles: {
+      fillColor: [220, 220, 220],
+      textColor: 0,
+      fontStyle: 'bold'
+    },
+    didDrawPage: function(data) {
+      // Page numbers
+      const pageCount = doc.internal.getNumberOfPages();
+      doc.setFontSize(10);
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.text(
+          `Page ${i} of ${pageCount}`,
+          data.settings.margin.left,
+          doc.internal.pageSize.height - 10
+        );
+      }
+    }
+  });
+
+  doc.save(`transactions_${format(new Date(), "yyyy-MM-dd")}.pdf`);
+};
 
   const handleExport = async () => {
     try {

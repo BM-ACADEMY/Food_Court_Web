@@ -287,70 +287,190 @@ export default function TransactionHistory() {
   };
 
   // Prepare export data
-  const prepareExportData = (transactions) => {
-    return transactions.map((txn) => ({
-      "Date & Time": txn.datetime || format(new Date(), "yyyy-MM-dd HH:mm:ss"),
-      "Transaction ID": txn.id || "Unknown",
-      "User Name": txn.user?.name || "Unknown",
-      "User Type": txn.user?.type || "Unknown",
-      Type: txn.type || "Unknown",
-      Description: txn.description || txn.remarks || "No description",
-      Amount: txn.amount < 0 ? `-₹${Math.abs(txn.amount).toFixed(2)}` : `₹${txn.amount.toFixed(2)}`,
-    }));
-  };
+const prepareExportData = (transactions) => {
+  return transactions.map((txn, index) => ({
+    "S.No": index + 1,
+    "Date & Time": txn.datetime || format(new Date(), "yyyy-MM-dd HH:mm:ss"),
+    "Transaction ID": txn.id || "Unknown",
+    "User Name": txn.user?.name || "Unknown",
+    "User Type": txn.user?.type || "Unknown",
+    Type: txn.type || "Unknown",
+    Description: txn.description || txn.remarks || "No description",
+    "Amount (₹)": txn.amount ? parseFloat(txn.amount) : 0,
+    "Formatted Amount": txn.amount < 0 ? `-₹${Math.abs(txn.amount).toFixed(2)}` : `₹${txn.amount.toFixed(2)}`,
+    Status: txn.status || "Unknown",
+  }));
+};
 
-  // Export to Excel
-  const exportToExcel = async () => {
+// Export to Excel with totals
+const exportToExcel = async () => {
+  try {
     const allTransactions = await fetchAllTransactions();
     const data = prepareExportData(allTransactions);
-    const ws = XLSX.utils.json_to_sheet(data);
+    
+    // Calculate total amount
+    const totalAmount = data.reduce((sum, item) => sum + item["Amount (₹)"], 0);
+    
+    // Add total row
+    const dataWithTotal = [
+      ...data,
+      {
+        "S.No": "TOTAL",
+        "Date & Time": "",
+        "Transaction ID": "",
+        "User Name": "",
+        "User Type": "",
+        Type: "",
+        Description: "",
+        "Amount (₹)": totalAmount,
+        "Formatted Amount": `₹${totalAmount.toFixed(2)}`,
+        Status: "",
+      }
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(dataWithTotal);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Transactions");
+    
+    // Style the total row
+    const totalRow = data.length + 2; // +2 because header is row 1 and data starts at row 2
+    ws[`A${totalRow}`].s = { font: { bold: true } };
+    ws[`H${totalRow}`].s = { font: { bold: true } };
+    ws[`I${totalRow}`].s = { font: { bold: true } };
+
     const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
     const file = new Blob([excelBuffer], { type: "application/octet-stream" });
     saveAs(file, `transactions_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
-  };
+  } catch (error) {
+    console.error("Error exporting to Excel:", error);
+    setError("Failed to export Excel. Please try again.");
+  }
+};
 
-  // Export to CSV
-  const exportToCSV = async () => {
+// Export to CSV with totals
+const exportToCSV = async () => {
+  try {
     const allTransactions = await fetchAllTransactions();
     const data = prepareExportData(allTransactions);
-    const ws = XLSX.utils.json_to_sheet(data);
+    
+    // Calculate total amount
+    const totalAmount = data.reduce((sum, item) => sum + item["Amount (₹)"], 0);
+    
+    // Add total row
+    const dataWithTotal = [
+      ...data,
+      {
+        "S.No": "TOTAL",
+        "Date & Time": "",
+        "Transaction ID": "",
+        "User Name": "",
+        "User Type": "",
+        Type: "",
+        Description: "",
+        "Amount (₹)": "",
+        "Formatted Amount": `₹${totalAmount.toFixed(2)}`,
+        Status: "",
+      }
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(dataWithTotal);
     const csv = XLSX.utils.sheet_to_csv(ws);
     const file = new Blob([csv], { type: "text/csv;charset=utf-8" });
     saveAs(file, `transactions_${format(new Date(), "yyyy-MM-dd")}.csv`);
-  };
+  } catch (error) {
+    console.error("Error exporting to CSV:", error);
+    setError("Failed to export CSV. Please try again.");
+  }
+};
 
-  // Export to PDF
-  const exportToPDF = async () => {
-    try {
-      const allTransactions = await fetchAllTransactions();
-      const data = prepareExportData(allTransactions);
-      const doc = new jsPDF();
-      doc.text("Transaction History", 14, 20);
-      autoTable(doc, {
-        startY: 30,
-        head: [["Date & Time", "Transaction ID", "User Name", "User Type", "Type", "Description", "Amount"]],
-        body: data.map((txn) => [
-          txn["Date & Time"],
-          txn["Transaction ID"],
-          txn["User Name"],
-          txn["User Type"],
-          txn.Type,
-          txn.Description,
-          txn.Amount,
-        ]),
-        theme: "grid",
-        styles: { fontSize: 8 },
-        headStyles: { fillColor: [0, 0, 77], textColor: [255, 255, 255] },
-        margin: { top: 30 },
-      });
-      doc.save(`transactions_${format(new Date(), "yyyy-MM-dd")}.pdf`);
-    } catch (error) {
-      console.error("Error exporting to PDF:", error);
-      setError("Failed to export PDF. Please try again.");
-    }
-  };
+// Export to PDF with totals and serial numbers
+const exportToPDF = async () => {
+  try {
+    const allTransactions = await fetchAllTransactions();
+    const data = prepareExportData(allTransactions);
+    
+    // Calculate total amount
+    const totalAmount = data.reduce((sum, item) => sum + item["Amount (₹)"], 0);
+    
+    const doc = new jsPDF();
+    
+    // Title and metadata
+    doc.setFontSize(16);
+    doc.text("Transaction History Report", 14, 15);
+    doc.setFontSize(10);
+    doc.text(`Generated on: ${format(new Date(), "yyyy-MM-dd HH:mm")}`, 14, 22);
+    doc.text(`Total Transactions: ${data.length}`, 14, 28);
+    doc.text(`Total Amount: ₹${totalAmount.toFixed(2)}`, 14, 34);
+
+    // Prepare table data
+    const tableData = data.map(item => [
+      item["S.No"],
+      item["Date & Time"],
+      item["Transaction ID"],
+      item["User Name"],
+      item.Type,
+      item.Description,
+      item["Formatted Amount"],
+      item.Status
+    ]);
+
+    // Add total row
+    const footerData = [
+      ["", "", "", "", "", "TOTAL", `₹${totalAmount.toFixed(2)}`, ""]
+    ];
+
+    autoTable(doc, {
+      startY: 40,
+      head: [["S.No", "Date", "ID", "User", "Type", "Description", "Amount", "Status"]],
+      body: tableData,
+      foot: footerData,
+      theme: "grid",
+      styles: { 
+        fontSize: 8,
+        cellPadding: 2,
+        overflow: "linebreak"
+      },
+      headStyles: { 
+        fillColor: [0, 0, 77],
+        textColor: 255,
+        fontStyle: 'bold'
+      },
+      footStyles: {
+        fillColor: [220, 220, 220],
+        textColor: 0,
+        fontStyle: 'bold'
+      },
+      columnStyles: {
+        0: { cellWidth: 'auto' }, // S.No
+        1: { cellWidth: 'auto' }, // Date
+        2: { cellWidth: 'auto' }, // ID
+        3: { cellWidth: 'auto' }, // User
+        4: { cellWidth: 'auto' }, // Type
+        5: { cellWidth: 40 },     // Description (wider)
+        6: { cellWidth: 'auto' }, // Amount
+        7: { cellWidth: 'auto' }  // Status
+      },
+      didDrawPage: function(data) {
+        // Page numbers
+        const pageCount = doc.internal.getNumberOfPages();
+        doc.setFontSize(10);
+        for (let i = 1; i <= pageCount; i++) {
+          doc.setPage(i);
+          doc.text(
+            `Page ${i} of ${pageCount}`,
+            data.settings.margin.left,
+            doc.internal.pageSize.height - 10
+          );
+        }
+      }
+    });
+
+    doc.save(`transactions_${format(new Date(), "yyyy-MM-dd")}.pdf`);
+  } catch (error) {
+    console.error("Error exporting to PDF:", error);
+    setError("Failed to export PDF. Please try again.");
+  }
+};
 
   // Handle export
   const handleExport = () => {
@@ -679,7 +799,8 @@ export default function TransactionHistory() {
                 <TableRow>
                   <TableHead>Date & Time</TableHead>
                   <TableHead>Transaction ID</TableHead>
-                  <TableHead>User</TableHead>
+                  <TableHead>Sender Name</TableHead>
+                  <TableHead>Receiver Name</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Payment Method</TableHead>
@@ -695,10 +816,17 @@ export default function TransactionHistory() {
                     <TableCell className="font-semibold">{txn.id}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Avatar name={txn.user.name} />
-                        <div className="font-medium">{txn.user.name}</div>
+                        <Avatar name={txn.sender.name} />
+                        <div className="font-medium">{txn.sender.name}</div>
                       </div>
-                      <div className="text-xs text-muted-foreground">{txn.user.type}</div>
+                      <div className="text-xs text-muted-foreground">({txn.sender.role})</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Avatar name={txn.receiver.name} />
+                        <div className="font-medium">{txn.receiver.name}</div>
+                      </div>
+                      <div className="text-xs text-muted-foreground">({txn.receiver.role})</div>
                     </TableCell>
                     <TableCell>
                       {editingTransactionId === txn.id ? (
@@ -722,7 +850,7 @@ export default function TransactionHistory() {
                       ) : (
                         <span
                           className={`capitalize rounded px-2 py-1 text-xs font-medium
-                            ${txn.type === "Transfer"
+                                  ${txn.type === "Transfer"
                               ? "bg-blue-100 text-blue-700"
                               : txn.type === "TopUp"
                                 ? "bg-purple-100 text-purple-700"
@@ -770,32 +898,46 @@ export default function TransactionHistory() {
                           </SelectContent>
                         </Select>
                       ) : (
-                        txn.paymentMethod
+                        <span
+                          className={`font-medium px-2 py-1 rounded-full  ${txn.paymentMethod === "Cash"
+                              ? "bg-green-100 text-green-800"
+                              : txn.paymentMethod === "Gpay"
+                                ? "bg-blue-100 text-blue-800"
+                                : txn.paymentMethod === "Mess bill"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : txn.paymentMethod === "Balance Deduction"
+                                    ? "bg-red-100 text-red-800"
+                                    : "bg-gray-100 text-gray-800"
+                            }`}
+                        >
+                          {txn.paymentMethod}
+                        </span>
                       )}
                     </TableCell>
+
                     {/* <TableCell>
-                      {editingTransactionId === txn.id ? (
-                        <Select
-                          value={editFormData.location_id}
-                          onValueChange={(value) =>
-                            setEditFormData((prev) => ({ ...prev, location_id: value }))
-                          }
-                        >
-                          <SelectTrigger className="w-[150px]">
-                            <SelectValue placeholder="Select Location" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {locations.map((loc) => (
-                              <SelectItem key={loc._id} value={loc._id}>
-                                {loc.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        txn.location
-                      )}
-                    </TableCell> */}
+                            {editingTransactionId === txn.id ? (
+                              <Select
+                                value={editFormData.location_id}
+                                onValueChange={(value) =>
+                                  setEditFormData((prev) => ({ ...prev, location_id: value }))
+                                }
+                              >
+                                <SelectTrigger className="w-[150px]">
+                                  <SelectValue placeholder="Select Location" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {locations.map((loc) => (
+                                    <SelectItem key={loc._id} value={loc._id}>
+                                      {loc.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              txn.location
+                            )}
+                          </TableCell> */}
                     <TableCell className="text-right font-semibold">
                       {editingTransactionId === txn.id ? (
                         <Input
@@ -840,7 +982,6 @@ export default function TransactionHistory() {
               </TableBody>
             </Table>
           </div>
-
           <div className="pt-4 w-full overflow-x-auto">
             <div className="min-w-[300px] whitespace-nowrap flex justify-end">
               <Pagination>
