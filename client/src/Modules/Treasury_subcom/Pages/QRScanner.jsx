@@ -1,7 +1,9 @@
+// In components/QRScanner.jsx
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input"; // Add Input component from shadcn
 import {
   Dialog,
   DialogTrigger,
@@ -12,7 +14,7 @@ import {
 import { QrCode, ScanLine } from "lucide-react";
 import { Html5Qrcode } from "html5-qrcode";
 import axios from "axios";
-import TopUpOnline from "./TopUpOnline"; // ✅ Updated import
+import TopUpOnline from "./TopUpOnline";
 
 function QRScanner() {
   const [scannedData, setScannedData] = useState(null);
@@ -21,6 +23,7 @@ function QRScanner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showTopUp, setShowTopUp] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState(""); // New state for phone number input
 
   const qrRef = useRef(null);
   const html5QrCodeRef = useRef(null);
@@ -119,6 +122,50 @@ function QRScanner() {
     }
   };
 
+  // New function to handle phone number search
+  const handlePhoneSearch = async () => {
+    if (!phoneNumber) {
+      setError("Please enter a phone number.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await axios.get(
+        `${BASE_URL}/customers/fetch-customer-details-by-phone?phone_number=${encodeURIComponent(phoneNumber)}`,
+        { withCredentials: true }
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Customer not found.");
+      }
+
+      const { customer_id, user_id, name, email, phone_number, balance } = response.data.data;
+
+      const balanceValue =
+        balance !== "Payment not done yet" ? parseFloat(balance.toString()) : 0;
+
+      const newScannedData = {
+        customerId: customer_id || "N/A",
+        userId: user_id,
+        name: name || "N/A",
+        phone: phone_number || "N/A",
+        email: email || "N/A",
+        currentBalance: balanceValue,
+      };
+
+      console.log("Phone search customer data:", newScannedData);
+      setScannedData(newScannedData);
+    } catch (err) {
+      console.error("Phone search error:", err);
+      setError(err.message || "Failed to fetch customer details.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (scannerOpen) {
       const delayStart = setTimeout(() => startScanner(), 300);
@@ -140,22 +187,21 @@ function QRScanner() {
     setShowTopUp(false);
     setScannedData(null);
     setError("");
+    setPhoneNumber(""); // Reset phone number input
   };
 
-  // ✅ Render TopUpOnline page if top-up is triggered
   if (showTopUp && scannedData) {
     return (
-  <TopUpOnline
-  customer={{
-    name: scannedData.name,
-    phone: scannedData.phone,
-    user_id: scannedData.userId._id, // ✅ Fix here
-    customer_id: scannedData.customerId,
-    email: scannedData.email,
-    currentBalance: scannedData.currentBalance,
-  }}
-/>
-
+      <TopUpOnline
+        customer={{
+          name: scannedData.name,
+          phone: scannedData.phone,
+          user_id: scannedData.userId,
+          customer_id: scannedData.customerId,
+          email: scannedData.email,
+          currentBalance: scannedData.currentBalance,
+        }}
+      />
     );
   }
 
@@ -198,6 +244,26 @@ function QRScanner() {
               </Button>
             </DialogContent>
           </Dialog>
+
+          {/* Phone Number Search Box */}
+          <div className="mt-4">
+            <div className="flex gap-2">
+              <Input
+                type="text"
+                placeholder="Enter phone number"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                className="w-full"
+              />
+              <Button
+                onClick={handlePhoneSearch}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={loading}
+              >
+                {loading ? "Searching..." : "Search"}
+              </Button>
+            </div>
+          </div>
 
           {error && (
             <p className="text-red-500 text-sm bg-red-50 p-2 rounded mt-4">{error}</p>

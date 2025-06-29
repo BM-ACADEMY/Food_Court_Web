@@ -454,3 +454,47 @@ exports.getCustomerByUserId = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// In controller/customerController.js
+exports.getCustomerDetailsByPhone = async (req, res) => {
+  try {
+    const { phone_number } = req.query;
+
+    // Validate phone number input
+    if (!phone_number) {
+      return res.status(400).json({ success: false, message: "Phone number is required" });
+    }
+
+    // Find user by phone number
+    const user = await User.findOne({ phone_number }).select("name email phone_number _id");
+    if (!user) {
+      return res.status(404).json({ success: false, message: "No user found for this phone number" });
+    }
+
+    // Find customer by user_id
+    const customer = await Customer.findOne({ user_id: user._id });
+    if (!customer) {
+      return res.status(404).json({ success: false, message: "No customer found for this user" });
+    }
+
+    // Fetch balance from UserBalance model
+    const userBalance = await UserBalance.findOne({ user_id: user._id });
+    const balance = userBalance ? parseFloat(userBalance.balance.toString()) : null;
+
+    // Prepare response
+    const response = {
+      customer_id: customer.customer_id,
+      user_id: user._id,
+      name: user.name,
+      email: user.email || "N/A",
+      phone_number: user.phone_number,
+      balance: balance !== null ? balance : "Payment not done yet",
+    };
+
+    res.status(200).json({ success: true, data: response });
+  } catch (err) {
+    console.error("Error in getCustomerDetailsByPhone:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+

@@ -30,5 +30,6 @@ router.get("/fetch-customer-details-by-qr", customerController.getCustomerDetail
 // Add to existing routes
 router.get("/fetch-by-customer-id", customerController.getCustomerByCustomerId);
 router.get("/fetch-by-user-id/:id", customerController.getCustomerByUserId);
-
+// In routes/customer.js
+router.get("/fetch-customer-details-by-phone", customerController.getCustomerDetailsByPhone);
 module.exports = router;
