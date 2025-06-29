@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { Button } from "@/components/ui/button";
-import { ScanLine, Play, Square, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import { ScanLine, Play, Square, CheckCircle2, XCircle, AlertCircle,ScanQrCode  } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -28,7 +28,7 @@ export default function Refund() {
   const html5QrCodeRef = useRef(null);
   const [scanning, setScanning] = useState(false);
   const [cameraError, setCameraError] = useState("");
-  const [manualQrCode, setManualQrCode] = useState("");
+  // const [manualQrCode, setManualQrCode] = useState("");
   const [customer, setCustomer] = useState({
     name: "",
     id: "",
@@ -72,7 +72,7 @@ export default function Refund() {
           backCamera.deviceId,
           {
             fps: 10,
-            qrbox: { width: 300, height: 150 },
+            qrbox: { width: 300, height: 350 },
           },
           decodedText => handleScanSuccess(decodedText),
           error => console.warn("QR scan error:", error)
@@ -83,7 +83,7 @@ export default function Refund() {
           { facingMode: "environment" },
           {
             fps: 10,
-            qrbox: { width: 300, height: 150 },
+            qrbox: { width: 300, height: 350 },
           },
           decodedText => handleScanSuccess(decodedText),
           error => console.warn("QR scan error:", error)
@@ -126,16 +126,16 @@ export default function Refund() {
     }
   };
 
-  const handleManualQrSubmit = async () => {
-    if (!manualQrCode) {
-      setResultMessage("Please enter a valid QR code.");
-      setIsSuccess(false);
-      setShowResultDialog(true);
-      return;
-    }
-    await handleScanSuccess(manualQrCode);
-    setManualQrCode("");
-  };
+  // const handleManualQrSubmit = async () => {
+  //   if (!manualQrCode) {
+  //     setResultMessage("Please enter a valid QR code.");
+  //     setIsSuccess(false);
+  //     setShowResultDialog(true);
+  //     return;
+  //   }
+  //   await handleScanSuccess(manualQrCode);
+  //   setManualQrCode("");
+  // };
 
   const stopScanner = async () => {
     if (html5QrCodeRef.current) {
@@ -219,13 +219,13 @@ export default function Refund() {
               <div className="w-full h-56 rounded-md overflow-hidden relative">
                 {!scanning && (
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <ScanLine className="w-40 h-40 text-[red] opacity-90" />
+                    <ScanQrCode className="w-40 h-40 text-[red] opacity-90" />
                   </div>
                 )}
                 <div
                   id="qr-reader"
                   ref={qrRef}
-                  className="w-full h-full bg-gray-100"
+                  className={`w-full h-full bg-gray-100 ${!scanning ? 'opacity-0' : 'opacity-100'}`}
                 />
               </div>
               {cameraError && (
@@ -233,7 +233,7 @@ export default function Refund() {
               )}
             </div>
 
-            <div className="mt-4 w-full max-w-sm">
+            {/* <div className="mt-4 w-full max-w-sm">
               <Label htmlFor="manualQrCode" className="text-sm">
                 Enter QR Code Manually
               </Label>
@@ -253,7 +253,7 @@ export default function Refund() {
                   Submit QR
                 </Button>
               </div>
-            </div>
+            </div> */}
 
             <div className="mt-6 w-full flex justify-center">
               {!scanning ? (

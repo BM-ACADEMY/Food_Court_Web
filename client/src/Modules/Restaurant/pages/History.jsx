@@ -156,63 +156,154 @@ export default function History() {
   const totalPages = Math.ceil(filtered.length / PER_PAGE);
   const paginated = filtered.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
 
-  // Export data
-  const exportData = () => {
-    const data = filtered.map((txn) => {
-      const customerName =
-        txn.sender_id?._id.toString() === user._id.toString()
-          ? txn.receiver_id?.name
-          : txn.sender_id?.name;
-      const customerId = txn.customer_id || "N/A";
-      const amountPrefix = txn.sender_id?._id.toString() === user._id.toString() ? "-" : "+";
-      const dateTime = new Date(txn.created_at).toLocaleString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "numeric",
-        hour12: true,
-      });
-      return {
-        "Transaction ID": txn.transaction_id || txn._id,
-        Customer: customerName || "Unknown",
-        "Customer ID": customerId,
-        Amount: `${amountPrefix}${txn.amount}`,
-        "Date & Time": dateTime,
-        Status: txn.status,
-        Type: txn.transaction_type,
-      };
+ const exportData = () => {
+  const data = filtered.map((txn, index) => {  // Added index parameter
+    const customerName =
+      txn.sender_id?._id.toString() === user._id.toString()
+        ? txn.receiver_id?.name
+        : txn.sender_id?.name;
+    const customerId = txn.customer_id || "N/A";
+    const amountPrefix = txn.sender_id?._id.toString() === user._id.toString() ? "-" : "+";
+    const numericAmount = parseFloat(txn.amount || "0");
+    const dateTime = new Date(txn.created_at).toLocaleString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "numeric",
+      hour12: true,
     });
+    return {
+      "S.No": index + 1,  // Added serial number
+      "Transaction ID": txn.transaction_id || txn._id,
+      Customer: customerName || "Unknown",
+      "Customer ID": customerId,
+      Amount: numericAmount,
+      "Formatted Amount": `${amountPrefix}${numericAmount.toFixed(2)}`,
+      "Date & Time": dateTime,
+      Status: txn.status,
+      Type: txn.transaction_type,
+    };
+  });
 
-    if (exportFormat === "csv" || exportFormat === "excel") {
-      const worksheet = XLSX.utils.json_to_sheet(data);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Transactions");
-      const fileType = exportFormat === "csv" ? "csv" : "xlsx";
-      const fileBuffer = XLSX.write(workbook, { bookType: fileType, type: "array" });
-      const blob = new Blob([fileBuffer], {
-        type:
-          exportFormat === "csv"
-            ? "text/csv;charset=utf-8;"
-            : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
-      saveAs(blob, `transaction_history.${fileType}`);
-    } else if (exportFormat === "pdf") {
-      const doc = new jsPDF();
-      doc.text("Transaction History Report", 14, 10);
-      autoTable(doc, {
-        startY: 20,
-        head: [
-          ["Transaction ID", "Customer", "Customer ID", "Amount", "Date & Time", "Status", "Type"],
-        ],
-        body: data.map((txn) => Object.values(txn)),
-      });
-      doc.save("transaction_history.pdf");
+  // Calculate total amount
+  const totalAmount = data.reduce((sum, txn) => {
+    const amount = txn.Amount;
+    const isOutgoing = txn["Formatted Amount"].startsWith("-");
+    return isOutgoing ? sum - amount : sum + amount;
+  }, 0);
+
+  if (exportFormat === "csv" || exportFormat === "excel") {
+    // Add total row to the data
+    const dataWithTotal = [
+      ...data,
+      {
+        "S.No": "",
+        "Transaction ID": "TOTAL",
+        Customer: "",
+        "Customer ID": "",
+        Amount: totalAmount,
+        "Formatted Amount": totalAmount.toFixed(2),
+        "Date & Time": "",
+        Status: "",
+        Type: "",
+      },
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(dataWithTotal);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Transactions");
+    
+    // Style the total row
+    if (exportFormat === "excel") {
+      const ws = workbook.Sheets["Transactions"];
+      // Bold the total row
+      const totalRow = data.length + 2; // +2 because header is row 1 and data starts at row 2
+      ws[`A${totalRow}`].s = { font: { bold: true } };
+      ws[`E${totalRow}`].s = { font: { bold: true } };
+      ws[`F${totalRow}`].s = { font: { bold: true } };
     }
 
-    setOpenDialog(false);
-  };
+    const fileType = exportFormat === "csv" ? "csv" : "xlsx";
+    const fileBuffer = XLSX.write(workbook, { bookType: fileType, type: "array" });
+    const blob = new Blob([fileBuffer], {
+      type:
+        exportFormat === "csv"
+          ? "text/csv;charset=utf-8;"
+          : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    saveAs(blob, `transaction_history.${fileType}`);
+  } else if (exportFormat === "pdf") {
+    const doc = new jsPDF();
+    
+    // Title
+    doc.setFontSize(16);
+    doc.text("Transaction History Report", 14, 10);
+    
+    // Date range info
+    doc.setFontSize(10);
+    doc.text(`Date Range: ${dateFilter}`, 14, 18);
+    
+    // Prepare data with serial numbers
+    const tableData = data.map((txn) => [
+      txn["S.No"],  // Serial number
+      txn["Transaction ID"],
+      txn.Customer,
+      txn["Formatted Amount"],
+      txn["Date & Time"],
+      txn.Status,
+      txn.Type,
+    ]);
 
+    // Table
+    autoTable(doc, {
+      startY: 25,
+      head: [
+        ["S.No", "Transaction ID", "Customer", "Amount", "Date & Time", "Status", "Type"],
+      ],
+      body: tableData,
+      foot: [
+        ["", "", "TOTAL", totalAmount.toFixed(2), "", "", ""],
+      ],
+      didDrawPage: function (data) {
+        // Footer with page numbers
+        const pageCount = doc.internal.getNumberOfPages();
+        doc.setFontSize(10);
+        for (let i = 1; i <= pageCount; i++) {
+          doc.setPage(i);
+          doc.text(
+            `Page ${i} of ${pageCount}`,
+            data.settings.margin.left,
+            doc.internal.pageSize.height - 10
+          );
+        }
+      },
+      headStyles: {
+        fillColor: [0, 0, 82], // Dark blue header
+        textColor: 255, // White text
+        fontStyle: 'bold'
+      },
+      footStyles: {
+        fillColor: [220, 220, 220], // Gray footer
+        textColor: 0, // Black text
+        fontStyle: 'bold'
+      },
+      columnStyles: {
+        0: { cellWidth: 'auto' }, // Serial number column
+        1: { cellWidth: 'auto' }, // Transaction ID column
+        2: { cellWidth: 'auto' }, // Customer column
+        3: { cellWidth: 'auto' }, // Amount column
+        4: { cellWidth: 'auto' }, // Date column
+        5: { cellWidth: 'auto' }, // Status column
+        6: { cellWidth: 'auto' }, // Type column
+      },
+    });
+    
+    doc.save("transaction_history.pdf");
+  }
+
+  setOpenDialog(false);
+};
   // Calculate today's transactions
   const todaysTransactions = transactions.filter((txn) => {
     const txnDate = new Date(txn.created_at);
