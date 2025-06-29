@@ -374,13 +374,13 @@ export default function TreasurySubcomList() {
               <Download className="mr-2 h-4 w-4" /> Export List
             </Button>
           </div>
-          <div className="overflow-x-auto">
+        <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Treasury Subcom ID</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Phone</TableHead>
+                  <TableHead>Sender Name</TableHead>
+                  <TableHead>Receiver Name</TableHead>
                   <TableHead>Balance</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Last Active</TableHead>
@@ -390,7 +390,7 @@ export default function TreasurySubcomList() {
               <TableBody>
                 {paginatedTreasurySubcoms.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center">
+                    <TableCell colSpan={8} className="text-center">
                       No treasury subcoms found
                     </TableCell>
                   </TableRow>
@@ -403,7 +403,9 @@ export default function TreasurySubcomList() {
                           <Avatar name={subcom.sender_name} />
                           <div className="flex flex-col gap-1">
                             <span>{subcom.sender_name}</span>
-                            <span className="text-[12px] text-gray-500">({subcom.sender_role_name})</span>
+                            <span className="text-[12px] text-gray-500">
+                              ({subcom.sender_role_name})
+                            </span>
                           </div>
                         </div>
                       </TableCell>
@@ -412,40 +414,38 @@ export default function TreasurySubcomList() {
                           <Avatar name={subcom.receiver_name} />
                           <div className="flex flex-col gap-1">
                             <span>{subcom.receiver_name}</span>
-                            <span className="text-[12px] text-gray-500">({subcom.receiver_role_name})</span>
+                            <span className="text-[12px] text-gray-500">
+                              ({subcom.receiver_role_name})
+                            </span>
                           </div>
                         </div>
                       </TableCell>
-
-                      <TableCell>{subcom.phone}</TableCell>
                       <TableCell>
                         <span
                           className={`font-medium ${subcom.balance > 10000
-                            ? "text-green-600"
-                            : subcom.balance > 0
-                              ? "text-yellow-600"
-                              : "text-red-600"
+                              ? "text-green-600"
+                              : subcom.balance > 0
+                                ? "text-yellow-600"
+                                : "text-red-600"
                             }`}
                         >
                           ₹{subcom.balance.toLocaleString()}
                         </span>
                       </TableCell>
-
                       <TableCell>
                         <Badge
                           variant="ghost"
                           className={`text-white ${subcom.status.toLowerCase() === "online"
-                            ? "bg-green-500"
-                            : "bg-red-500"
+                              ? "bg-green-500"
+                              : "bg-red-500"
                             }`}
                         >
                           {subcom.status}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {subcom.lastActive && !isNaN(new Date(subcom.lastActive).getTime())
-                          ? format(new Date(subcom.lastActive), "dd-MM-yyyy HH:mm")
-                          : "N/A"}
+                        {subcom.lastActive }
+                        
                       </TableCell>
                       <TableCell className="flex gap-2">
                         <Button
@@ -456,12 +456,12 @@ export default function TreasurySubcomList() {
                           <Eye className="mr-1 h-4 w-4" /> View
                         </Button>
                         {/* <Button
-                          variant="link"
-                          className="text-green-600 p-0 h-auto text-sm"
-                          onClick={() => handleEdit(subcom)}
-                        >
-                          <Pencil className="mr-1 h-4 w-4" /> Edit
-                        </Button> */}
+                variant="link"
+                className="text-green-600 p-0 h-auto text-sm"
+                onClick={() => handleEdit(subcom)}
+              >
+                <Pencil className="mr-1 h-4 w-4" /> Edit
+              </Button> */}
                       </TableCell>
                     </TableRow>
                   ))

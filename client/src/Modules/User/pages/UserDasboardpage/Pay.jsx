@@ -30,7 +30,7 @@ const QrScanner = () => {
   const [resultMessage, setResultMessage] = useState("");
   const [isSuccess, setIsSuccess] = useState(true);
   const [amount, setAmount] = useState("");
-  const [manualQrCode, setManualQrCode] = useState("");
+  // const [manualQrCode, setManualQrCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user, loading } = useAuth();
   const navigate = useNavigate();
@@ -61,7 +61,7 @@ const QrScanner = () => {
     try {
       await html5QrCode.start(
         { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 300, height: 150 } },
+        { fps: 10, qrbox: { width: 300, height: 350 } },
         async (decodedText) => {
           await validateQrCode(decodedText);
           stopScanner();
@@ -112,22 +112,22 @@ const QrScanner = () => {
     }
   };
 
-  const handleManualQrSubmit = async () => {
-    if (!isCustomer) {
-      setResultMessage(user ? "Only customers can make payments." : "Please log in to make payments.");
-      setIsSuccess(false);
-      setShowResultDialog(true);
-      return;
-    }
+  // const handleManualQrSubmit = async () => {
+  //   if (!isCustomer) {
+  //     setResultMessage(user ? "Only customers can make payments." : "Please log in to make payments.");
+  //     setIsSuccess(false);
+  //     setShowResultDialog(true);
+  //     return;
+  //   }
 
-    if (manualQrCode.trim()) {
-      await validateQrCode(manualQrCode);
-    } else {
-      setResultMessage("Please enter a valid QR code.");
-      setIsSuccess(false);
-      setShowResultDialog(true);
-    }
-  };
+  //   if (manualQrCode.trim()) {
+  //     await validateQrCode(manualQrCode);
+  //   } else {
+  //     setResultMessage("Please enter a valid QR code.");
+  //     setIsSuccess(false);
+  //     setShowResultDialog(true);
+  //   }
+  // };
 
   const handlePaymentSubmit = async () => {
     if (!isCustomer || !user?._id) {
@@ -240,10 +240,10 @@ const QrScanner = () => {
                     <ScanLine className="w-40 h-40 text-[#00004d] opacity-90" />
                   </div>
                 )}
-                <div id="qr-reader" ref={qrRef} className="w-full h-full" />
+                <div id="qr-reader" ref={qrRef} className={`w-full h-full ${!scanning ? 'opacity-0' : 'opacity-100'}`} />
               </div>
 
-              <div className="mt-4 w-full">
+              {/* <div className="mt-4 w-full">
                 <Input
                   type="text"
                   value={manualQrCode}
@@ -259,7 +259,7 @@ const QrScanner = () => {
                 >
                   Validate QR Code
                 </Button>
-              </div>
+              </div> */}
             </div>
 
             <div className="mt-6 w-full flex justify-center">

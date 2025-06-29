@@ -28,7 +28,7 @@ export default function Deduct() {
   const html5QrCodeRef = useRef(null);
   const [scanning, setScanning] = useState(false);
   const [cameraError, setCameraError] = useState("");
-  const [manualQrCode, setManualQrCode] = useState("");
+  // const [manualQrCode, setManualQrCode] = useState("");
   const [customer, setCustomer] = useState({
     name: "",
     id: "",
@@ -126,16 +126,16 @@ export default function Deduct() {
     }
   };
 
-  const handleManualQrSubmit = async () => {
-    if (!manualQrCode) {
-      setResultMessage("Please enter a valid QR code.");
-      setIsSuccess(false);
-      setShowResultDialog(true);
-      return;
-    }
-    await handleScanSuccess(manualQrCode);
-    setManualQrCode("");
-  };
+  // const handleManualQrSubmit = async () => {
+  //   if (!manualQrCode) {
+  //     setResultMessage("Please enter a valid QR code.");
+  //     setIsSuccess(false);
+  //     setShowResultDialog(true);
+  //     return;
+  //   }
+  //   await handleScanSuccess(manualQrCode);
+  //   setManualQrCode("");
+  // };
 
   const stopScanner = async () => {
     if (html5QrCodeRef.current) {
@@ -231,56 +231,56 @@ export default function Deduct() {
 
 
 
-const handleDeduct = async () => {
-  const deductAmount = parseFloat(amount);
-  if (isNaN(deductAmount) || deductAmount <= 0) {
-    setResultMessage("Please enter a valid amount greater than 0.");
-    setIsSuccess(false);
-    setShowResultDialog(true);
-    return;
-  }
+  const handleDeduct = async () => {
+    const deductAmount = parseFloat(amount);
+    if (isNaN(deductAmount) || deductAmount <= 0) {
+      setResultMessage("Please enter a valid amount greater than 0.");
+      setIsSuccess(false);
+      setShowResultDialog(true);
+      return;
+    }
 
-  if (deductAmount > customer.balance) {
-    setResultMessage(`Insufficient balance. Current balance: ₹${customer.balance.toFixed(2)}`);
-    setIsSuccess(false);
-    setShowResultDialog(true);
-    return;
-  }
+    if (deductAmount > customer.balance) {
+      setResultMessage(`Insufficient balance. Current balance: ₹${customer.balance.toFixed(2)}`);
+      setIsSuccess(false);
+      setShowResultDialog(true);
+      return;
+    }
 
-  try {
-    console.log("Initiating payment:", { deductAmount, customerId: customer.id, restaurantId: user._id });
-    const formattedAmount = deductAmount.toFixed(2);
-    const response = await axios.post(
-      `${import.meta.env.VITE_BASE_URL}/transactions/process-payment`,
-      {
-        sender_id: customer.id,
-        receiver_id: user._id,
-        amount: formattedAmount,
-        transaction_type: "Transfer",
-        payment_method: "Gpay",
-        remarks: `Payment from ${customer.name} to restaurant`,
-      },
-      { withCredentials: true }
-    );
+    try {
+      console.log("Initiating payment:", { deductAmount, customerId: customer.id, restaurantId: user._id });
+      const formattedAmount = deductAmount.toFixed(2);
+      const response = await axios.post(
+        `${import.meta.env.VITE_BASE_URL}/transactions/process-payment`,
+        {
+          sender_id: customer.id,
+          receiver_id: user._id,
+          amount: formattedAmount,
+          transaction_type: "Transfer",
+          payment_method: "Gpay",
+          remarks: `Payment from ${customer.name} to restaurant`,
+        },
+        { withCredentials: true }
+      );
 
-    console.log("Payment response:", response.data);
-    const newCustomerBalance = (customer.balance - deductAmount).toFixed(2);
-    setCustomer(prev => ({
-      ...prev,
-      balance: parseFloat(newCustomerBalance),
-    }));
-    setAmount("");
-    setResultMessage(response.data.message);
-    setIsSuccess(true);
-    setShowResultDialog(true);
-  } catch (err) {
-    console.error("Deduction error:", err);
-    const errorMessage = err.response?.data?.message || "Failed to process payment. Please try again.";
-    setResultMessage(`Error: ${errorMessage}`);
-    setIsSuccess(false);
-    setShowResultDialog(true);
-  }
-};
+      console.log("Payment response:", response.data);
+      const newCustomerBalance = (customer.balance - deductAmount).toFixed(2);
+      setCustomer(prev => ({
+        ...prev,
+        balance: parseFloat(newCustomerBalance),
+      }));
+      setAmount("");
+      setResultMessage(response.data.message);
+      setIsSuccess(true);
+      setShowResultDialog(true);
+    } catch (err) {
+      console.error("Deduction error:", err);
+      const errorMessage = err.response?.data?.message || "Failed to process payment. Please try again.";
+      setResultMessage(`Error: ${errorMessage}`);
+      setIsSuccess(false);
+      setShowResultDialog(true);
+    }
+  };
 
   useEffect(() => {
     return () => {
@@ -313,7 +313,7 @@ const handleDeduct = async () => {
                 <div
                   id="qr-reader"
                   ref={qrRef}
-                  className="w-full h-full bg-gray-100"
+                  className={`w-full h-full bg-gray-100 ${!scanning ? 'opacity-0' : 'opacity-100'}`}
                 />
               </div>
               {cameraError && (
@@ -321,7 +321,7 @@ const handleDeduct = async () => {
               )}
             </div>
 
-            <div className="mt-4 w-full max-w-sm">
+            {/* <div className="mt-4 w-full max-w-sm">
               <Label htmlFor="manualQrCode" className="text-sm sm:text-base">
                 Enter QR Code Manually
               </Label>
@@ -341,7 +341,7 @@ const handleDeduct = async () => {
                   Submit QR
                 </Button>
               </div>
-            </div>
+            </div> */}
 
             <div className="mt-6 w-full flex justify-center">
               {!scanning ? (

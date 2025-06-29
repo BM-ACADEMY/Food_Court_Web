@@ -5,6 +5,7 @@ const UserBalance = require('../model/userBalanceModel');
 const Transaction = require('../model/transactionModel');
 const Counter = require('../model/counterModel');
 const User = require('../model/userModel');
+const Role =require('../model/roleModel')
 
 // Initialize Counter for transaction_id if it doesn't exist
 async function initializeCounter() {
@@ -280,5 +281,132 @@ exports.feeDeduction = async (req, res) => {
       receiver_id,
     });
     res.status(500).json({ success: false, message: `Error processing registration fee: ${err.message || 'Unknown error'}` });
+  }
+};
+
+
+exports.getAllFeesAdmin = async (req, res) => {
+   try {
+    const {
+      page = 1,
+      limit = 10,
+      search = '',
+      filter = 'all',
+      sort = 'created_at',
+      order = 'desc'
+    } = req.query;
+
+    // Build query
+    const query = {};
+    
+    // Search by name or phone
+    if (search) {
+      const searchRegex = new RegExp(search, 'i');
+      const users = await User.find({
+        $or: [
+          { name: searchRegex },
+          { phone_number: searchRegex }
+        ]
+      }).select('_id');
+      
+      query.user_id = { $in: users.map(user => user._id) };
+    }
+
+    // Date filter
+    const now = new Date();
+    // Adjust for IST (UTC+5:30)
+    const istOffset = 5.5 * 60 * 60 * 1000; // 5 hours 30 minutes in milliseconds
+    const istNow = new Date(now.getTime() + istOffset);
+
+    if (filter === 'today') {
+      query.created_at = {
+        $gte: new Date(istNow.setHours(0, 0, 0, 0)),
+        $lte: new Date(istNow.setHours(23, 59, 59, 999))
+      };
+    } else if (filter === 'yesterday') {
+      const yesterday = new Date(istNow);
+      yesterday.setDate(istNow.getDate() - 1);
+      query.created_at = {
+        $gte: new Date(yesterday.setHours(0, 0, 0, 0)),
+        $lte: new Date(yesterday.setHours(23, 59, 59, 999))
+      };
+    } else if (filter === 'week') {
+      // Week starts on Monday and ends on Sunday
+      const startOfWeek = new Date(istNow);
+      const dayOfWeek = startOfWeek.getDay();
+      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Adjust for Sunday (0) to get to Monday
+      startOfWeek.setDate(istNow.getDate() - daysToMonday);
+      startOfWeek.setHours(0, 0, 0, 0);
+
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 6);
+      endOfWeek.setHours(23, 59, 59, 999);
+
+      query.created_at = {
+        $gte: startOfWeek,
+        $lte: endOfWeek
+      };
+    }
+
+    // Get total amount
+    const totalAmountPipeline = [
+      { $match: query },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: { $toDouble: '$amount' } }
+        }
+      }
+    ];
+    const totalResult = await Fee.aggregate(totalAmountPipeline);
+    const totalAmount = totalResult[0]?.total || 0;
+
+    // Get fees with pagination and proper population
+    const fees = await Fee.find(query)
+      .populate({
+        path: 'user_id',
+        select: 'name phone_number is_flagged role_id',
+        populate: {
+          path: 'role_id',
+          model: 'Role',
+          select: 'name'
+        }
+      })
+      .sort({ [sort]: order === 'desc' ? -1 : 1 })
+      .skip((page - 1) * limit)
+      .limit(parseInt(limit));
+
+    // Fetch UserBalance for each user_id in fees
+    const userIds = fees.map(fee => fee.user_id?._id).filter(id => id);
+    const balances = await UserBalance.find({ user_id: { $in: userIds } }).select('user_id balance');
+
+    // Map balances to fees
+    const feesWithBalance = fees.map(fee => {
+      const balanceRecord = balances.find(b => b.user_id.toString() === fee.user_id?._id?.toString());
+      return {
+        ...fee.toObject(),
+        user_balance: balanceRecord ? parseFloat(balanceRecord.balance).toFixed(2) : '0.00'
+      };
+    });
+
+    // Get total count for pagination
+    const total = await Fee.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        fees: feesWithBalance,
+        totalAmount,
+        pagination: {
+          total,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          pages: Math.ceil(total / limit)
+        }
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching fees:', err.message, err.stack);
+    res.status(500).json({ success: false, message: err.message });
   }
 };

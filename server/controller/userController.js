@@ -21,16 +21,23 @@ const crypto = require("crypto");
 
 // Login function
 exports.loginUser = async (req, res) => {
-  const { emailOrPhone, password, role } = req.body; // include role from body
+  const { emailOrPhone, password, role } = req.body;
 
   try {
     // Find user by email or phone number
     const user = await User.findOne({
       $or: [{ email: emailOrPhone }, { phone_number: emailOrPhone }],
-    }).populate("role_id"); // to access role_id.role_id
+    }).populate("role_id");
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
+    }
+
+    // Check if user is flagged
+    if (user.is_flagged === true) {
+      return res.status(403).json({
+        message: "Your account is flagged. Please contact the administrator.",
+      });
     }
 
     const userRoleId = user.role_id?.role_id;
@@ -43,9 +50,7 @@ exports.loginUser = async (req, res) => {
       }
     } else if (role === "customer") {
       if (userRoleId !== "role-5") {
-        return res
-          .status(403)
-          .json({ message: "Unauthorized: Not a customer" });
+        return res.status(403).json({ message: "Unauthorized: Not a customer" });
       }
     } else {
       return res.status(400).json({ message: "Invalid role context provided" });
@@ -85,6 +90,7 @@ exports.loginUser = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 // Get current user
 exports.getMe = async (req, res) => {
@@ -483,8 +489,7 @@ exports.sendOtpController = async (req, res) => {
     if (!phone_number) {
       return res.status(400).json({
         success: false,
-        message:
-          "Invalid phone number. Must be a valid Indian number (+91xxxxxxxxxx).",
+        message: "Invalid phone number. Must be a valid Indian number (+91xxxxxxxxxx).",
       });
     }
 
@@ -497,9 +502,17 @@ exports.sendOtpController = async (req, res) => {
       });
     }
 
+    // Restrict flagged users
+    if (user.is_flagged === true) {
+      return res.status(403).json({
+        success: false,
+        message: "Your account is flagged. Please contact the administrator.",
+      });
+    }
+
     // Generate OTP
     const otp = generateOtp();
-    const otpExpiry = new Date(Date.now() + 3 * 60 * 1000); // OTP expires in 3 minutes
+    const otpExpiry = new Date(Date.now() + 3 * 60 * 1000); // 3 minutes expiry
 
     // Update user's OTP fields
     user.phone_number_otp = otp;
@@ -509,6 +522,8 @@ exports.sendOtpController = async (req, res) => {
     // Send OTP via ChennaiSMS
     try {
       const smsResponse = await sendOtpSms(phone_number, otp);
+      console.log(smsResponse,"sms");
+      
       if (smsResponse) {
         return res.status(200).json({
           success: true,
@@ -536,6 +551,7 @@ exports.sendOtpController = async (req, res) => {
     });
   }
 };
+
 
 // Get all users with pagination, search, and role filter
 exports.getUsers = async (req, res) => {
@@ -985,6 +1001,39 @@ exports.updateUser = async (req, res) => {
     res.json({ data: userObj, message: "User updated successfully" });
   } catch (err) {
     console.error("updateUser error:", err.message, err.stack);
+    res.status(500).json({ message: "Server error", details: err.message });
+  }
+};
+exports.updateUserFlag = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { is_flagged } = req.body;
+
+    console.log("updateUserFlag: Request payload:", { userId, is_flagged });
+
+    if (!mongoose.isValidObjectId(userId)) {
+      return res.status(400).json({ message: "Invalid user ID format" });
+    }
+
+    if (typeof is_flagged !== "boolean") {
+      return res.status(400).json({ message: "is_flagged must be true or false" });
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { is_flagged, updatedAt: Date.now() },
+      { new: true }
+    ).select("_id name email phone_number is_flagged");
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    console.log("updateUserFlag: Success:", updatedUser);
+
+    res.json({success:true, message: "User flag status updated", data: updatedUser });
+  } catch (err) {
+    console.error("updateUserFlag error:", err.message, err.stack);
     res.status(500).json({ message: "Server error", details: err.message });
   }
 };

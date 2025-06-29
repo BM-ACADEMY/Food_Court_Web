@@ -354,7 +354,8 @@ export default function UserList() {
 
     const handleToggleRestrict = async (user) => {
         try {
-            const updated = await axios.put(`${import.meta.env.VITE_BASE_URL}/users/update-user/${user._id}`, {
+            const id=user._id;
+            const updated = await axios.put(`${import.meta.env.VITE_BASE_URL}/users/update-user-flag/${id}`, {
                 is_flagged: !user.is_flagged,
             });
 

@@ -11,6 +11,7 @@ import AddDeleteAccess from "@/Modules/Master-admin/pages/users/AddDeleteAccess"
 import SessionHistory from "@/Modules/Master-admin/pages/account/SessionHistory";
 import { LocationManager } from "@/Modules/Master-admin/pages/locations/LocationPage";
 import { UpiManager } from "@/Modules/Master-admin/pages/upi/UpiPage";
+import FeesTable from "@/Modules/Master-admin/pages/Fees/FeesTable";
 
 export default function MasterAdminRoutes() {
   return (
@@ -26,6 +27,7 @@ export default function MasterAdminRoutes() {
         <Route path="adddelete/add-new-user" element={<AddDeleteAccess />} />
         <Route path="history" element={<SessionHistory />} />
         <Route path="locations" element={<LocationManager />} />
+        <Route path="fees" element={<FeesTable />} />
         <Route path="upi" element={<UpiManager />} />
       </Route>
     </Routes>
