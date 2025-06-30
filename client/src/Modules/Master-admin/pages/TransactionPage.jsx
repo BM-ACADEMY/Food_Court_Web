@@ -1072,7 +1072,7 @@ const exportToPDF = async () => {
             </ToggleGroup>
           </div>
           {chartData[chartView]?.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer  height={300}>
               <BarChart data={chartData[chartView]}>
                 <XAxis dataKey="label" />
                 <YAxis />
