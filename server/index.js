@@ -34,14 +34,14 @@ const app = express();
 const server = http.createServer(app);
 
 // ✅ CORS setup with origin validation
-const allowedOrigins = [
-  "https://pegasus2025.com",
-  "https://www.pegasus2025.com"
-];
 // const allowedOrigins = [
-//   "http://localhost:5173",
-
+//   "https://pegasus2025.com",
+//   "https://www.pegasus2025.com"
 // ];
+const allowedOrigins = [
+  "http://localhost:5173",
+
+];
 
 app.use(cookieParser());
 app.use(cors({

@@ -1,48 +1,32 @@
-import { Input } from "@/components/ui/input";
+import React, { useState, useEffect, useMemo } from "react";
+import axios from "axios";
+import { format } from "date-fns";
 import {
   Select,
+  SelectTrigger,
   SelectContent,
   SelectItem,
-  SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  CalendarIcon,
-  QrCode,
-  Users,
-  Wifi,
-  Wallet,
-  ChevronDownIcon,
-  Search,
-  Download,
-  Eye,
-  Pencil,
-  Unlock,
-  Lock
-} from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
-import { useState, useEffect, useMemo } from "react";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { format } from "date-fns";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import {
   Table,
-  TableBody,
-  TableCell,
-  TableHead,
   TableHeader,
   TableRow,
+  TableHead,
+  TableBody,
+  TableCell,
 } from "@/components/ui/table";
 import {
   Pagination,
   PaginationContent,
   PaginationItem,
   PaginationLink,
-  PaginationNext,
   PaginationPrevious,
+  PaginationNext,
 } from "@/components/ui/pagination";
 import {
   Dialog,
@@ -52,16 +36,27 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import axios from "axios";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Badge } from "@/components/ui/badge";
+import {
+  CalendarIcon,
+  Users,
+  Wifi,
+  Wallet,
+  ChevronDownIcon,
+  Search,
+  Download,
+  Eye,
+  Lock,
+  Unlock,
+} from "lucide-react";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { toast } from "react-toastify";
 import RestaurantDetailsModal from "./RestaurantDetailsModel";
-import { toast, Bounce } from "react-toastify";
-
-
-
 const getRandomColor = () => {
   const colors = ["#FF6B6B", "#4ECDC4", "#556270", "#C7F464", "#FFA500"];
   return colors[Math.floor(Math.random() * colors.length)];
@@ -100,6 +95,7 @@ export default function RestaurantList() {
     onlineCount: 0,
     totalPages: 0,
   });
+  const [allRestaurants, setAllRestaurants] = useState([]); // New state for all restaurants
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -107,47 +103,82 @@ export default function RestaurantList() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRestaurant, setSelectedRestaurant] = useState(null);
 
-  // Fetch data from backend
+  // Fetch paginated restaurants for display
   useEffect(() => {
-
+    const fetchRestaurants = async () => {
+      setLoading(true);
+      try {
+        const response = await axios.get(
+          `${import.meta.env.VITE_BASE_URL}/restaurants/fetch-all-restaurant-details`,
+          {
+            params: {
+              search,
+              status,
+              lastActive,
+              regDate: regDate ? format(new Date(regDate), "yyyy-MM-dd") : "",
+              sortBy,
+              page,
+              pageSize,
+            },
+          }
+        );
+        setData(response.data);
+        setError(null);
+      } catch (err) {
+        console.error("Error fetching restaurants:", err);
+        setError("Failed to load data. Please try again.");
+        toast.error("Failed to load data. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    };
     fetchRestaurants();
   }, [search, status, lastActive, regDate, sortBy, page, pageSize]);
-  const fetchRestaurants = async () => {
-    setLoading(true);
-    try {
-      const response = await axios.get(
-        `${import.meta.env.VITE_BASE_URL}/restaurants/fetch-all-restaurant-details`,
-        {
-          params: {
-            search,
-            status,
-            lastActive,
-            regDate: regDate ? format(new Date(regDate), "yyyy-MM-dd") : "",
-            sortBy,
-            page,
-            pageSize,
-          },
+
+  // Fetch all restaurants for export when export modal is opened
+  useEffect(() => {
+    if (isExportModalOpen) {
+      const fetchAllRestaurants = async () => {
+        try {
+          const response = await axios.get(
+            `${import.meta.env.VITE_BASE_URL}/restaurants/fetch-all-restaurant-details`,
+            {
+              params: {
+                search,
+                status,
+                lastActive,
+                regDate: regDate ? format(new Date(regDate), "yyyy-MM-dd") : "",
+                sortBy,
+                page: 1,
+                pageSize: 1000, // Set a high pageSize to fetch all records
+              },
+            }
+          );
+          setAllRestaurants(response.data.restaurants);
+        } catch (err) {
+          console.error("Error fetching all restaurants for export:", err);
+          toast.error("Failed to fetch all restaurants for export.");
         }
-      );
-      setData(response.data);
-      setError(null);
-    } catch (err) {
-      console.error("Error fetching restaurants:", err);
-      setError("Failed to load data. Please try again.");
-    } finally {
-      setLoading(false);
+      };
+      fetchAllRestaurants();
     }
-  };
+  }, [isExportModalOpen, search, status, lastActive, regDate, sortBy]);
+
   const { restaurants, totalRestaurants, totalSales, onlineCount, totalPages } = data;
 
   // Memoized paginated data
   const paginatedRestaurants = useMemo(() => restaurants, [restaurants]);
 
-  // Export functions
+  // Export functions using allRestaurants
   const exportToExcel = () => {
-    const data = paginatedRestaurants.map((restaurant) => ({
+    if (allRestaurants.length === 0) {
+      toast.error("No data available to export. Please try again.");
+      return;
+    }
+    const data = allRestaurants.map((restaurant) => ({
       "Restaurant ID": restaurant.id,
       Name: restaurant.name,
+      Role: restaurant.sender_role_name || "Restaurant",
       Category: restaurant.category,
       Sales: `₹${restaurant.sales.toLocaleString()}`,
       Status: restaurant.status,
@@ -162,9 +193,14 @@ export default function RestaurantList() {
   };
 
   const exportToCSV = () => {
-    const data = paginatedRestaurants.map((restaurant) => ({
+    if (allRestaurants.length === 0) {
+      toast.error("No data available to export. Please try again.");
+      return;
+    }
+    const data = allRestaurants.map((restaurant) => ({
       "Restaurant ID": restaurant.id,
       Name: restaurant.name,
+      Role: restaurant.sender_role_name || "Restaurant",
       Category: restaurant.category,
       Sales: `₹${restaurant.sales.toLocaleString()}`,
       Status: restaurant.status,
@@ -177,17 +213,22 @@ export default function RestaurantList() {
   };
 
   const exportToPDF = () => {
+    if (allRestaurants.length === 0) {
+      toast.error("No data available to export. Please try again.");
+      return;
+    }
     try {
       const doc = new jsPDF();
       doc.text("Restaurant List", 14, 20);
       autoTable(doc, {
         startY: 30,
         head: [
-          ["Restaurant ID", "Name", "Category", "Sales", "Status", "Last Active"],
+          ["Restaurant ID", "Name", "Role", "Category", "Sales", "Status", "Last Active"],
         ],
-        body: paginatedRestaurants.map((restaurant) => [
+        body: allRestaurants.map((restaurant) => [
           restaurant.id || "N/A",
           restaurant.name || "Unknown",
+          restaurant.sender_role_name || "Restaurant",
           restaurant.category || "N/A",
           `₹${restaurant.sales.toLocaleString()}` || "₹0",
           restaurant.status || "N/A",
@@ -202,6 +243,7 @@ export default function RestaurantList() {
     } catch (error) {
       console.error("Error exporting to PDF:", error);
       setError("Failed to export PDF. Please try again.");
+      toast.error("Failed to export PDF. Please try again.");
     }
   };
 
@@ -222,17 +264,34 @@ export default function RestaurantList() {
     setIsExportModalOpen(false);
   };
 
-  const handleToggleRestrict = async (user) => {
-
-
+  const handleToggleRestrict = async (restaurant) => {
     try {
-      const updated = await axios.put(`${import.meta.env.VITE_BASE_URL}/users/update-user/${user.user_id}`, {
-        is_flagged: !user.is_flagged,
-      });
-
+      const updated = await axios.put(
+        `${import.meta.env.VITE_BASE_URL}/users/update-user-flag/${restaurant.user_id}`,
+        {
+          is_flagged: !restaurant.is_flagged,
+        }
+      );
       if (updated.data) {
-        toast.success(`User ${!user.is_flagged ? "restricted" : "unrestricted"} successfully`);
-        fetchRestaurants(); // Refresh list
+        toast.success(`User ${!restaurant.is_flagged ? "restricted" : "unrestricted"} successfully`, {
+          transition: Bounce,
+        });
+        // Refresh list
+        const response = await axios.get(
+          `${import.meta.env.VITE_BASE_URL}/restaurants/fetch-all-restaurant-details`,
+          {
+            params: {
+              search,
+              status,
+              lastActive,
+              regDate: regDate ? format(new Date(regDate), "yyyy-MM-dd") : "",
+              sortBy,
+              page,
+              pageSize,
+            },
+          }
+        );
+        setData(response.data);
       }
     } catch (err) {
       console.error("Failed to toggle restriction", err);
@@ -241,13 +300,13 @@ export default function RestaurantList() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       <h2 className="text-3xl font-bold text-[#00004D]">Restaurant Check</h2>
 
       {/* Filters */}
       <div className="bg-white p-4 rounded-lg shadow-sm space-y-4">
         <div className="flex flex-col md:flex-row md:items-center gap-4">
-          <div className="relative flex flex-1/2">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground size-4" />
             <Input
               placeholder="Search by name or ID..."
@@ -256,10 +315,6 @@ export default function RestaurantList() {
               className="pl-9"
             />
           </div>
-          {/* <Button className="bg-[#00004D] text-white flex items-center gap-2 flex-1/5">
-            <QrCode className="size-4" />
-            Scan QR Code
-          </Button> */}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           {/* Status */}
@@ -401,12 +456,12 @@ export default function RestaurantList() {
             </Button>
           </div>
           <div className="overflow-x-auto">
-            <Table>
+            <Table className="min-w-[1000px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Restaurant ID</TableHead>
                   <TableHead>Sender Name</TableHead>
-                  <TableHead>Receiver Name</TableHead>
+                  <TableHead>Role</TableHead>
                   {/* <TableHead>Category</TableHead> */}
                   <TableHead>Sales</TableHead>
                   <TableHead>Status</TableHead>
@@ -417,56 +472,47 @@ export default function RestaurantList() {
               <TableBody>
                 {paginatedRestaurants.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center">
+                    <TableCell colSpan={8} className="text-center">
                       No restaurants found
                     </TableCell>
                   </TableRow>
                 ) : (
                   paginatedRestaurants.map((restaurant) => (
                     <TableRow key={restaurant.id}>
-                      <TableCell className="font-medium">
-                        #{restaurant.id}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Avatar name={restaurant.sender_name} />
-                          <div className="flex flex-col gap-1">
-                            <span>{restaurant.sender_name}</span>
-                            <span className="text-[12px] text-gray-500">({restaurant.sender_role_name})</span>
-                          </div>
-                        </div>
-                      </TableCell>
+                      <TableCell className="font-medium">#{restaurant.id}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Avatar name={restaurant.receiver_name} />
-                          <div className="flex flex-col gap-1">
-                            <span>{restaurant.receiver_name}</span>
-                            <span className="text-[12px] text-gray-500">({restaurant.receiver_role_name})</span>
-                          </div>
+                          <p>{restaurant.receiver_name}</p>
                         </div>
                       </TableCell>
-
-                      {/* <TableCell>{restaurant.category}</TableCell> */}
+                      <TableCell>
+                        <span className="text-sm text-orange-500">
+                          {restaurant.receiver_role_name || "Restaurant"}
+                        </span>
+                      </TableCell>
+                      {/* <TableCell>{restaurant.category || "N/A"}</TableCell> */}
                       <TableCell>
                         <span
-                          className={`font-medium ${restaurant.sales > 100000
-                            ? "text-green-600"
-                            : restaurant.sales > 50000
+                          className={`font-medium ${
+                            restaurant.sales > 100000
+                              ? "text-green-600"
+                              : restaurant.sales > 50000
                               ? "text-yellow-600"
                               : "text-red-600"
-                            }`}
+                          }`}
                         >
                           ₹{restaurant.sales.toLocaleString()}
                         </span>
                       </TableCell>
-
                       <TableCell>
                         <Badge
                           variant="ghost"
-                          className={`text-white ${restaurant.status.toLowerCase() === "online"
-                            ? "bg-green-500"
-                            : "bg-red-500"
-                            }`}
+                          className={`text-white ${
+                            restaurant.status.toLowerCase() === "online"
+                              ? "bg-green-500"
+                              : "bg-red-500"
+                          }`}
                         >
                           {restaurant.status}
                         </Badge>
@@ -497,7 +543,6 @@ export default function RestaurantList() {
                           )}
                         </Button>
                       </TableCell>
-
                     </TableRow>
                   ))
                 )}

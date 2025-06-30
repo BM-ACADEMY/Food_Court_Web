@@ -202,7 +202,15 @@ exports.getAllCustomerDetails = async (req, res) => {
           as: "loginLogs",
         },
       },
-      // Lookup for transaction (get the most recent transaction)
+      {
+        $lookup: {
+          from: "roles",
+          localField: "role_id",
+          foreignField: "_id",
+          as: "role",
+        },
+      },
+      { $unwind: { path: "$role", preserveNullAndEmptyArrays: true } },
       {
         $lookup: {
           from: "transactions",
@@ -300,6 +308,7 @@ exports.getAllCustomerDetails = async (req, res) => {
           receiver_name: "$transaction.receiver_name",
           receiver_role: "$transaction.receiver_role_name",
           receiver_role_id: "$transaction.receiver_role_id",
+          role: "$role.name", // Include role name
         },
       },
     ];
@@ -356,6 +365,7 @@ exports.getAllCustomerDetails = async (req, res) => {
         status: customer.status,
         lastActive,
         is_flagged: customer.is_flagged || false,
+        role: customer.role || "Unknown", // Include role in response
         sender_id: customer.sender_id?.toString() || "Unknown",
         sender_name: customer.sender_name || "Unknown",
         sender_role: customer.sender_role || "Unknown",
@@ -425,6 +435,7 @@ exports.getAllCustomerDetails = async (req, res) => {
     res.status(500).json({ error: "Server error", details: error.message });
   }
 };
+
 exports.getCustomerByQrCode = async (req, res) => {
   try {
     const { qr_code } = req.query;
