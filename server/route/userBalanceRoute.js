@@ -4,6 +4,9 @@ const userBalanceController = require('../controller/userBalanceController');
 
 // Routes
 router.post('/create-or-update-balance', userBalanceController.createOrUpdateBalance); // create or update
+
+router.post('/create-or-update-balance-for-master-admin', userBalanceController.createOrUpdateBalanceMasterAdmin); // create or update
+
 router.get('/fetch-all-balance', userBalanceController.getAllUserBalances); // list all
 
 router.get('/dashboard-summary', userBalanceController.getDashboardSummary); // list all

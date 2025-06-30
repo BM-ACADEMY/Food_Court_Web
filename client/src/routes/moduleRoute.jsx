@@ -3,6 +3,7 @@ import { SiteHeader } from "@/components/site-header";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Outlet } from "react-router-dom";
+import Footer from "@/Modules/User/components/footer/Footer";
 
 export default function ModuleLayout() {
   return (
@@ -14,6 +15,9 @@ export default function ModuleLayout() {
           <SidebarInset>
             <main className="flex-1 p-4 overflow-y-auto">
               <Outlet />
+              <div className="mt-8">
+                <Footer />
+              </div>
             </main>
           </SidebarInset>
         </div>

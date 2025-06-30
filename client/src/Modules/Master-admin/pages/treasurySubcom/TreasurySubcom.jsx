@@ -55,6 +55,7 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import TreasurySubcomDetailsModal from "./TreasurySubcomDetailsModel";
 
 export default function TreasurySubcomList() {
   const [search, setSearch] = useState("");
@@ -77,6 +78,30 @@ export default function TreasurySubcomList() {
   const [error, setError] = useState(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState("xlsx");
+  const [selectedSubcom, setSelectedSubcom] = useState(null);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+
+
+  const getRandomColor = () => {
+    const colors = ["#FF6B6B", "#4ECDC4", "#556270", "#C7F464", "#FFA500"];
+    return colors[Math.floor(Math.random() * colors.length)];
+  };
+
+  const Avatar = ({ name = "" }) => {
+    const initials = name
+      ? name.split(" ").map((word) => word[0]?.toUpperCase()).slice(0, 2).join("")
+      : "U";
+    const color = getRandomColor();
+
+    return (
+      <div
+        className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold"
+        style={{ backgroundColor: color }}
+      >
+        {initials}
+      </div>
+    );
+  };
 
   // Fetch data from backend
   useEffect(() => {
@@ -113,6 +138,17 @@ export default function TreasurySubcomList() {
 
   // Memoized filtered data for rendering
   const paginatedTreasurySubcoms = useMemo(() => treasurySubcoms, [treasurySubcoms]);
+
+  // Handle View and Edit
+  const handleView = (subcom) => {
+    setSelectedSubcom(subcom);
+    setIsDetailsModalOpen(true);
+  };
+
+  const handleEdit = (subcom) => {
+    setSelectedSubcom(subcom);
+    setIsDetailsModalOpen(true);
+  };
 
   // Export functions
   const exportToExcel = () => {
@@ -216,13 +252,12 @@ export default function TreasurySubcomList() {
               className="pl-9"
             />
           </div>
-          <Button className="bg-[#00004D] text-white flex items-center gap-2 flex-1/5">
+          {/* <Button className="bg-[#00004D] text-white flex items-center gap-2 flex-1/5">
             <QrCode className="size-4" />
             Scan QR Code
-          </Button>
+          </Button> */}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          {/* Status */}
           <div className="flex flex-col gap-1">
             <Label className="text-sm px-1">Status</Label>
             <Select value={status} onValueChange={setStatus}>
@@ -236,17 +271,11 @@ export default function TreasurySubcomList() {
               </SelectContent>
             </Select>
           </div>
-
-          {/* Registration Date */}
           <div className="flex flex-col gap-1">
             <Label htmlFor="date" className="text-sm px-1">Registration Date</Label>
             <Popover open={open} onOpenChange={setOpen}>
               <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  id="date"
-                  className="w-full justify-between font-normal"
-                >
+                <Button variant="outline" id="date" className="w-full justify-between font-normal">
                   {date ? format(date, "dd-MM-yyyy") : "Select date"}
                   <ChevronDownIcon className="ml-2 h-4 w-4 text-muted-foreground" />
                 </Button>
@@ -267,8 +296,6 @@ export default function TreasurySubcomList() {
               </PopoverContent>
             </Popover>
           </div>
-
-          {/* Last Active */}
           <div className="flex flex-col gap-1">
             <Label className="text-sm px-1">Last Active</Label>
             <Select value={lastActive} onValueChange={setLastActive}>
@@ -283,8 +310,6 @@ export default function TreasurySubcomList() {
               </SelectContent>
             </Select>
           </div>
-
-          {/* Sort By */}
           <div className="flex flex-col gap-1">
             <Label className="text-sm px-1">Sort By</Label>
             <Select value={sortBy} onValueChange={setSortBy}>
@@ -313,9 +338,7 @@ export default function TreasurySubcomList() {
           <Card className="border-l-4 border-green-400">
             <CardContent className="p-4 flex items-center justify-between">
               <div>
-                <CardTitle className="text-muted-foreground text-sm">
-                  Total Treasury Subcoms
-                </CardTitle>
+                <CardTitle className="text-muted-foreground text-sm">Total Treasury Subcoms</CardTitle>
                 <div className="text-2xl font-bold mt-1">{totalTreasurySubcoms}</div>
               </div>
               <Users className="bg-green-100 text-green-500 rounded-full p-2 size-10" />
@@ -324,9 +347,7 @@ export default function TreasurySubcomList() {
           <Card className="border-l-4 border-blue-400">
             <CardContent className="p-4 flex items-center justify-between">
               <div>
-                <CardTitle className="text-muted-foreground text-sm">
-                  Online Now
-                </CardTitle>
+                <CardTitle className="text-muted-foreground text-sm">Online Now</CardTitle>
                 <div className="text-2xl font-bold mt-1">{onlineCount}</div>
               </div>
               <Wifi className="bg-blue-100 text-blue-500 rounded-full p-2 size-10" />
@@ -335,12 +356,8 @@ export default function TreasurySubcomList() {
           <Card className="border-l-4 border-purple-400">
             <CardContent className="p-4 flex items-center justify-between">
               <div>
-                <CardTitle className="text-muted-foreground text-sm">
-                  Total Balance
-                </CardTitle>
-                <div className="text-2xl font-bold mt-1">
-                  ₹{totalBalance.toLocaleString()}
-                </div>
+                <CardTitle className="text-muted-foreground text-sm">Total Balance</CardTitle>
+                <div className="text-2xl font-bold mt-1">₹{totalBalance.toLocaleString()}</div>
               </div>
               <Wallet className="bg-purple-100 text-purple-500 rounded-full p-2 size-10" />
             </CardContent>
@@ -353,20 +370,17 @@ export default function TreasurySubcomList() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold">Treasury Subcom List</h2>
-            <Button
-              className="bg-[#00004D] text-white"
-              onClick={() => setIsExportModalOpen(true)}
-            >
+            <Button className="bg-[#00004D] text-white" onClick={() => setIsExportModalOpen(true)}>
               <Download className="mr-2 h-4 w-4" /> Export List
             </Button>
           </div>
-          <div className="overflow-x-auto">
+        <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Treasury Subcom ID</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Phone</TableHead>
+                  <TableHead>Sender Name</TableHead>
+                  <TableHead>Receiver Name</TableHead>
                   <TableHead>Balance</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Last Active</TableHead>
@@ -376,7 +390,7 @@ export default function TreasurySubcomList() {
               <TableBody>
                 {paginatedTreasurySubcoms.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center">
+                    <TableCell colSpan={8} className="text-center">
                       No treasury subcoms found
                     </TableCell>
                   </TableRow>
@@ -384,35 +398,70 @@ export default function TreasurySubcomList() {
                   paginatedTreasurySubcoms.map((subcom) => (
                     <TableRow key={subcom.id}>
                       <TableCell className="font-medium">#{subcom.id}</TableCell>
-                      <TableCell>{subcom.name}</TableCell>
-                      <TableCell>{subcom.phone}</TableCell>
-                      <TableCell>₹{subcom.balance.toLocaleString()}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Avatar name={subcom.sender_name} />
+                          <div className="flex flex-col gap-1">
+                            <span>{subcom.sender_name}</span>
+                            <span className="text-[12px] text-gray-500">
+                              ({subcom.sender_role_name})
+                            </span>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Avatar name={subcom.receiver_name} />
+                          <div className="flex flex-col gap-1">
+                            <span>{subcom.receiver_name}</span>
+                            <span className="text-[12px] text-gray-500">
+                              ({subcom.receiver_role_name})
+                            </span>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={`font-medium ${subcom.balance > 10000
+                              ? "text-green-600"
+                              : subcom.balance > 0
+                                ? "text-yellow-600"
+                                : "text-red-600"
+                            }`}
+                        >
+                          ₹{subcom.balance.toLocaleString()}
+                        </span>
+                      </TableCell>
                       <TableCell>
                         <Badge
                           variant="ghost"
-                          className={`text-white ${
-                            subcom.status.toLowerCase() === "online"
+                          className={`text-white ${subcom.status.toLowerCase() === "online"
                               ? "bg-green-500"
                               : "bg-red-500"
-                          }`}
+                            }`}
                         >
                           {subcom.status}
                         </Badge>
                       </TableCell>
-                      <TableCell>{subcom.lastActive}</TableCell>
+                      <TableCell>
+                        {subcom.lastActive }
+                        
+                      </TableCell>
                       <TableCell className="flex gap-2">
                         <Button
                           variant="link"
                           className="text-blue-600 p-0 h-auto text-sm"
+                          onClick={() => handleView(subcom)}
                         >
                           <Eye className="mr-1 h-4 w-4" /> View
                         </Button>
-                        <Button
-                          variant="link"
-                          className="text-green-600 p-0 h-auto text-sm"
-                        >
-                          <Pencil className="mr-1 h-4 w-4" /> Edit
-                        </Button>
+                        {/* <Button
+                variant="link"
+                className="text-green-600 p-0 h-auto text-sm"
+                onClick={() => handleEdit(subcom)}
+              >
+                <Pencil className="mr-1 h-4 w-4" /> Edit
+              </Button> */}
                       </TableCell>
                     </TableRow>
                   ))
@@ -422,6 +471,16 @@ export default function TreasurySubcomList() {
           </div>
         </div>
       )}
+
+      {/* Treasury Subcom Details Modal */}
+      <TreasurySubcomDetailsModal
+        subcom={selectedSubcom}
+        isOpen={isDetailsModalOpen}
+        onClose={() => {
+          setIsDetailsModalOpen(false);
+          setSelectedSubcom(null);
+        }}
+      />
 
       {/* Export Modal */}
       <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>

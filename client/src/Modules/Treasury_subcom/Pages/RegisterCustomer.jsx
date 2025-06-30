@@ -89,7 +89,7 @@ function RegisterCustomer() {
     setFetchError("");
     try {
       console.log(`Scanning QR code: ${decodedText}`);
-      const response = await axios.get("http://localhost:4000/api/customers/fetch-by-qr", {
+      const response = await axios.get(`${import.meta.env.VITE_BASE_URL}/customers/fetch-by-qr`, {
         params: { qr_code: decodedText },
       });
       console.log("Customer response:", JSON.stringify(response.data, null, 2));
@@ -103,7 +103,7 @@ function RegisterCustomer() {
         }
 
         console.log(`Fetching user for userId: ${userIdString}`);
-        const userResponse = await axios.get(`http://localhost:4000/api/users/fetch-user-by-id/${userIdString}`);
+        const userResponse = await axios.get(`${import.meta.env.VITE_BASE_URL}/users/fetch-user-by-id/${userIdString}`);
         console.log("User response:", JSON.stringify(userResponse.data, null, 2));
 
         if (userResponse.data.success && userResponse.data.data) {
@@ -160,7 +160,7 @@ function RegisterCustomer() {
 
     try {
       console.log(`Updating user for userId: ${userId}`);
-      const updateResponse = await axios.put(`http://localhost:4000/api/users/update-user/${userId}`, {
+      const updateResponse = await axios.put(`${import.meta.env.VITE_BASE_URL}/users/update-user/${userId}`, {
         name: formData.customerName,
         email: formData.email,
         phone_number: formData.phoneNumber,
@@ -174,7 +174,7 @@ function RegisterCustomer() {
       let customerIdForDisplay = customerId;
       try {
         console.log(`Fetching customer for userId: ${userId}`);
-        const customerResponse = await axios.get(`http://localhost:4000/api/customers/fetch-all-customer`, {
+        const customerResponse = await axios.get(`${import.meta.env.VITE_BASE_URL}/customers/fetch-all-customer`, {
           params: { user_id: userId },
         });
         console.log("Customer response:", JSON.stringify(customerResponse.data, null, 2));

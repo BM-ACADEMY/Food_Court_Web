@@ -1,66 +1,79 @@
-import React from "react";
-import { Phone, Mail, MessageSquare } from "lucide-react";
+import { useState } from "react";
+import { Mail, Phone } from "lucide-react";
+import TermsModal from "@/Modules/User/components/footer/TermsModal";
+import PrivacyModal from "@/Modules/User/components/footer/PrivacyModal";
 
 const Footer = () => {
-  return (
-    <footer className="bg-[#030047] text-white py-12 px-6 md:px-20 text-sm">
-      <div className="flex flex-col md:flex-row justify-between gap-12">
-        {/* Left Section */}
-        <div className="max-w-md">
-          <h2 className="text-xl font-bold mb-2">Pegasus 2k25</h2>
-          <p className="text-gray-300 leading-relaxed">
-            The annual cultural and technical festival of our college.
-          </p>
-          <a
-            href="#"
-            className="inline-block mt-4 underline text-white hover:text-gray-200"
-          >
-            Visit main website
-          </a>
-        </div>
+  const [showTerms, setShowTerms] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
 
-        {/* Right Section */}
-        <div>
-          <h3 className="text-lg font-semibold mb-3">Any Problems?</h3>
-          <ul className="space-y-2 text-gray-300">
-            <li className="flex items-center gap-2">
-              <Phone className="h-5 w-5" />
-              <a href="tel:+916369777051" className="hover:underline">
+  return (
+    <footer className="bg-[#05023A] text-white px-4 sm:px-6 md:px-12 lg:px-20 py-10">
+      <div className="max-w-7xl mx-auto">
+        {/* Top Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-10 text-sm sm:text-base">
+          {/* Left Section */}
+          <div className="text-center md:text-left">
+            <h2 className="font-bold text-lg sm:text-xl mb-1">PEGASUS 2K25</h2>
+            <p className="italic text-[#cfcfd8] text-sm sm:text-base">
+              "One Destination. Endless Taste, Treasures and Thrills"
+            </p>
+          </div>
+
+          {/* Center Section */}
+          <div className="text-center md:text-left">
+            <h3 className="font-bold text-lg sm:text-xl mb-3">Contact Support</h3>
+
+            <div className="flex items-start gap-2 mb-2 justify-center md:justify-start text-[#8ef5b7]">
+              <Phone className="w-4 h-4 mt-1" />
+              <a href="tel:+916369777051" className="text-white hover:underline">
                 Samuel Vincent D G: +91 6369777051
               </a>
-            </li>
-            <li className="flex items-center gap-2">
-              <MessageSquare className="h-5 w-5" />
-              <a href="tel:+917010124947" className="hover:underline">
+            </div>
+
+            <div className="flex items-start gap-2 mb-2 justify-center md:justify-start text-[#8ef5b7]">
+              <Phone className="w-4 h-4 mt-1" />
+              <a href="tel:+917010124947" className="text-white hover:underline">
                 Mohith Varshan G: +91 7010124947
               </a>
-            </li>
-            <li className="flex items-center gap-2">
-              <Mail className="h-5 w-5" />
-              <a
-                href="mailto:pegasus25coupons@gmail.com"
-                className="hover:underline"
-              >
+            </div>
+
+            <div className="flex items-start gap-2 justify-center md:justify-start text-[#8ef5b7]">
+              <Mail className="w-4 h-4 mt-1" />
+              <a href="mailto:pegasus25coupons@gmail.com" className="text-white hover:underline break-words">
                 pegasus25coupons@gmail.com
               </a>
-            </li>
-          </ul>
-        </div>
-      </div>
+            </div>
+          </div>
 
-      {/* Divider */}
-      <hr className="my-8 border-gray-700" />
-
-      {/* Bottom Bar */}
-      <div className="flex flex-col md:flex-row justify-between items-center text-gray-400 text-sm">
-        <div className="flex gap-6 mb-3 md:mb-0">
-          <a href="#" className="hover:underline">
-            Terms and Conditions
-          </a>
-          <a href="#" className="hover:underline">
-            Privacy Policy
-          </a>
+          {/* Right Section */}
+          <div className="text-center md:text-left">
+            <h3 className="font-bold text-lg sm:text-xl mb-3">Legal</h3>
+            <ul className="space-y-1 text-[#cfcfd8]">
+              <li>
+                <button
+                  className="hover:underline text-left w-full"
+                  onClick={() => setShowTerms(true)}
+                >
+                  Terms & Conditions
+                </button>
+              </li>
+              <li>
+                <button
+                  className="hover:underline text-left w-full"
+                  onClick={() => setShowPrivacy(true)}
+                >
+                  Privacy Policy
+                </button>
+              </li>
+            </ul>
+          </div>
         </div>
+
+        {/* Divider */}
+        <hr className="my-8 border-[#2e2c63]" />
+
+        {/* Bottom Note */}
         <p className="text-center text-[#cfcfd8] text-xs sm:text-sm">
           © {new Date().getFullYear()}{" "}
           <a
@@ -74,6 +87,10 @@ const Footer = () => {
           All Rights Reserved.
         </p>
       </div>
+
+      {/* Modals */}
+      <TermsModal open={showTerms} onOpenChange={setShowTerms} />
+      <PrivacyModal open={showPrivacy} onOpenChange={setShowPrivacy} />
     </footer>
   );
 };

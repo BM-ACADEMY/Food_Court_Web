@@ -17,6 +17,8 @@ import {
   Download,
   Eye,
   Pencil,
+  Unlock,
+  Lock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
@@ -55,6 +57,31 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import RestaurantDetailsModal from "./RestaurantDetailsModel";
+import { toast, Bounce } from "react-toastify";
+
+
+
+const getRandomColor = () => {
+  const colors = ["#FF6B6B", "#4ECDC4", "#556270", "#C7F464", "#FFA500"];
+  return colors[Math.floor(Math.random() * colors.length)];
+};
+
+const Avatar = ({ name = "" }) => {
+  const initials = name
+    ? name.split(" ").map((word) => word[0]?.toUpperCase()).slice(0, 2).join("")
+    : "R";
+  const color = getRandomColor();
+
+  return (
+    <div
+      className="w-9 h-9 min-w-[2.25rem] rounded-full flex items-center justify-center text-white font-semibold text-sm"
+      style={{ backgroundColor: color }}
+    >
+      {initials}
+    </div>
+  );
+};
 
 export default function RestaurantList() {
   const [search, setSearch] = useState("");
@@ -77,38 +104,40 @@ export default function RestaurantList() {
   const [error, setError] = useState(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState("xlsx");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedRestaurant, setSelectedRestaurant] = useState(null);
 
   // Fetch data from backend
   useEffect(() => {
-    const fetchRestaurants = async () => {
-      setLoading(true);
-      try {
-        const response = await axios.get(
-          `${import.meta.env.VITE_BASE_URL}/restaurants/fetch-all-restaurant-details`,
-          {
-            params: {
-              search,
-              status,
-              lastActive,
-              regDate: regDate ? format(new Date(regDate), "yyyy-MM-dd") : "",
-              sortBy,
-              page,
-              pageSize,
-            },
-          }
-        );
-        setData(response.data);
-        setError(null);
-      } catch (err) {
-        console.error("Error fetching restaurants:", err);
-        setError("Failed to load data. Please try again.");
-      } finally {
-        setLoading(false);
-      }
-    };
+
     fetchRestaurants();
   }, [search, status, lastActive, regDate, sortBy, page, pageSize]);
-
+  const fetchRestaurants = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/restaurants/fetch-all-restaurant-details`,
+        {
+          params: {
+            search,
+            status,
+            lastActive,
+            regDate: regDate ? format(new Date(regDate), "yyyy-MM-dd") : "",
+            sortBy,
+            page,
+            pageSize,
+          },
+        }
+      );
+      setData(response.data);
+      setError(null);
+    } catch (err) {
+      console.error("Error fetching restaurants:", err);
+      setError("Failed to load data. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
   const { restaurants, totalRestaurants, totalSales, onlineCount, totalPages } = data;
 
   // Memoized paginated data
@@ -193,6 +222,24 @@ export default function RestaurantList() {
     setIsExportModalOpen(false);
   };
 
+  const handleToggleRestrict = async (user) => {
+
+
+    try {
+      const updated = await axios.put(`${import.meta.env.VITE_BASE_URL}/users/update-user/${user.user_id}`, {
+        is_flagged: !user.is_flagged,
+      });
+
+      if (updated.data) {
+        toast.success(`User ${!user.is_flagged ? "restricted" : "unrestricted"} successfully`);
+        fetchRestaurants(); // Refresh list
+      }
+    } catch (err) {
+      console.error("Failed to toggle restriction", err);
+      toast.error("Failed to update restriction");
+    }
+  };
+
   return (
     <div className="space-y-6">
       <h2 className="text-3xl font-bold text-[#00004D]">Restaurant Check</h2>
@@ -200,7 +247,7 @@ export default function RestaurantList() {
       {/* Filters */}
       <div className="bg-white p-4 rounded-lg shadow-sm space-y-4">
         <div className="flex flex-col md:flex-row md:items-center gap-4">
-          <div className="relative flex flex-1/3">
+          <div className="relative flex flex-1/2">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground size-4" />
             <Input
               placeholder="Search by name or ID..."
@@ -209,10 +256,10 @@ export default function RestaurantList() {
               className="pl-9"
             />
           </div>
-          <Button className="bg-[#00004D] text-white flex items-center gap-2 flex-1/5">
+          {/* <Button className="bg-[#00004D] text-white flex items-center gap-2 flex-1/5">
             <QrCode className="size-4" />
             Scan QR Code
-          </Button>
+          </Button> */}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           {/* Status */}
@@ -358,8 +405,9 @@ export default function RestaurantList() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Restaurant ID</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Category</TableHead>
+                  <TableHead>Sender Name</TableHead>
+                  <TableHead>Receiver Name</TableHead>
+                  {/* <TableHead>Category</TableHead> */}
                   <TableHead>Sales</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Last Active</TableHead>
@@ -379,17 +427,46 @@ export default function RestaurantList() {
                       <TableCell className="font-medium">
                         #{restaurant.id}
                       </TableCell>
-                      <TableCell>{restaurant.name}</TableCell>
-                      <TableCell>{restaurant.category}</TableCell>
-                      <TableCell>₹{restaurant.sales.toLocaleString()}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Avatar name={restaurant.sender_name} />
+                          <div className="flex flex-col gap-1">
+                            <span>{restaurant.sender_name}</span>
+                            <span className="text-[12px] text-gray-500">({restaurant.sender_role_name})</span>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Avatar name={restaurant.receiver_name} />
+                          <div className="flex flex-col gap-1">
+                            <span>{restaurant.receiver_name}</span>
+                            <span className="text-[12px] text-gray-500">({restaurant.receiver_role_name})</span>
+                          </div>
+                        </div>
+                      </TableCell>
+
+                      {/* <TableCell>{restaurant.category}</TableCell> */}
+                      <TableCell>
+                        <span
+                          className={`font-medium ${restaurant.sales > 100000
+                            ? "text-green-600"
+                            : restaurant.sales > 50000
+                              ? "text-yellow-600"
+                              : "text-red-600"
+                            }`}
+                        >
+                          ₹{restaurant.sales.toLocaleString()}
+                        </span>
+                      </TableCell>
+
                       <TableCell>
                         <Badge
                           variant="ghost"
-                          className={`text-white ${
-                            restaurant.status.toLowerCase() === "online"
-                              ? "bg-green-500"
-                              : "bg-red-500"
-                          }`}
+                          className={`text-white ${restaurant.status.toLowerCase() === "online"
+                            ? "bg-green-500"
+                            : "bg-red-500"
+                            }`}
                         >
                           {restaurant.status}
                         </Badge>
@@ -399,16 +476,28 @@ export default function RestaurantList() {
                         <Button
                           variant="link"
                           className="text-blue-600 p-0 h-auto text-sm"
+                          onClick={() => {
+                            setSelectedRestaurant(restaurant);
+                            setIsModalOpen(true);
+                          }}
                         >
                           <Eye className="mr-1 h-4 w-4" /> View
                         </Button>
                         <Button
-                          variant="link"
-                          className="text-green-600 p-0 h-auto text-sm"
+                          size="icon"
+                          variant="ghost"
+                          className="cursor-pointer"
+                          onClick={() => handleToggleRestrict(restaurant)}
+                          title={restaurant.is_flagged ? "Unrestrict User" : "Restrict User"}
                         >
-                          <Pencil className="mr-1 h-4 w-4" /> Edit
+                          {restaurant.is_flagged ? (
+                            <Lock className="w-4 h-4 text-red-600" />
+                          ) : (
+                            <Unlock className="w-4 h-4 text-green-600" />
+                          )}
                         </Button>
                       </TableCell>
+
                     </TableRow>
                   ))
                 )}
@@ -417,6 +506,15 @@ export default function RestaurantList() {
           </div>
         </div>
       )}
+
+      {/* Restaurant Details Modal */}
+      <div className="w-full max-w-none">
+        <RestaurantDetailsModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          restaurant={selectedRestaurant}
+        />
+      </div>
 
       {/* Export Modal */}
       <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>

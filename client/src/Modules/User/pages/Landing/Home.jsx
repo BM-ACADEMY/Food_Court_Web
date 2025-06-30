@@ -1,14 +1,15 @@
-import React, { useState } from "react";
-import { UserPlus, LogIn } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import RegisterForm from "@/Modules/User/pages/Loginpage/Register";
-import OtpForm from "@/Modules/User/pages/Loginpage/OtpForm";
-import LoginForm from "@/Modules/User/pages/Loginpage/Login";
-import ForgotPasswordForm from "@/Modules/User/pages/Loginpage/ForgotPasswordForm";
-import MobileLogin from "@/Modules/User/pages/Loginpage/MobileLogin";
-import MobileOtp from "@/Modules/User/pages/Loginpage/MobileOtp"; // import
-import Header from "@/Modules/User/components/header/Navbar";
-import Footer from "@/Modules/User/components/footer/Footer";
+import React, { useState, useEffect } from 'react';
+import { UserPlus, LogIn } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import RegisterForm from '@/Modules/User/pages/Loginpage/Register';
+import OtpForm from '@/Modules/User/pages/Loginpage/OtpForm';
+import LoginForm from '@/Modules/User/pages/Loginpage/Login';
+import ForgotPasswordForm from '@/Modules/User/pages/Loginpage/ForgotPasswordForm';
+import MobileLogin from '@/Modules/User/pages/Loginpage/MobileLogin';
+import MobileOtp from '@/Modules/User/pages/Loginpage/MobileOtp';
+import Header from '@/Modules/User/components/header/Navbar';
+import Footer from '@/Modules/User/components/footer/Footer';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const Home = () => {
   const [showRegister, setShowRegister] = useState(false);
@@ -16,15 +17,34 @@ const Home = () => {
   const [showLogin, setShowLogin] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showMobileLogin, setShowMobileLogin] = useState(false);
-  const [phoneNumber, setPhoneNumber] = useState(""); // mobile login tracking
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [mode, setMode] = useState('');
+  const [role, setRole] = useState('customer');
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Handle role from URL query parameter
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const roleFromUrl = params.get('role');
+    if (roleFromUrl === 'admin') {
+      setRole('admin');
+      setShowLogin(true);
+    } else {
+      setRole('customer');
+      setShowLogin(false);
+    }
+  }, [location.search]);
+
+  const handleCustomer = () => {
+    setShowLogin(true);
+    setRole('customer');
+  };
 
   return (
     <>
       <Header />
-
       <div className="relative min-h-[60vh] md:min-h-[80vh] bg-[#f8f9fa] overflow-hidden px-4 flex flex-col items-center justify-center gap-8 py-10">
-
-        {/* Background Bubbles */}
         {/* Background Bubbles */}
         <div className="absolute inset-0 z-0 overflow-hidden">
           <div className="absolute top-10 left-10 w-40 h-40 bg-gray-300 rounded-full opacity-30 animate-pulse-slow"></div>
@@ -47,7 +67,8 @@ const Home = () => {
             Welcome to Pegasus
           </h1>
           <p className="text-base md:text-xl text-blue-900 mb-4 text-center">
-            Celebrating 125 years of CMC Vellore
+            Celebrating 125 years of CMC».
+
           </p>
           <div className="w-12 md:w-16 h-1 bg-blue-900 rounded-full"></div>
         </div>
@@ -67,70 +88,52 @@ const Home = () => {
                   New Here? Join now to get started
                 </span>
               </Button>
-
               <Button
                 variant="outline"
                 className="w-full border-2 border-[#05025b] text-[#05025b] hover:bg-[#f0f0ff] text-base sm:text-lg py-6 px-6 flex items-center gap-4"
-                onClick={() => setShowLogin(true)}
+                onClick={handleCustomer}
               >
                 <LogIn className="h-7 w-7 sm:h-8 sm:w-8" />
                 <span className="whitespace-normal font-semibold">
                   Login as Customer
                 </span>
               </Button>
-              <Button
-                variant="outline"
-                className="w-full border-2 border-[#05025b] text-[#05025b] hover:bg-[#f0f0ff] text-base sm:text-lg py-6 px-6 flex items-center gap-4"
-                onClick={() => setShowLogin(true)}
-              >
-                <LogIn className="h-7 w-7 sm:h-8 sm:w-8" />
-                <span className="whitespace-normal font-semibold">
-                  Login as Admin
-                </span>
-              </Button>
             </div>
           )}
 
-        {/* Register Flow */}
         {showRegister && !showOtp && (
           <RegisterForm
             onClose={() => setShowRegister(false)}
-            onOtpSent={() => {
+            onOtpSent={(phone) => {
               setShowRegister(false);
               setShowOtp(true);
-              setPhoneNumber(""); // clear mobile number in case
+              setPhoneNumber(phone);
+              setMode('register');
             }}
           />
         )}
 
-        {/* Email/Phone OTP Verification */}
-        {showOtp && !phoneNumber && (
+        {showOtp && (
           <OtpForm
+            phone={phoneNumber}
+            mode={mode}
             onBack={() => {
               setShowOtp(false);
               setShowRegister(false);
               setShowLogin(false);
               setShowMobileLogin(false);
+              setPhoneNumber('');
             }}
           />
         )}
 
-        {/* Mobile OTP Verification */}
-        {showOtp && phoneNumber && (
-          <MobileOtp
-            phone={phoneNumber}
-            onBack={() => {
-              setShowOtp(false);
-              setShowMobileLogin(false);
-              setPhoneNumber("");
-            }}
-          />
-        )}
-
-        {/* Login with Password */}
         {showLogin && !showOtp && !showForgotPassword && !showMobileLogin && (
           <LoginForm
-            onBack={() => setShowLogin(false)}
+            onBack={() => {
+              setShowLogin(false);
+              navigate('/'); // Clear query params on back
+            }}
+            role={role}
             onForgotPassword={() => {
               setShowLogin(false);
               setShowForgotPassword(true);
@@ -142,7 +145,6 @@ const Home = () => {
           />
         )}
 
-        {/* Forgot Password */}
         {showForgotPassword && (
           <ForgotPasswordForm
             onBack={() => {
@@ -152,17 +154,18 @@ const Home = () => {
           />
         )}
 
-        {/* Mobile Login (Enter phone) */}
         {showMobileLogin && (
           <MobileLogin
             onOtpSent={(mobile) => {
-              setPhoneNumber(mobile); // save mobile to determine which OTP to show
+              setPhoneNumber(mobile);
               setShowMobileLogin(false);
               setShowOtp(true);
+              setMode('login');
             }}
             onBack={() => {
               setShowMobileLogin(false);
               setShowLogin(false);
+              navigate('/'); // Clear query params on back
             }}
           />
         )}

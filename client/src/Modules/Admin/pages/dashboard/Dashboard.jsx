@@ -59,7 +59,26 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 const API_BASE_URL = import.meta.env.VITE_BASE_URL || "http://localhost:3000/api";
+const getRandomColor = () => {
+  const colors = ["#FF6B6B", "#4ECDC4", "#556270", "#C7F464", "#FFA500"];
+  return colors[Math.floor(Math.random() * colors.length)];
+};
 
+const Avatar = ({ name = "" }) => {
+  const initials =
+    name?.split(" ")[0]?.[0]?.toUpperCase() +
+    (name?.split(" ")[1]?.[0]?.toUpperCase() || "");
+  const color = getRandomColor();
+
+  return (
+    <div
+      className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
+      style={{ backgroundColor: color }}
+    >
+      {initials}
+    </div>
+  );
+};
 export default function Dashboard() {
   const [stats, setStats] = useState([]);
   const [transactions, setTransactions] = useState([]);
@@ -77,6 +96,7 @@ export default function Dashboard() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState("xlsx");
   const itemsPerPage = 20; // Last 20 transactions
+  const [paymentMethod, setPaymentMethod] = useState("all");
 
   const totalPages = Math.ceil(totalRecords / itemsPerPage);
 
@@ -150,6 +170,7 @@ export default function Dashboard() {
         params: {
           transactionType: transactionType === "all" ? undefined : transactionType,
           userType: userType === "all" ? undefined : userType,
+           paymentMethod: paymentMethod === "all" ? undefined : paymentMethod,
           fromDate: fromDate ? format(fromDate, "yyyy-MM-dd") : undefined,
           toDate: toDate ? format(toDate, "yyyy-MM-dd") : undefined,
           page: currentPage,
@@ -165,21 +186,25 @@ export default function Dashboard() {
     }
   };
 
-  const fetchExportData = async (type) => {
+  const fetchExportData = async () => {
     try {
-      const params= {};
-      if (type === "userType" && userType !== "all") {
-        params.userType = userType;
-      } else if (type === "range" && startDate && endDate) {
-        params.startDate = format(startDate, "yyyy-MM-dd");
-        params.endDate = format(endDate, "yyyy-MM-dd");
-      }
-      const response = await axios.get(`${API_BASE_URL}/dashboards/export`, { params });
-      setExportData(response.data || []);
+      const response = await axios.get(`${API_BASE_URL}/dashboards/transactions`, {
+        params: {
+          transactionType: transactionType === "all" ? undefined : transactionType,
+          userType: userType === "all" ? undefined : userType,
+          fromDate: fromDate ? format(fromDate, "yyyy-MM-dd") : undefined,
+          toDate: toDate ? format(toDate, "yyyy-MM-dd") : undefined,
+          limit: 10000, // Large limit for exports
+          page: 1
+        }
+      });
+      return response.data.transactions || [];
     } catch (error) {
       console.error("Error fetching export data:", error);
+      throw error;
     }
   };
+
 
   useEffect(() => {
     fetchFilteredTransactions();
@@ -234,81 +259,175 @@ export default function Dashboard() {
     if (page >= 1 && page <= totalPages) setCurrentPage(page);
   };
 
-  const exportToExcel = () => {
-    const data = exportData.map((item) => ({
-      "Transaction ID": item.id || "N/A",
-      Name: item.name || "Unknown",
-      Phone: item.phone || "N/A",
-      Balance: `₹${(item.balance || 0).toLocaleString()}`,
-      Status: item.status || "N/A",
-      "Last Active": item.lastActive || "N/A",
-    }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Transactions");
-    const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-    const file = new Blob([excelBuffer], { type: "application/octet-stream" });
-    saveAs(file, `transactions_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
-  };
+const exportToExcel = (data) => {
+  // Add serial numbers and format data
+  const formattedData = data.map((item, index) => ({
+    "S.No": index + 1,
+    "Transaction ID": item.id || "N/A",
+    "Time": item.time || "N/A",
+    "Type": item.type || "N/A",
+    "From": item.from || "Unknown",
+    "To": item.to || "Unknown",
+    "Amount": item.amount ? parseFloat(item.amount.replace(/[^0-9.-]+/g,"")) : 0,
+    "Status": item.status || "N/A",
+  }));
 
-  const exportToCSV = () => {
-    const data = exportData.map((item) => ({
-      "Transaction ID": item.id || "N/A",
-      Name: item.name || "Unknown",
-      Phone: item.phone || "N/A",
-      Balance: `₹${(item.balance || 0).toLocaleString()}`,
-      Status: item.status || "N/A",
-      "Last Active": item.lastActive || "N/A",
-    }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    const csv = XLSX.utils.sheet_to_csv(ws);
-    const file = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    saveAs(file, `transactions_${format(new Date(), "yyyy-MM-dd")}.csv`);
-  };
+  // Calculate total amount
+  const totalAmount = formattedData.reduce((sum, item) => sum + item.Amount, 0);
 
-  const exportToPDF = () => {
-    try {
-      const doc = new jsPDF();
-      doc.text("Transaction List", 14, 20);
-      autoTable(doc, {
-        startY: 30,
-        head: [["Transaction ID", "Name", "Phone", "Balance", "Status", "Last Active"]],
-        body: exportData.map((item) => [
-          item.id || "N/A",
-          item.name || "Unknown",
-          item.phone || "N/A",
-          `₹${(item.balance || 0).toLocaleString()}`,
-          item.status || "N/A",
-          item.lastActive || "N/A",
-        ]),
-        theme: "grid",
-        styles: { fontSize: 8 },
-        headStyles: { fillColor: [0, 0, 77], textColor: [255, 255, 255] },
-        margin: { top: 30 },
-      });
-      doc.save(`transactions_${format(new Date(), "yyyy-MM-dd")}.pdf`);
-    } catch (error) {
-      console.error("Error exporting to PDF:", error);
+  // Add total row
+  formattedData.push({
+    "S.No": "TOTAL",
+    "Transaction ID": "",
+    "Time": "",
+    "Type": "",
+    "From": "",
+    "To": "",
+    "Amount": totalAmount,
+    "Status": "",
+  });
+
+  const ws = XLSX.utils.json_to_sheet(formattedData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Transactions");
+
+  // Style the total row
+  const totalRow = data.length + 2; // +2 because header is row 1 and data starts at row 2
+  ws[`A${totalRow}`].s = { font: { bold: true } };
+  ws[`G${totalRow}`].s = { font: { bold: true } };
+
+  XLSX.writeFile(wb, `transactions_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+};
+
+const exportToCSV = (data) => {
+  // Add serial numbers and format data
+  const formattedData = data.map((item, index) => ({
+    "S.No": index + 1,
+    "Transaction ID": item.id || "N/A",
+    "Time": item.time || "N/A",
+    "Type": item.type || "N/A",
+    "From": item.from || "Unknown",
+    "To": item.to || "Unknown",
+    "Amount": item.amount || "₹0",
+    "Status": item.status || "N/A",
+  }));
+
+  // Calculate total amount
+  const totalAmount = formattedData.reduce((sum, item) => {
+    const amount = parseFloat(item.Amount.replace(/[^0-9.-]+/g,"")) || 0;
+    return sum + amount;
+  }, 0);
+
+  // Add total row
+  formattedData.push({
+    "S.No": "TOTAL",
+    "Transaction ID": "",
+    "Time": "",
+    "Type": "",
+    "From": "",
+    "To": "",
+    "Amount": `₹${totalAmount.toFixed(2)}`,
+    "Status": "",
+  });
+
+  const ws = XLSX.utils.json_to_sheet(formattedData);
+  const csv = XLSX.utils.sheet_to_csv(ws);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  saveAs(blob, `transactions_${format(new Date(), "yyyy-MM-dd")}.csv`);
+};
+
+const exportToPDF = (data) => {
+  const doc = new jsPDF();
+  
+  // Title and date
+  doc.setFontSize(16);
+  doc.text("Transaction Report", 14, 15);
+  doc.setFontSize(10);
+  doc.text(`Generated on: ${format(new Date(), "yyyy-MM-dd HH:mm")}`, 14, 22);
+
+  // Prepare data with serial numbers
+  const tableData = data.map((item, index) => [
+    index + 1, // Serial number
+    item.id || "N/A",
+    item.time || "N/A",
+    item.type || "N/A",
+    item.from || "Unknown",
+    item.to || "Unknown",
+    item.amount || "₹0",
+    item.status || "N/A",
+  ]);
+
+  // Calculate total amount
+  const totalAmount = data.reduce((sum, item) => {
+    const amount = parseFloat(item.amount?.replace(/[^0-9.-]+/g,"") || 0);
+    return sum + amount;
+  }, 0);
+
+  autoTable(doc, {
+    startY: 30,
+    head: [["S.No", "ID", "Time", "Type", "From", "To", "Amount", "Status"]],
+    body: tableData,
+    foot: [["", "", "", "", "", "TOTAL", `₹${totalAmount.toFixed(2)}`, ""]],
+    theme: "grid",
+    styles: { fontSize: 8 },
+    headStyles: { 
+      fillColor: [0, 0, 77],
+      textColor: 255,
+      fontStyle: 'bold'
+    },
+    footStyles: {
+      fillColor: [220, 220, 220],
+      textColor: 0,
+      fontStyle: 'bold'
+    },
+    didDrawPage: function(data) {
+      // Page numbers
+      const pageCount = doc.internal.getNumberOfPages();
+      doc.setFontSize(10);
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.text(
+          `Page ${i} of ${pageCount}`,
+          data.settings.margin.left,
+          doc.internal.pageSize.height - 10
+        );
+      }
     }
-  };
+  });
 
-  const handleExport = (type) => {
-    fetchExportData(type).then(() => {
+  doc.save(`transactions_${format(new Date(), "yyyy-MM-dd")}.pdf`);
+};
+
+  const handleExport = async () => {
+    try {
+      setIsLoading(true);
+      const data = await fetchExportData();
+
+      if (!data || data.length === 0) {
+        alert("No data available to export");
+        return;
+      }
+
       switch (exportFormat) {
         case "xlsx":
-          exportToExcel();
+          exportToExcel(data);
           break;
         case "csv":
-          exportToCSV();
+          exportToCSV(data);
           break;
         case "pdf":
-          exportToPDF();
+          exportToPDF(data);
           break;
         default:
           console.error("Invalid export format");
       }
+    } catch (error) {
+      console.error("Export failed:", error);
+      alert("Export failed. Please try again.");
+    } finally {
+      setIsLoading(false);
       setIsExportModalOpen(false);
-    });
+    }
   };
 
   return (
@@ -333,7 +452,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-sm text-green-600">+{stat.diff}% from yesterday</p>
+              <p className="text-sm text-green-600">+{stat.diff} from yesterday</p>
             </CardContent>
           </Card>
         ))}
@@ -436,6 +555,25 @@ export default function Dashboard() {
                 </PopoverContent>
               </Popover>
             </div>
+            <div className="space-y-2 w-full sm:w-64">
+              <label className="text-sm font-medium text-gray-700">Payment Method</label>
+              <Select
+                value={paymentMethod}
+                onValueChange={(value) => setPaymentMethod(value)}
+              >
+                <SelectTrigger className="w-full h-10 text-sm">
+                  <SelectValue placeholder="Select Payment Method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="Cash">Cash</SelectItem>
+                  <SelectItem value="Gpay">Gpay</SelectItem>
+                  <SelectItem value="Mess bill">Mess bill</SelectItem>
+                  <SelectItem value="Balance Deduction">Balance Deduction</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
           </div>
 
           <div className="overflow-x-auto">
@@ -456,11 +594,79 @@ export default function Dashboard() {
                   <TableRow key={tx.id}>
                     <TableCell>{tx.time || "N/A"}</TableCell>
                     <TableCell>#{tx.id || "N/A"}</TableCell>
-                    <TableCell>{tx.type || "N/A"}</TableCell>
-                    <TableCell>{tx.from || "Unknown"}</TableCell>
-                    <TableCell>{tx.to || "Unknown"}</TableCell>
-                    <TableCell>{tx.amount || "₹0"}</TableCell>
-                    <TableCell>{tx.status || "N/A"}</TableCell>
+                    <TableCell>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium
+      ${tx.type === "Transfer"
+                            ? "bg-blue-100 text-blue-700"
+                            : tx.type === "TopUp"
+                              ? "bg-purple-100 text-purple-700"
+                              : tx.type === "Refund"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : tx.type === "Credit"
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-gray-100 text-gray-600"
+                          }
+    `}
+                      >
+                        {tx.type || "N/A"}
+                      </span>
+                    </TableCell>
+
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Avatar name={tx.from} />
+                        <div className="flex flex-col gap-1">
+                          <span>{tx.from || "Unknown"}</span>
+                          <span className="text-gray-600 text-[12px]">({tx.fromRoleName || "Unknown"})</span>
+                        </div>
+                      </div>
+                    </TableCell>
+
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Avatar name={tx.to} />
+                        <div className="flex flex-col gap-1">
+                          <span>{tx.to || "Unknown"}</span>
+                          <span className="text-gray-600 text-[12px]">({tx.toRoleName || "Unknown"})</span>
+                        </div>
+                      </div>
+                    </TableCell>
+
+                    <TableCell>
+                      <span
+                        className={`font-semibold ${tx.type === "Credit"
+                          ? "text-green-600"
+                          : tx.type === "TopUp"
+                            ? "text-purple-600"
+                            : tx.type === "Refund"
+                              ? "text-yellow-600"
+                              : tx.type === "Transfer"
+                                ? "text-blue-600"
+                                : "text-gray-600"
+                          }`}
+                      >
+                        {tx.amount || "₹0"}
+                      </span>
+                    </TableCell>
+
+                    <TableCell>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium
+      ${tx.status === "Success"
+                            ? "bg-green-100 text-green-700"
+                            : tx.status === "Pending"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : tx.status === "Failed"
+                                ? "bg-red-100 text-red-700"
+                                : "bg-gray-100 text-gray-600"
+                          }
+    `}
+                      >
+                        {tx.status || "N/A"}
+                      </span>
+                    </TableCell>
+
                   </TableRow>
                 ))}
               </TableBody>
@@ -630,7 +836,11 @@ export default function Dashboard() {
           </DialogHeader>
           <div className="py-4">
             <Label className="text-sm font-medium">Select Export Format</Label>
-            <RadioGroup value={exportFormat} onValueChange={setExportFormat} className="mt-2">
+            <RadioGroup
+              value={exportFormat}
+              onValueChange={setExportFormat}
+              className="mt-2"
+            >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="xlsx" id="xlsx" />
                 <Label htmlFor="xlsx">Excel (xlsx)</Label>
@@ -649,18 +859,8 @@ export default function Dashboard() {
             <Button variant="outline" onClick={() => setIsExportModalOpen(false)}>
               Cancel
             </Button>
-            <Button
-              onClick={() =>
-                handleExport(
-                  startDate && endDate
-                    ? "range"
-                    : userType !== "all"
-                      ? "userType"
-                      : "all"
-                )
-              }
-            >
-              OK
+            <Button onClick={handleExport} disabled={isLoading}>
+              {isLoading ? "Exporting..." : "Export"}
             </Button>
           </DialogFooter>
         </DialogContent>

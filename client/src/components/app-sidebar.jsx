@@ -10,7 +10,8 @@ import {
   SquareTerminal,
   MapPin,
   QrCode,
-  FileText
+  FileText,
+  ArrowDownFromLine
 } from "lucide-react";
 
 import { NavMain } from "@/components/nav-main";
@@ -74,6 +75,11 @@ const masterAdminNavLinks = [
     url: "/master-admin/upi",
     icon: FileText,
   },
+  {
+    title: "Registration Fees",
+    url: "/master-admin/fees",
+    icon: ArrowDownFromLine,
+  },
 ];
 
 const adminNavLinks = [
@@ -107,7 +113,12 @@ const adminNavLinks = [
     url: "/admin/transaction-history",
     icon: History,
   },
-    {
+  {
+    title: "Add / Delete Access",
+    url: "/admin/adddelete/add-new-user",
+    icon: KeyRound,
+  },
+  {
     title: "Point Exchange",
     url: "/admin/points/point-exchange",
     icon: Coins,
@@ -126,6 +137,11 @@ const adminNavLinks = [
     title: "Offline Qrcode",
     url: "/admin/qrcode",
     icon: QrCode,
+  },
+   {
+    title: "Registration Fees",
+    url: "/admin/fees",
+    icon: ArrowDownFromLine,
   },
 ];
 
@@ -152,7 +168,8 @@ export function AppSidebar(props) {
       {...props}
     >
       <SidebarHeader>
-        <div className="px-4 py-2 font-semibold text-lg">Welcome, {userName}</div>
+        <div className="px-4 py-2 font-semibold text-lg text-[#00004D]">Welcome, {userName}</div>
+        <hr />
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={navItems} />

@@ -1,7 +1,6 @@
-"use client";
-
 import React, { useState, useEffect } from "react";
-import { toast } from 'react-toastify';
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 import Pegasus from "@/assets/pegasus.png";
 import {
   DropdownMenu,
@@ -22,9 +21,16 @@ import { Button } from "@/components/ui/button";
 import { ChevronsUpDown, LogOut, User, Save } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import axios from "axios";
+import { io } from "socket.io-client";
+
+const socket = io(import.meta.env.VITE_BASE_URL,{
+   withCredentials: true,
+});
 
 const RestaurantNavbar = () => {
-  const { user, logout, setUser } = useAuth();
+  const { user, logout, setUser, fetchUser } = useAuth();
+  const navigate = useNavigate();
+
   const [openAccount, setOpenAccount] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [editData, setEditData] = useState({
@@ -45,57 +51,80 @@ const RestaurantNavbar = () => {
     }
   }, [user]);
 
+  useEffect(() => {
+    if (user?._id) {
+      socket.emit("joinRestaurantRoom", user._id.toString());
+      socket.on("connect", () => console.log("WebSocket connected"));
+      socket.on("newTransaction", async (data) => {
+        console.log("🔔 New transaction in RestaurantNavbar:", data);
+        try {
+          const balanceRes = await axios.get(
+            `${import.meta.env.VITE_BASE_URL}/user-balance/fetch-balance-by-id/${user._id}`,
+            { withCredentials: true }
+          );
+          setUser({ ...user, balance: balanceRes.data.data.balance || "0.00" });
+        } catch (error) {
+          console.error("Failed to fetch balance:", error);
+        }
+      });
+
+      return () => {
+        socket.off("newTransaction");
+        socket.off("connect");
+      };
+    }
+  }, [user?._id, setUser]);
+
   const handleSave = async () => {
-  try {
-    if (!editData.name || !editData.email || !editData.phone) {
-      toast.error("All fields are required");
-      return;
+    try {
+      if (!editData.name || !editData.email || !editData.phone) {
+        toast.error("All fields are required");
+        return;
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(editData.email)) {
+        toast.error("Invalid email format");
+        return;
+      }
+
+      const phoneRegex = /^\d{10}$/;
+      if (!phoneRegex.test(editData.phone)) {
+        toast.error("Phone number must be 10 digits");
+        return;
+      }
+
+      const restaurantResponse = await axios.put(
+        `${import.meta.env.VITE_BASE_URL}/restaurants/update-restaurant/${user.r_id}`,
+        { restaurant_name: editData.name },
+        { withCredentials: true }
+      );
+
+      const userResponse = await axios.put(
+        `${import.meta.env.VITE_BASE_URL}/users/update-user/${user._id}`,
+        {
+          name: editData.name,
+          email: editData.email,
+          phone_number: editData.phone,
+        },
+        { withCredentials: true }
+      );
+
+      setUser({
+        ...user,
+        name: userResponse.data.data.name,
+        email: userResponse.data.data.email,
+        phone_number: userResponse.data.data.phone_number,
+        restaurant_id: restaurantResponse.data.data.restaurant_id,
+      });
+      await fetchUser();
+      setOpenAccount(false);
+      toast.success("Details updated successfully!");
+    } catch (err) {
+      console.error("Update failed:", err.response?.data || err);
+      toast.error("Update failed. Please try again.");
     }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(editData.email)) {
-      toast.error("Invalid email format");
-      return;
-    }
-
-    const phoneRegex = /^\d{10}$/;
-    if (!phoneRegex.test(editData.phone)) {
-      toast.error("Phone number must be 10 digits");
-      return;
-    }
-
-    const restaurantResponse = await axios.put(
-      `${import.meta.env.VITE_BASE_URL}/restaurants/update-restaurant/${user.r_id}`,
-      { restaurant_name: editData.name },
-      { withCredentials: true }
-    );
-
-    const userResponse = await axios.put(
-      `${import.meta.env.VITE_BASE_URL}/users/update-user/${user._id}`,
-      {
-        name: editData.name,
-        email: editData.email,
-        phone_number: editData.phone,
-      },
-      { withCredentials: true }
-    );
-
-    setUser({
-      ...user,
-      name: userResponse.data.data.name,
-      email: userResponse.data.data.email,
-      phone_number: userResponse.data.data.phone_number,
-      restaurant_id: restaurantResponse.data.data.restaurant_id,
-    });
-
-    setOpenAccount(false);
-    toast.success("Details updated successfully!");
-  } catch (err) {
-    console.error("Update failed:", err.response?.data || err);
-    toast.error("Update failed. Please try again.");
-  }
-};
-
+  };
 
   if (!user) {
     return <div className="text-white bg-[#000052] p-4">Loading...</div>;
@@ -105,7 +134,9 @@ const RestaurantNavbar = () => {
     <>
       <header className="w-full bg-[#000052] text-white px-6 py-4 flex items-center justify-between shadow-md">
         <div className="flex items-center gap-3">
-          <img src={Pegasus} alt="Pegasus Logo" className="w-10 h-10" />
+          <button onClick={() => navigate("/restaurant")} className="focus:outline-none">
+            <img src={Pegasus} alt="Pegasus Logo" className="w-10 h-10" />
+          </button>
           <div>
             <h1 className="text-base md:text-base font-bold tracking-wide">
               PEGASUS 2K25
@@ -140,17 +171,12 @@ const RestaurantNavbar = () => {
             </DropdownMenu>
           </div>
         </div>
-
         <div className="text-right">
           <p className="text-xs sm:text-sm md:text-sm lg:text-base font-medium text-white/70">
             Your Balance
           </p>
           <p className="text-base sm:text-lg md:text-lg lg:text-2xl font-semibold">
-            ₹{" "}
-            {user.balance?.toLocaleString("en-IN", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            }) || "0.00"}
+            ₹ {user.balance}
           </p>
         </div>
       </header>
@@ -163,7 +189,6 @@ const RestaurantNavbar = () => {
               You can update your restaurant details here.
             </DialogDescription>
           </DialogHeader>
-
           <div className="space-y-3">
             <div>
               <label className="block text-sm font-medium mb-1">Restaurant Name</label>
@@ -198,7 +223,6 @@ const RestaurantNavbar = () => {
               <Input value={editData.restaurantId} disabled />
             </div>
           </div>
-
           <DialogFooter className="pt-4">
             <Button variant="default" onClick={handleSave}>
               <Save className="mr-2 h-4 w-4" />

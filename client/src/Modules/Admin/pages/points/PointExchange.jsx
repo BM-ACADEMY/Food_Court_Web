@@ -97,7 +97,8 @@ const PointExchange = () => {
     const [status, setStatus] = useState("");
     const [sortBy, setSortBy] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
-    const { user } = useAuth();
+    const { user: loggedInUser } = useAuth(); // destructure logged-in user
+
     const [roles, setRoles] = useState([]);
     const [users, setUsers] = useState([]);
     const [visibleTransactions, setVisibleTransactions] = useState(transactions.slice(0, 5));
@@ -108,6 +109,8 @@ const PointExchange = () => {
     const [openModal, setOpenModal] = useState(false);
     const transactionRef = useRef(null);
 
+    
+
     const scrollToTransactions = () => {
         transactionRef.current?.scrollIntoView({ behavior: "smooth" });
     };
@@ -117,6 +120,7 @@ const PointExchange = () => {
 
     useEffect(() => {
         fetchAllRoles();
+
         if (selectedRoleId) {
             fetchUsers(selectedRoleId, 1);
         }
@@ -371,15 +375,16 @@ const PointExchange = () => {
                                 </div>
 
                                 <Button
-                                    className={`mt-4 w-full bg-[#00004D] cursor-pointer
-                                        }`}
+                                    className={`mt-4 w-full bg-[#00004D] ${loggedInUser._id === user._id ? "opacity-50 cursor-not-allowed" : ""}`}
                                     onClick={() => {
-                                        setSelectedReceiver(user); // pass entire user or just user._id
+                                        setSelectedReceiver(user);
                                         setOpenModal(true);
                                     }}
+                                    disabled={loggedInUser._id === user.user_id}
                                 >
                                     + Add Funds
                                 </Button>
+
                             </CardContent>
                         </Card>
 
@@ -389,7 +394,7 @@ const PointExchange = () => {
                     <DialogContent className="sm:max-w-[500px]">
                         {selectedReceiver && (
                             <AddFundModalForm
-                                senderId={user._id}
+                                senderId={loggedInUser._id}
                                 receiver={selectedReceiver}
                                 onClose={() => setOpenModal(false)}
                             />

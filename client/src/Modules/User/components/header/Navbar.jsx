@@ -1,22 +1,29 @@
-// components/Header.tsx
-import React from 'react'
-import Pegasus from "@/assets/pegasus.png";
-import Cmc from "@/assets/cmc.png"
+import React from 'react';
+import { Link } from 'react-router-dom';
+import Pegasus from '@/assets/pegasus.png';
+import Cmc from '@/assets/cmc.png';
+
 const Header = () => {
   return (
     <header className="w-full bg-[#07014A] text-white px-6 py-3 flex items-center justify-between shadow-md">
       <div className="flex items-center gap-2">
         <img
-          src={Pegasus} 
+          src={Pegasus}
           alt="Pegasus Logo"
           className="w-8 h-8"
         />
         <span className="text-lg font-bold tracking-wide">PEGASUS 2K25</span>
       </div>
 
-      <div>
+      <div className="flex items-center gap-4">
+        <Link
+          to="/login?role=admin"
+          className="text-white hover:underline text-base font-medium"
+        >
+          Admin
+        </Link>
         <img
-          src={Cmc} 
+          src={Cmc}
           alt="CMC Logo"
           className="w-10 h-10 rounded-full border border-white p-1"
         />
@@ -25,4 +32,4 @@ const Header = () => {
   );
 };
 
-export default Header;  
+export default Header;

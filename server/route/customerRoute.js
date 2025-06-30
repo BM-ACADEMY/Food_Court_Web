@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const customerController = require("../controller/customerController");
+const authMiddleware=require('../middleware/authMiddleware')
 
 // Base: /api/customers
 
@@ -24,8 +25,13 @@ router.put("/update-customer/:id", customerController.updateCustomer);
 // Delete
 router.delete("/delete-customer/:id", customerController.deleteCustomer);
 
+router.get("/fetch-single-customer-details/:customerId", customerController.getCustomerDetails);
+
+router.get("/fetch-single-customer-transaction/:customerId/transactions", customerController.getCustomerTransactions);
+
 //scan qr in the online user 
 router.get("/fetch-customer-details-by-qr", customerController.getCustomerDetailsByQrCode);
+
 
 // Add to existing routes
 router.get("/fetch-by-customer-id", customerController.getCustomerByCustomerId);

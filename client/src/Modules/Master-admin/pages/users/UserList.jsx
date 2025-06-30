@@ -68,6 +68,26 @@ const roleColumnMap = {
         { label: "Registration Type", key: "registration_type" },
     ],
 };
+const getRandomColor = () => {
+  const colors = ["#FF6B6B", "#4ECDC4", "#556270", "#C7F464", "#FFA500"];
+  return colors[Math.floor(Math.random() * colors.length)];
+};
+
+const Avatar = ({ name = "" }) => {
+  const initials = name
+    ? name.split(" ").map((word) => word[0]?.toUpperCase()).slice(0, 2).join("")
+    : "U";
+  const color = getRandomColor();
+
+  return (
+    <div
+      className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold"
+      style={{ backgroundColor: color }}
+    >
+      {initials}
+    </div>
+  );
+};
 
 
 export default function UserList() {
@@ -328,13 +348,14 @@ export default function UserList() {
             fetchUsers();
         } catch (err) {
             console.error("Error during submission:", err);
-            toast.error(err.response?.data?.message || "Something went wrong");
+            // toast.error(err.response?.data?.message || "Something went wrong");
         }
     };
 
     const handleToggleRestrict = async (user) => {
         try {
-            const updated = await axios.put(`${import.meta.env.VITE_BASE_URL}/users/update-user/${user._id}`, {
+            const id=user._id;
+            const updated = await axios.put(`${import.meta.env.VITE_BASE_URL}/users/update-user-flag/${id}`, {
                 is_flagged: !user.is_flagged,
             });
 

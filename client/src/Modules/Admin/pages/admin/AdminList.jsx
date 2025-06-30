@@ -55,6 +55,29 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import AdminDetailsModal from "./AdminDetailsModel"; // Import the modal
+
+const getRandomColor = () => {
+  const colors = ["#FF6B6B", "#4ECDC4", "#556270", "#C7F464", "#FFA500"];
+  return colors[Math.floor(Math.random() * colors.length)];
+};
+
+const Avatar = ({ name = "" }) => {
+  const initials = name
+    ? name.split(" ").map((word) => word[0]?.toUpperCase()).slice(0, 2).join("")
+    : "U";
+  const color = getRandomColor();
+
+  return (
+    <div
+      className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold"
+      style={{ backgroundColor: color }}
+    >
+      {initials}
+    </div>
+  );
+};
+
 
 export default function AdminList() {
   const [search, setSearch] = useState("");
@@ -74,19 +97,33 @@ export default function AdminList() {
   const [error, setError] = useState(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState("xlsx");
-  const pageSize = 10;
+  const [selectedAdmin, setSelectedAdmin] = useState(null);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [pageSize] = useState(10);
+
+  const handleView = (admin) => {
+    setSelectedAdmin(admin);
+    setIsDetailsModalOpen(true);
+  };
+
+  const handleEdit = (admin) => {
+    setSelectedAdmin(admin);
+    setIsDetailsModalOpen(true);
+  };
+  const handleTransactionEdit = (admin) => {
+
+
+  };
 
   useEffect(() => {
     const fetchAdmins = async () => {
       setLoading(true);
       try {
         const response = await fetch(
-          `${
-            import.meta.env.VITE_BASE_URL
+          `${import.meta.env.VITE_BASE_URL
           }/admins/fetch-all-admins-details?search=${encodeURIComponent(
             search
-          )}&status=${status}&lastActive=${lastActive}&regDate=${
-            date ? format(date, "yyyy-MM-dd") : ""
+          )}&status=${status}&lastActive=${lastActive}&regDate=${date ? format(date, "yyyy-MM-dd") : ""
           }&sortBy=${sortBy}&page=${page}&pageSize=${pageSize}`
         );
         if (!response.ok) throw new Error("Failed to fetch admins");
@@ -200,10 +237,10 @@ export default function AdminList() {
               className="pl-9"
             />
           </div>
-          <Button className="bg-[#00004D] text-white flex items-center gap-2 flex-1/5">
+          {/* <Button className="bg-[#00004D] text-white flex items-center gap-2 flex-1/5">
             <QrCode className="size-4" />
             Scan QR Code
-          </Button>
+          </Button> */}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           <div className="flex flex-col gap-1">
@@ -325,12 +362,13 @@ export default function AdminList() {
               <Download className="mr-2 h-4 w-4" /> Export List
             </Button>
           </div>
-          <div className="overflow-x-auto">
-            <Table>
+          <div className="w-full overflow-x-auto">
+            <Table className="min-w-[1000px]"> {/* enforce min width */}
               <TableHeader>
                 <TableRow>
                   <TableHead>Admin ID</TableHead>
-                  <TableHead>Name</TableHead>
+                  <TableHead>Sender Name</TableHead>
+                  <TableHead>Receiver Name</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Balance</TableHead>
                   <TableHead>Status</TableHead>
@@ -341,7 +379,7 @@ export default function AdminList() {
               <TableBody>
                 {admins.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center">
+                    <TableCell colSpan={8} className="text-center">
                       No admins found
                     </TableCell>
                   </TableRow>
@@ -349,17 +387,49 @@ export default function AdminList() {
                   admins.map((admin) => (
                     <TableRow key={admin.id}>
                       <TableCell className="font-medium">#{admin.id}</TableCell>
-                      <TableCell>{admin.name}</TableCell>
+
+                      {/* Sender Name */}
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Avatar name={admin.sender_name} />
+                          <div className="flex flex-col">
+                            <span className="font-medium">{admin.sender_name}</span>
+                            <span className="text-xs text-gray-500">{admin.sender_role_name}</span>
+                          </div>
+                        </div>
+                      </TableCell>
+
+                      {/* Receiver Name */}
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Avatar name={admin.receiver_name} />
+                          <div className="flex flex-col">
+                            <span className="font-medium">{admin.receiver_name}</span>
+                            <span className="text-xs text-gray-500">{admin.receiver_role_name}</span>
+                          </div>
+                        </div>
+                      </TableCell>
+
                       <TableCell>{admin.phone}</TableCell>
-                      <TableCell>₹{admin.balance.toLocaleString()}</TableCell>
+                      <TableCell>
+                        <span
+                          className={`font-medium ${admin.balance > 10000
+                              ? "text-green-600"
+                              : admin.balance > 0
+                                ? "text-yellow-600"
+                                : "text-red-600"
+                            }`}
+                        >
+                          ₹{admin.balance.toLocaleString()}
+                        </span>
+                      </TableCell>
                       <TableCell>
                         <Badge
                           variant="ghost"
-                          className={`text-white ${
-                            admin.status.toLowerCase() === "online"
+                          className={`text-white ${admin.status.toLowerCase() === "online"
                               ? "bg-green-500"
                               : "bg-red-500"
-                          }`}
+                            }`}
                         >
                           {admin.status}
                         </Badge>
@@ -369,14 +439,9 @@ export default function AdminList() {
                         <Button
                           variant="link"
                           className="text-blue-600 p-0 h-auto text-sm"
+                          onClick={() => handleView(admin)}
                         >
                           <Eye className="mr-1 h-4 w-4" /> View
-                        </Button>
-                        <Button
-                          variant="link"
-                          className="text-green-600 p-0 h-auto text-sm"
-                        >
-                          <Pencil className="mr-1 h-4 w-4" /> Edit
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -385,8 +450,19 @@ export default function AdminList() {
               </TableBody>
             </Table>
           </div>
+
         </div>
       )}
+
+      {/* Admin Details Modal */}
+      <AdminDetailsModal
+        admin={selectedAdmin}
+        isOpen={isDetailsModalOpen}
+        onClose={() => {
+          setIsDetailsModalOpen(false);
+          setSelectedAdmin(null);
+        }}
+      />
 
       {/* Export Modal */}
       <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>

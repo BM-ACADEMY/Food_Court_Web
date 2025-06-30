@@ -16,20 +16,44 @@ const { sendOtpSms } = require("../utils/sentSmsOtp");
 const LoginLog = require("../model/loginLogModel");
 const Role = require("../model/roleModel");
 const Transaction = require("../model/transactionModel");
+const sendEmail=require("../utils/sendEmail");
+const crypto = require("crypto");
 
-
-//login function
+// Login function
 exports.loginUser = async (req, res) => {
-  const { emailOrPhone, password } = req.body;
+  const { emailOrPhone, password, role } = req.body;
 
   try {
     // Find user by email or phone number
     const user = await User.findOne({
       $or: [{ email: emailOrPhone }, { phone_number: emailOrPhone }],
-    });
+    }).populate("role_id");
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
+    }
+
+    // Check if user is flagged
+    if (user.is_flagged === true) {
+      return res.status(403).json({
+        message: "Your account is flagged. Please contact the administrator.",
+      });
+    }
+
+    const userRoleId = user.role_id?.role_id;
+
+    // Role-based access restriction
+    if (role === "admin") {
+      const allowedAdminRoles = ["role-1", "role-2", "role-3", "role-4"];
+      if (!allowedAdminRoles.includes(userRoleId)) {
+        return res.status(403).json({ message: "Unauthorized: Not an admin" });
+      }
+    } else if (role === "customer") {
+      if (userRoleId !== "role-5") {
+        return res.status(403).json({ message: "Unauthorized: Not a customer" });
+      }
+    } else {
+      return res.status(400).json({ message: "Invalid role context provided" });
     }
 
     // Verify password
@@ -40,13 +64,13 @@ exports.loginUser = async (req, res) => {
 
     // Generate JWT token
     const token = jwt.sign(
-      { id: user._id, role: user.role },
+      { id: user._id, role: user.role_id },
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
 
     // Set token in cookie
-     res.cookie("token", token, {
+    res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
@@ -57,7 +81,7 @@ exports.loginUser = async (req, res) => {
     await LoginLog.create({
       user_id: user._id,
       login_time: new Date(),
-      status:true
+      status: true,
     });
 
     res.json({ success: true, message: "Login successful" });
@@ -67,10 +91,14 @@ exports.loginUser = async (req, res) => {
   }
 };
 
+
+// Get current user
 exports.getMe = async (req, res) => {
   const token = req.cookies.token;
 
-  if (!token) return res.status(401).json({ message: "Not logged in" });
+  if (!token) {
+    return res.status(401).json({ message: "Not logged in" });
+  }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -80,19 +108,29 @@ exports.getMe = async (req, res) => {
       .select("-password_hash")
       .populate("role_id");
 
-    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
     // Fetch balance
     const userBalance = await UserBalance.findOne({ user_id: user._id });
-const balance = userBalance
-  ? parseFloat(userBalance.balance.toString())
-  : 0.0;
+    const balance = userBalance
+      ? parseFloat(userBalance.balance.toString())
+      : 0.0;
 
     // Fetch customer data
     const customer = await Customer.findOne({ user_id: user._id }).lean();
 
     // Fetch restaurant data
     const restaurant = await Restaurant.findOne({ user_id: user._id }).lean();
+
+    // Fetch treasury subcom data for role-3 users
+    let treasurySubcom = null;
+    if (user.role_id?.role_id === "role-3") {
+      treasurySubcom = await TreasurySubcom.findOne({
+        user_id: user._id,
+      }).lean();
+    }
 
     // Prepare response object
     const userObj = {
@@ -111,21 +149,25 @@ const balance = userBalance
       customer_id: customer ? customer.customer_id : "N/A",
       restaurant_id: restaurant ? restaurant.restaurant_id : "N/A", // Add restaurant_id
       r_id: restaurant ? restaurant._id : null, // Mongo ID for updating restaurant
+      treasury_subcom_id: treasurySubcom
+        ? treasurySubcom.treasury_subcom_id
+        : "N/A", // Add treasury_subcom_id
     };
 
     res.json({ user: userObj });
   } catch (err) {
-    console.error("getMe error:", err);
-    return res.status(401).json({ message: "Invalid token" });
+    console.error("getMe error:", err.message, err.stack);
+    return res
+      .status(401)
+      .json({ message: "Invalid token", details: err.message });
   }
 };
-
-//logout function
+// Logout function
 exports.logoutUser = async (req, res) => {
   try {
     // Get user ID from middleware
     const userId = req.user?.id;
-    console.log("Logout attempt for userId:", userId);
+
 
     // Validate userId
     if (!userId) {
@@ -138,14 +180,14 @@ exports.logoutUser = async (req, res) => {
     // Update the most recent login log with logout time
     const updatedLog = await LoginLog.findOneAndUpdate(
       { user_id: userId, logout_time: null },
-      { logout_time: new Date(),status:false },
+      { logout_time: new Date(), status: false },
       { sort: { login_time: -1 }, new: true } // Return updated document
     );
 
     if (!updatedLog) {
       console.warn(`No open login log found for user ${userId}`);
     } else {
-      console.log("Updated login log:", updatedLog);
+
     }
 
     // Clear token cookie
@@ -162,6 +204,7 @@ exports.logoutUser = async (req, res) => {
   }
 };
 
+// Get session history
 exports.getSessionHistory = async (req, res) => {
   try {
     const { userId, startDate, endDate } = req.query;
@@ -237,11 +280,13 @@ exports.createUser = async (req, res) => {
     }
 
     // Generate OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = generateOtp().toString();
     const otpExpiry = new Date(Date.now() + 5 * 60 * 1000); // 5 mins
 
     // Hash password
     const password_hash = await bcrypt.hash(password, 10);
+    const otpres = sendOtpSms(phone_number, otp);
+  
 
     // Create user
     const newUser = new User({
@@ -256,6 +301,18 @@ exports.createUser = async (req, res) => {
     });
 
     await newUser.save();
+
+    // Create customer record for role-5 users
+    if (role_id.toString() === "role-5") {
+      const customer = new Customer({
+        user_id: newUser._id,
+        customer_id: `CUST-${newUser._id.toString().slice(-6)}`,
+        registration_type: "Standard",
+        registration_fee_paid: false,
+        status: "Active",
+      });
+      await customer.save();
+    }
 
     // Populate role
     const populatedUser = await User.findById(newUser._id).populate("role_id");
@@ -277,7 +334,7 @@ exports.createUser = async (req, res) => {
   }
 };
 
-// POST /users/verify-otp
+// Verify OTP
 exports.verifyOtp = async (req, res) => {
   try {
     const { phone_number, otp } = req.body;
@@ -330,9 +387,171 @@ exports.verifyOtp = async (req, res) => {
       message: "Phone number verified successfully",
     });
   } catch (err) {
+    console.error("Verify OTP error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+exports.verifyMobileLoginOtp = async (req, res) => {
+  try {
+    const { phone_number, otp } = req.body;
+
+    if (!phone_number || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: "Phone number and OTP are required",
+      });
+    }
+
+    // Find user and populate role_id
+    const user = await User.findOne({ phone_number }).populate("role_id");
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Check if OTP is correct and not expired
+    const now = new Date();
+    if (
+      user.phone_number_otp !== otp ||
+      !user.otp_expires_at ||
+      now > user.otp_expires_at
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          user.phone_number_otp !== otp
+            ? "Invalid OTP"
+            : "OTP has expired. Please request a new one.",
+      });
+    }
+
+    // Mark number as verified
+    user.number_verified = true;
+    user.phone_number_otp = null;
+    user.otp_expires_at = null;
+    await user.save();
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { id: user._id, role: user.role_id.role_id }, // Use role_id from populated role
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
+
+    // Set token in cookie
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+      maxAge: 86400000, // 1 day
+    });
+
+    // Create login log
+    await LoginLog.create({
+      user_id: user._id,
+      login_time: new Date(),
+      status: true,
+    });
+
+    // Return user data with populated role
+    return res.status(200).json({
+      success: true,
+      message: "Phone number verified and login successful",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone_number: user.phone_number,
+        role: {
+          role_id: user.role_id.role_id,
+          name: user.role_id.name,
+        },
+        number_verified: user.number_verified,
+      },
+    });
+  } catch (err) {
+    console.error("Verify OTP error:", err);
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
+exports.sendOtpController = async (req, res) => {
+  const { phone_number } = req.body;
+
+  try {
+    // Validate phone number
+    if (!phone_number) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid phone number. Must be a valid Indian number (+91xxxxxxxxxx).",
+      });
+    }
+
+    // Check if user exists
+    const user = await User.findOne({ phone_number });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found with this phone number.",
+      });
+    }
+
+    // Restrict flagged users
+    if (user.is_flagged === true) {
+      return res.status(403).json({
+        success: false,
+        message: "Your account is flagged. Please contact the administrator.",
+      });
+    }
+
+    // Generate OTP
+    const otp = generateOtp();
+    const otpExpiry = new Date(Date.now() + 3 * 60 * 1000); // 3 minutes expiry
+
+    // Update user's OTP fields
+    user.phone_number_otp = otp;
+    user.otp_expires_at = otpExpiry;
+    await user.save();
+
+    // Send OTP via ChennaiSMS
+    try {
+      const smsResponse = await sendOtpSms(phone_number, otp);
+   
+      
+      if (smsResponse) {
+        return res.status(200).json({
+          success: true,
+          message: "OTP sent successfully.",
+        });
+      } else {
+        console.error("SMS response:", smsResponse);
+        return res.status(500).json({
+          success: false,
+          message: "Failed to send OTP. Please try again.",
+        });
+      }
+    } catch (smsError) {
+      console.error("SMS sending failed:", smsError.message);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send OTP. Please try again.",
+      });
+    }
+  } catch (error) {
+    console.error("Error in sendOtpController:", error);
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while processing your request.",
+    });
+  }
+};
+
 
 // Get all users with pagination, search, and role filter
 exports.getUsers = async (req, res) => {
@@ -387,7 +606,6 @@ exports.getUsers = async (req, res) => {
 
         switch (roleKey) {
           case "role-1": {
-            // Master Admin
             const master = await MasterAdmin.findOne({
               user_id: user._id,
             }).lean();
@@ -399,9 +617,7 @@ exports.getUsers = async (req, res) => {
             }
             break;
           }
-
           case "role-2": {
-            // Admin
             const admin = await Admin.findOne({ user_id: user._id }).lean();
             if (admin) {
               enriched.admin_id = admin.admin_id;
@@ -413,9 +629,7 @@ exports.getUsers = async (req, res) => {
             }
             break;
           }
-
           case "role-3": {
-            // Treasury Subcom
             const subcom = await TreasurySubcom.findOne({
               user_id: user._id,
             }).lean();
@@ -426,9 +640,7 @@ exports.getUsers = async (req, res) => {
             }
             break;
           }
-
           case "role-4": {
-            // Restaurant
             const restaurant = await Restaurant.findOne({ user_id: user._id })
               .populate("location", "name")
               .lean();
@@ -444,9 +656,7 @@ exports.getUsers = async (req, res) => {
             }
             break;
           }
-
           case "role-5": {
-            // Customer
             const customer = await Customer.findOne({
               user_id: user._id,
             }).lean();
@@ -460,7 +670,6 @@ exports.getUsers = async (req, res) => {
             }
             break;
           }
-
           default:
             break;
         }
@@ -483,46 +692,182 @@ exports.getUsers = async (req, res) => {
   }
 };
 
+// Get all users for history (with customer_id for role-5)
 exports.getAllUsersforHistory = async (req, res) => {
   try {
     const requestingUserId = req.user?.id;
+    const { userId, startDate, endDate } = req.query;
+
+    // Validate requesting user
     const requestingUser = await User.findById(requestingUserId).populate(
       "role_id"
     );
-
     if (!requestingUser) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Requesting user not found" });
+      return res.status(404).json({ error: "Requesting user not found" });
     }
 
     const roleName = requestingUser.role_id?.name || "";
     if (!["Master-Admin", "Admin"].includes(roleName)) {
       return res
         .status(403)
-        .json({ success: false, message: "Unauthorized to view users" });
+        .json({ error: "Unauthorized to view user history" });
     }
 
-    const users = await User.find()
-      .populate("role_id", "name")
-      .select("name email role_id");
+    // Build match query for users
+    let matchQuery = {};
+    if (userId) {
+      try {
+        matchQuery._id = mongoose.Types.ObjectId(userId);
+      } catch (err) {
+        return res.status(400).json({ error: "Invalid userId format" });
+      }
+    }
+
+    // Build session match query for date filtering
+    let sessionMatch = {};
+    if (startDate) {
+      sessionMatch.login_time = { $gte: new Date(startDate) };
+    }
+    if (endDate) {
+      sessionMatch.login_time = {
+        ...sessionMatch.login_time,
+        $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999)),
+      };
+    }
+
+    // Aggregate users, sessions, and transactions
+    const users = await User.aggregate([
+      { $match: matchQuery },
+      {
+        $lookup: {
+          from: "roles",
+          localField: "role_id",
+          foreignField: "_id",
+          as: "role",
+        },
+      },
+      { $unwind: { path: "$role", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "loginlogs",
+          let: { user_id: "$_id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ["$user_id", "$$user_id"] },
+                ...sessionMatch,
+              },
+            },
+            { $sort: { login_time: -1 } },
+            { $limit: 1 },
+          ],
+          as: "latestSession",
+        },
+      },
+      { $unwind: { path: "$latestSession", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "transactions",
+          let: {
+            user_id: "$_id",
+            session_start: "$latestSession.login_time",
+            session_end: {
+              $ifNull: ["$latestSession.logout_time", new Date()],
+            },
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    {
+                      $or: [
+                        { $eq: ["$sender_id", "$$user_id"] },
+                        { $eq: ["$receiver_id", "$$user_id"] },
+                      ],
+                    },
+                    { $gte: ["$created_at", "$$session_start"] },
+                    { $lte: ["$created_at", "$$session_end"] },
+                  ],
+                },
+              },
+            },
+            {
+              $project: {
+                transaction_id: 1,
+                sender_id: 1,
+                receiver_id: 1,
+                amount: 1,
+                transaction_type: 1,
+                payment_method: 1,
+                status: 1,
+                remarks: 1,
+                created_at: 1,
+              },
+            },
+          ],
+          as: "actions",
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+          name: 1,
+          email: 1,
+          phone_number: 1,
+          role: "$role.name",
+          session: {
+            login_time: "$latestSession.login_time",
+            logout_time: "$latestSession.logout_time",
+            status: {
+              $cond: {
+                if: { $eq: ["$latestSession.status", true] },
+                then: "Online",
+                else: "Offline",
+              },
+            },
+          },
+          actions: 1,
+        },
+      },
+    ]);
+
     res.status(200).json({ success: true, data: users });
   } catch (error) {
-    console.error("Get users error:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    console.error("Get users history error:", error);
+    res.status(500).json({ error: "Server error", details: error.message });
   }
 };
 
 // Get user by ID
 exports.getUserById = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).populate("role_id", "name");
-    if (!user)
+    const user = await User.findById(req.params.id)
+      .populate("role_id", "name role_id")
+      .select("-password_hash")
+      .lean();
+
+    if (!user) {
       return res
         .status(404)
         .json({ success: false, message: "User not found" });
-    res.status(200).json({ success: true, data: user });
+    }
+
+    const enriched = {
+      ...user,
+      role_id: user.role_id?._id,
+      role_name: user.role_id?.name,
+      role_key: user.role_id?.role_id,
+    };
+
+    if (user.role_id?.role_id === "role-5") {
+      const customer = await Customer.findOne({ user_id: user._id }).lean();
+      enriched.customer_id = customer ? customer.customer_id : "N/A";
+    }
+
+    res.status(200).json({ success: true, data: enriched });
   } catch (err) {
+    console.error("Get user by ID error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
@@ -531,27 +876,67 @@ exports.getUserById = async (req, res) => {
 exports.updateUser = async (req, res) => {
   try {
     const userId = req.params.id;
-    const { name, email, phone_number } = req.body;
+    const { name, email, phone_number, is_flagged } = req.body;
 
-    // Validate input
-    if (!name || !email || !phone_number) {
-      return res.status(400).json({ message: "All fields are required" });
+ 
+    if (!mongoose.isValidObjectId(userId)) {
+      console.error(`updateUser: Invalid user ID format: ${userId}`);
+      return res.status(400).json({ message: "Invalid user ID format" });
     }
 
-    // Update user
+    if (!name || !email || !phone_number) {
+      console.error("updateUser: Missing required fields", {
+        name,
+        email,
+        phone_number,
+      });
+      return res
+        .status(400)
+        .json({ message: "Name, email, and phone number are required" });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      console.error(`updateUser: Invalid email format: ${email}`);
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+
+    const phoneRegex = /^\d{10}$/;
+    if (!phoneRegex.test(phone_number)) {
+      console.error(`updateUser: Invalid phone number format: ${phone_number}`);
+      return res
+        .status(400)
+        .json({ message: "Phone number must be 10 digits" });
+    }
+
+    const existingEmail = await User.findOne({ email, _id: { $ne: userId } });
+    if (existingEmail) {
+      console.error(`updateUser: Email already exists: ${email}`);
+      return res.status(409).json({ message: "Email already exists" });
+    }
+
+    const existingPhone = await User.findOne({
+      phone_number,
+      _id: { $ne: userId },
+    });
+    if (existingPhone) {
+      console.error(`updateUser: Phone number already exists: ${phone_number}`);
+      return res.status(409).json({ message: "Phone number already exists" });
+    }
+
     const updatedUser = await User.findByIdAndUpdate(
       userId,
-      { name, email, phone_number, updatedAt: Date.now() },
+      { name, email, phone_number, is_flagged, updatedAt: Date.now() },
       { new: true, runValidators: true }
     )
       .select("-password_hash")
       .populate("role_id");
 
     if (!updatedUser) {
+      console.error(`updateUser: User not found for ID ${userId}`);
       return res.status(404).json({ message: "User not found" });
     }
 
-    // If the user is a restaurant, update the restaurant name
     if (updatedUser.role_id?.role_id === "role-4") {
       const restaurant = await Restaurant.findOneAndUpdate(
         { user_id: userId },
@@ -559,23 +944,30 @@ exports.updateUser = async (req, res) => {
         { new: true }
       );
       if (!restaurant) {
-        console.warn(`No restaurant found for user ${userId}`);
+        console.warn(`updateUser: No restaurant found for user ${userId}`);
       }
     }
 
-    // Fetch balance
     const userBalance = await UserBalance.findOne({ user_id: updatedUser._id });
     const balance = userBalance
       ? parseFloat(userBalance.balance.toString())
       : 0.0;
 
-    // Fetch customer data
-    const customer = await Customer.findOne({ user_id: updatedUser._id }).lean();
+    const customer = await Customer.findOne({
+      user_id: updatedUser._id,
+    }).lean();
+    const restaurant = await Restaurant.findOne({
+      user_id: updatedUser._id,
+    }).lean();
 
-    // Fetch restaurant data
-    const restaurant = await Restaurant.findOne({ user_id: updatedUser._id }).lean();
+    let treasurySubcom = null;
+    if (updatedUser.role_id?.role_id === "role-3") {
+      treasurySubcom = await TreasurySubcom.findOne({
+        user_id: updatedUser._id,
+      }).lean();
 
-    // Prepare response object
+    }
+
     const userObj = {
       _id: updatedUser._id,
       name: updatedUser.name,
@@ -586,17 +978,56 @@ exports.updateUser = async (req, res) => {
       number_verified: updatedUser.number_verified,
       createdAt: updatedUser.createdAt,
       updatedAt: updatedUser.updatedAt,
-      role: updatedUser.role_id, // Populated role object
-      balance, // User's balance
-      customer_id: customer ? customer.customer_id : "N/A", // Customer ID
-      restaurant_id: restaurant ? restaurant.restaurant_id : "N/A", // Restaurant ID
-      r_id: restaurant ? restaurant._id : null, // Mongo ID for restaurant
+      role: updatedUser.role_id,
+      role_key: updatedUser.role_id?.role_id,
+      role_name: updatedUser.role_id?.name,
+      balance,
+      customer_id: customer ? customer.customer_id : "N/A",
+      restaurant_id: restaurant ? restaurant.restaurant_id : "N/A",
+      r_id: restaurant ? restaurant._id : null,
+      treasury_subcom_id: treasurySubcom
+        ? treasurySubcom.treasury_subcom_id
+        : "N/A",
     };
 
+   
     res.json({ data: userObj, message: "User updated successfully" });
   } catch (err) {
-    console.error("updateUser error:", err);
-    res.status(500).json({ message: "Server error" });
+    console.error("updateUser error:", err.message, err.stack);
+    res.status(500).json({ message: "Server error", details: err.message });
+  }
+};
+exports.updateUserFlag = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { is_flagged } = req.body;
+
+
+
+    if (!mongoose.isValidObjectId(userId)) {
+      return res.status(400).json({ message: "Invalid user ID format" });
+    }
+
+    if (typeof is_flagged !== "boolean") {
+      return res.status(400).json({ message: "is_flagged must be true or false" });
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { is_flagged, updatedAt: Date.now() },
+      { new: true }
+    ).select("_id name email phone_number is_flagged");
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+
+
+    res.json({success:true, message: "User flag status updated", data: updatedUser });
+  } catch (err) {
+    console.error("updateUserFlag error:", err.message, err.stack);
+    res.status(500).json({ message: "Server error", details: err.message });
   }
 };
 
@@ -604,16 +1035,18 @@ exports.updateUser = async (req, res) => {
 exports.deleteUser = async (req, res) => {
   try {
     const user = await User.findByIdAndDelete(req.params.id);
-    if (!user)
+    if (!user) {
       return res
         .status(404)
         .json({ success: false, message: "User not found" });
+    }
     res
-      .status(200).json({ success: true, message: "User deleted successfully" });
+      .status(200)
+      .json({ success: true, message: "User deleted successfully" });
   } catch (err) {
+    console.error("Delete user error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
-
 };
 
 const roleModelMap = {
@@ -777,7 +1210,7 @@ exports.getUsersWithBalanceByRole = async (req, res) => {
   }
 };
 
-// Get User by Phone Number
+
 exports.getUserByPhone = async (req, res) => {
   try {
     const { phone_number } = req.query;
@@ -794,6 +1227,193 @@ exports.getUserByPhone = async (req, res) => {
   } catch (err) {
     console.error("Error in getUserByPhone:", err);
     res.status(500).json({ success: false, message: err.message });
+  }
+};
+exports.getTransactionDetails = async (req, res) => {
+  try {
+    const { transactionId } = req.params;
+    const requestingUserId = req.user?.id;
+
+    // Validate requesting user
+    const requestingUser = await User.findById(requestingUserId).populate(
+      "role_id"
+    );
+    if (!requestingUser) {
+      return res.status(404).json({ error: "Requesting user not found" });
+    }
+
+    const roleName = requestingUser.role_id?.name || "";
+    if (!["Master-Admin", "Admin"].includes(roleName)) {
+      return res
+        .status(403)
+        .json({ error: "Unauthorized to view transaction details" });
+    }
+
+    // Find transaction and populate sender/receiver details
+    const transaction = await Transaction.findOne({
+      transaction_id: transactionId,
+    })
+      .populate({
+        path: "sender_id",
+        select: "name email phone_number role_id",
+        populate: { path: "role_id", select: "name" },
+      })
+      .populate({
+        path: "receiver_id",
+        select: "name email phone_number role_id",
+        populate: { path: "role_id", select: "name" },
+      })
+      .lean();
+
+    if (!transaction) {
+      return res.status(404).json({ error: "Transaction not found" });
+    }
+
+    // Format response
+    const formattedTransaction = {
+      transaction_id: transaction.transaction_id,
+      amount: transaction.amount,
+      transaction_type: transaction.transaction_type,
+      payment_method: transaction.payment_method || "N/A",
+      status: transaction.status,
+      remarks: transaction.remarks || "N/A",
+      created_at: transaction.created_at,
+      sender: {
+        _id: transaction.sender_id._id,
+        name: transaction.sender_id.name,
+        email: transaction.sender_id.email || "N/A",
+        phone_number: transaction.sender_id.phone_number,
+        role: transaction.sender_id.role_id?.name || "Unknown",
+      },
+      receiver: {
+        _id: transaction.receiver_id._id,
+        name: transaction.receiver_id.name,
+        email: transaction.receiver_id.email || "N/A",
+        phone_number: transaction.receiver_id.phone_number,
+        role: transaction.receiver_id.role_id?.name || "Unknown",
+      },
+    };
+
+    res.status(200).json({ success: true, data: formattedTransaction });
+  } catch (error) {
+    console.error("Get transaction details error:", error);
+    res.status(500).json({ error: "Server error", details: error.message });
+  }
+};
+
+exports.verifyCredentials = async (req, res) => {
+  try {
+    const { emailOrPhone, password, user_id } = req.body;
+
+    // Validate required fields
+    if (!emailOrPhone || !password || !user_id) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    // Find user by email or phone number
+    const user = await User.findOne({
+      $or: [{ email: emailOrPhone }, { phone_number: emailOrPhone }],
+    }).populate("role_id"); // Populate role_id to get Role document
+
+    if (!user) {
+      return res.status(401).json({ error: "Invalid email or phone number" });
+    }
+
+    // Verify user_id matches
+    if (user._id.toString() !== user_id) {
+      return res.status(403).json({ error: "Unauthorized user" });
+    }
+
+    // Check role_id from Role model
+    if (!user.role_id || !["role-1", "role-2"].includes(user.role_id.role_id)) {
+      return res.status(403).json({
+        error: "Unauthorized: Only Master-Admin or Admin roles are allowed",
+      });
+    }
+
+    // Check password
+    const isMatch = await bcrypt.compare(password, user.password_hash);
+    if (!isMatch) {
+      return res.status(401).json({ error: "Invalid password" });
+    }
+
+    // Credentials and role are valid
+    res.status(200).json({ isValid: true });
+  } catch (error) {
+    console.error("Credential verification error:", error);
+    res.status(500).json({
+      error: "Failed to verify credentials",
+      details: error.message,
+    });
+  }
+};
+
+
+exports.forgotPassword = async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const user = await User.findOne({ email });
+
+    if (!user)
+      return res.status(404).json({ message: "User not found with this email." });
+
+    // Generate token
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
+
+    // Set token + expiry
+    user.resetPasswordToken = hashedToken;
+    user.resetPasswordExpire = Date.now() + 15 * 60 * 1000; // 15 minutes
+    await user.save();
+
+    const resetUrl = `http://localhost:5173/customer/reset-password/${resetToken}`;
+    // const resetUrl = `${process.env.DEV_FRONTEND_URL}/reset-password/${resetToken}`;
+
+    // Send reset link
+    await sendEmail({
+      to: email,
+      subject: "Password Reset Request",
+      html: `<p>Click <a href="${resetUrl}">here</a> to reset your password. This link will expire in 15 minutes.</p>`,
+    });
+
+    res.status(200).json({ message: "Reset link sent to email." });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.resetPassword = async (req, res) => {
+  const { token } = req.params;
+  const { password, confirmPassword } = req.body;
+
+  if (password !== confirmPassword) {
+    return res.status(400).json({ message: "Passwords do not match." });
+  }
+
+  try {
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpire: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: "Token is invalid or has expired." });
+    }
+
+    // Reset password
+    user.password = password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save();
+
+    res.status(200).json({ message: "Password has been reset successfully." });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
