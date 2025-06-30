@@ -23,10 +23,11 @@ function TopUpSuccess({ data, onNewTopUp, customer }) {
     if (!user || !user._id) {
       throw new Error('Authenticated user ID is missing.');
     }
-
+    console.log(customer,"customer");
+    
     const objectIdPattern = /^[0-9a-fA-F]{24}$/;
-    if (!objectIdPattern.test(customer.receiver_id) || !objectIdPattern.test(customer.sender_id)) {
-      console.warn('Invalid ID format:', { receiver_id: customer.receiver_id, sender_id: customer.sender_id });
+    if (!objectIdPattern.test(customer.receiver_id._id) || !objectIdPattern.test(customer.sender_id)) {
+      console.warn('Invalid ID format:', { receiver_id: customer.receiver_id._id, sender_id: customer.sender_id });
       navigate('/home');
       return;
     }
@@ -35,7 +36,7 @@ function TopUpSuccess({ data, onNewTopUp, customer }) {
       `${import.meta.env.VITE_BASE_URL}/fees/fee-deduction`,
       {
         sender_id: customer.sender_id,
-        receiver_id: customer.receiver_id,
+        receiver_id: customer.receiver_id._id,
       },
       { withCredentials: true }
     );
@@ -49,7 +50,7 @@ function TopUpSuccess({ data, onNewTopUp, customer }) {
   } catch (err) {
   console.error('Back to Home error:', {
     message: err.message,
-    response: err.response?.data, // Log the full response
+    response: err.response?.data, 
     status: err.response?.status,
     customer: customer,
   });
