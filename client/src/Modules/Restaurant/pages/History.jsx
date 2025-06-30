@@ -51,16 +51,16 @@ import {
 } from "@/components/ui/pagination";
 import { useAuth } from "@/context/AuthContext";
 import { io } from "socket.io-client";
-const PER_PAGE = 15;
 const socket = io(import.meta.env.VITE_BASE_SOCKET_URL, {
   withCredentials: true,
 });
+const PER_PAGE = 15;
+
 export default function History() {
   const { user } = useAuth();
   const [transactions, setTransactions] = useState([]);
-  const [currentBalance, setCurrentBalance] = useState("0.00");
-    const [todayBalance, setTodayBalance] = useState("0.00");
-    const [transactionCount, setTransactionCount] = useState(0);
+  const [todayBalance, setTodayBalance] = useState("0.00");
+  const [transactionCount, setTransactionCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
@@ -69,7 +69,7 @@ export default function History() {
   const [exportFormat, setExportFormat] = useState("csv");
   const [dateFilter, setDateFilter] = useState("All Time");
   const [typeFilter, setTypeFilter] = useState("All");
-  useEffect(() => {
+ useEffect(() => {
     if (user?._id) {
       socket.emit("joinRestaurantRoom", user._id.toString());
 
@@ -83,19 +83,20 @@ export default function History() {
       };
     }
   }, [user?._id]);
-  // Fetch balance and transactions
+  // Fetch today's balance and transactions
   const loadData = async () => {
     if (!user) return;
 
     setIsLoading(true);
     setError(null);
     try {
-      // Fetch balance
+      // Fetch today's balance for restaurant
       const balanceRes = await axios.get(
-        `${import.meta.env.VITE_BASE_URL}/user-balance/fetch-balance-by-id/${user._id}`,
+        `${import.meta.env.VITE_BASE_URL}/transactions/today-balance/${user._id}`,
         { withCredentials: true }
       );
-      setCurrentBalance(balanceRes.data.data.balance || "0.00");
+      setTodayBalance(balanceRes.data.data.todayBalance || "0.00");
+      setTransactionCount(balanceRes.data.data.transactionCount || 0);
 
       // Fetch transactions
       const txRes = await axios.get(
@@ -105,7 +106,7 @@ export default function History() {
       const allTransactions = txRes.data.data;
 
       // Log transactions to debug customer_id
-
+      console.log("Fetched transactions:", allTransactions);
 
       // Filter transactions where user is sender or receiver
       const userTransactions = allTransactions.filter(
@@ -115,7 +116,7 @@ export default function History() {
           tx.customer_id !== undefined // Ensure customer_id is present
       );
 
-
+      console.log("Filtered user transactions:", userTransactions);
       userTransactions.forEach((tx) =>
         console.log(`Transaction ${tx.transaction_id}: customer_id=${tx.customer_id}`)
       );
@@ -123,15 +124,14 @@ export default function History() {
       setTransactions(userTransactions);
     } catch (error) {
       console.error("Failed to load data:", error);
-      setError(error.response?.data?.message || "Failed to load transactions or balance.");
+      setError(
+        error.response?.data?.message ||
+          "Failed to load transactions or today's balance."
+      );
     } finally {
       setIsLoading(false);
     }
   };
-
-  useEffect(() => {
-    loadData();
-  }, [user]);
 
   useEffect(() => {
     loadData();
