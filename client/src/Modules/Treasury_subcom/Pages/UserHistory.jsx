@@ -104,9 +104,9 @@ const UserHistory = () => {
         quickFilter: timeFilter,
         type: typeFilter,
       });
-
+      const userId=user._id
       const response = await axios.get(
-        `${import.meta.env.VITE_BASE_URL}/transactions/history/user/${user._id}`,
+        `${import.meta.env.VITE_BASE_URL}/transactions/history/user/${userId}`,
         {
           params: { page, limit, search, quickFilter: timeFilter, type: typeFilter },
           withCredentials: true,

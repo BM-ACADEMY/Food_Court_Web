@@ -1600,9 +1600,6 @@ exports.getTransactionTreasuryRestaurantHistory = async (req, res) => {
   }
 };
 
-// Update transaction by transaction_id
-// exports.updateTransaction = async (req, res) => {
-
 exports.getTransactionHistoryByUserId = async (req, res) => {
   try {
     const {
@@ -1615,7 +1612,6 @@ exports.getTransactionHistoryByUserId = async (req, res) => {
     } = req.query;
     const { userId } = req.params;
 
-    // Validate userId
     if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
       console.error("Invalid userId received:", userId);
       return res
@@ -1623,22 +1619,19 @@ exports.getTransactionHistoryByUserId = async (req, res) => {
         .json({ success: false, message: "Invalid or missing userId" });
     }
 
-    // Build filter object
     let filter = {
       status: "Success",
       $or: [
-        { sender_id: mongoose.Types.ObjectId.createFromHexString(userId) },
-        { receiver_id: mongoose.Types.ObjectId.createFromHexString(userId) },
+        { sender_id: mongoose.Types.ObjectId(userId) },
+        { receiver_id: mongoose.Types.ObjectId(userId) },
       ],
     };
 
-    // Date filter
     const dateFilter = buildDateFilter(quickFilter, fromDate, toDate);
     if (dateFilter.created_at) {
       filter = { ...filter, ...dateFilter };
     }
 
-    // Search filter
     if (search.trim()) {
       const users = await User.find({
         $or: [
@@ -1646,17 +1639,16 @@ exports.getTransactionHistoryByUserId = async (req, res) => {
           { phone_number: { $regex: search, $options: "i" } },
         ],
       }).select("_id");
-      const userIds = users.map((user) => user._id);
+
+      const userIds = users.map((u) => u._id);
       filter.$or = [
         { sender_id: { $in: userIds } },
         { receiver_id: { $in: userIds } },
       ];
     }
 
-    // Pagination
     const skip = (page - 1) * limit;
 
-    // Fetch transactions
     const transactionsPromise = Transaction.find(filter)
       .populate({
         path: "sender_id",
@@ -1672,10 +1664,8 @@ exports.getTransactionHistoryByUserId = async (req, res) => {
       .limit(parseInt(limit))
       .lean();
 
-    // Count total transactions
     const totalTransactionsPromise = Transaction.countDocuments(filter);
 
-    // Count today's transactions
     let todaysTransactions = 0;
     if (quickFilter === "today") {
       const todayFilter = {
@@ -1688,39 +1678,44 @@ exports.getTransactionHistoryByUserId = async (req, res) => {
       todaysTransactions = await Transaction.countDocuments(todayFilter);
     }
 
-    // Execute queries
     const [transactions, totalTransactions] = await Promise.all([
       transactionsPromise,
       totalTransactionsPromise,
     ]);
 
-    // Format transactions
+    // 🔐 Filter out incomplete transactions early
+    const safeTransactions = transactions.filter((txn) => {
+      return txn?.sender_id?._id || txn?.receiver_id?._id;
+    });
+
     const formattedTransactions = await Promise.all(
-      transactions.map(async (txn) => {
+      safeTransactions.map(async (txn) => {
+        const senderId = txn?.sender_id?._id?.toString() || "";
+        const receiverId = txn?.receiver_id?._id?.toString() || "";
+
         let user = txn.sender_id;
         let amount = parseFloat(txn.amount);
         let customer_id = "N/A";
 
-        // Determine if the logged-in user is sender or receiver
-        if (txn.receiver_id._id.toString() === userId) {
+        if (receiverId === userId) {
           user = txn.receiver_id;
-          amount = amount; // Incoming
-        } else if (txn.sender_id._id.toString() === userId) {
-          amount = -amount; // Outgoing
+          amount = amount; // incoming
+        } else if (senderId === userId) {
+          amount = -amount; // outgoing
         }
 
-        // Fetch customer_id
-        const customer = await Customer.findOne({ user_id: user._id })
+        const customer = await Customer.findOne({ user_id: user?._id })
           .select("customer_id")
           .lean();
+
         customer_id =
-          customer?.customer_id || `CUST${txn.transaction_id.slice(-3)}`;
+          customer?.customer_id || `CUST${txn.transaction_id?.slice(-3) || "000"}`;
 
         return {
           id: txn.transaction_id,
           user: {
-            name: user.name || "Unknown",
-            type: user.role_id?.name || "Unknown",
+            name: user?.name || "Unknown",
+            type: user?.role_id?.name || "Unknown",
           },
           customer_id,
           amount,
@@ -1730,7 +1725,6 @@ exports.getTransactionHistoryByUserId = async (req, res) => {
       })
     );
 
-    // Send response
     res.status(200).json({
       success: true,
       transactions: formattedTransactions,
@@ -1747,6 +1741,9 @@ exports.getTransactionHistoryByUserId = async (req, res) => {
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
+
+
+
 
 exports.exportTransactionHistoryByUserId = async (req, res) => {
   try {
@@ -2334,8 +2331,8 @@ exports.getTransactionTreasuryRestaurantHistory = async (req, res) => {
 //   }
 // };
 
-exports.getTransactionHistoryByUserId = async (req, res) => {
-};
+// exports.getTransactionHistoryByUserId = async (req, res) => {
+// };
 
 
 // exports.exportTransactionHistoryByUserId = async (req, res) => {
