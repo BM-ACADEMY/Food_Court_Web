@@ -81,7 +81,7 @@ export default function RecentTransactions() {
                   <TableHead className="whitespace-nowrap">AMOUNT</TableHead>
                   <TableHead className="whitespace-nowrap">STATUS</TableHead>
                   <TableHead className="whitespace-nowrap">PAYMENT METHOD</TableHead>
-                  <TableHead className="whitespace-nowrap">ACTIONS</TableHead>
+                  {/* <TableHead className="whitespace-nowrap">ACTIONS</TableHead> */}
                 </TableRow>
               </TableHeader>
 
@@ -140,7 +140,7 @@ export default function RecentTransactions() {
                       </TableCell>
 
                       {/* ACTIONS column */}
-                      <TableCell className="whitespace-nowrap">
+                      {/* <TableCell className="whitespace-nowrap">
                         <Button
                           size="sm"
                           variant="ghost"
@@ -149,7 +149,7 @@ export default function RecentTransactions() {
                         >
                           <Eye className="w-4 h-4" /> View
                         </Button>
-                      </TableCell>
+                      </TableCell> */}
                     </TableRow>
                   );
                 })}

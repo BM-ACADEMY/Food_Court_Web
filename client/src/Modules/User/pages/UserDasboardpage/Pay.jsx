@@ -61,8 +61,8 @@ const QrScanner = () => {
       await html5QrCode.start(
         { facingMode: "environment" },
         {
-            fps: 10,
-            qrbox: { width: 300, height: 350 },
+            fps: 30,
+            qrbox: { width: 400, height: 500 },
           },
         async (decodedText) => {
           await validateQrCode(decodedText);

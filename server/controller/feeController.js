@@ -224,6 +224,8 @@ exports.getFeeByUserId = async (req, res) => {
 //     session.endSession();
 //   }
 // };
+
+
 exports.feeDeduction = async (req, res) => {
   const session = await mongoose.startSession();
   try {
@@ -277,9 +279,9 @@ exports.feeDeduction = async (req, res) => {
       return res.status(200).json({ success: true, message: 'Registration fee already paid' });
     }
 
-    // Determine fee based on registration type
-    const feeAmount = customer.registration_type === 'online' ? 20 : 50;
-    const feeAmountStr = feeAmount.toFixed(2); // For string representation
+    // Determine fee amount based on registration_type
+    const feeAmount = customer.registration_type === 'online' ? '20.00' : '50.00';
+    const feeAmountFloat = parseFloat(feeAmount);
 
     // Check balance
     const balanceResponse = await UserBalance.findOne({ user_id: receiver_id }).session(session);
@@ -288,7 +290,7 @@ exports.feeDeduction = async (req, res) => {
     }
 
     const currentBalance = parseFloat(balanceResponse.balance.toString());
-    if (isNaN(currentBalance) || currentBalance < feeAmount) {
+    if (isNaN(currentBalance) || currentBalance < feeAmountFloat) {
       return res.status(400).json({ success: false, message: `Insufficient balance to deduct registration fee of ${feeAmount}` });
     }
 
@@ -302,7 +304,7 @@ exports.feeDeduction = async (req, res) => {
     // Deduct balance
     const updatedBalance = await UserBalance.findOneAndUpdate(
       { user_id: receiver_id },
-      { $inc: { balance: new mongoose.Types.Decimal128(`-${feeAmountStr}`) } },
+      { $inc: { balance: new mongoose.Types.Decimal128(`-${feeAmount}`) } },
       { new: true, session }
     );
     if (!updatedBalance) {
@@ -312,16 +314,20 @@ exports.feeDeduction = async (req, res) => {
     // Create Fee record
     const fee = new Fee({
       user_id: new mongoose.Types.ObjectId(receiver_id),
-      amount: new mongoose.Types.Decimal128(feeAmountStr),
+      amount: new mongoose.Types.Decimal128(feeAmount),
     });
     const savedFee = await fee.save({ session });
-  
+    console.log('Fee record saved:', {
+      feeId: savedFee._id.toString(),
+      userId: savedFee.user_id.toString(),
+      amount: savedFee.amount.toString(),
+    });
 
     // Create Transaction record
     const transaction = new Transaction({
       sender_id: new mongoose.Types.ObjectId(receiver_id),
       receiver_id: new mongoose.Types.ObjectId(sender_id),
-      amount: feeAmountStr,
+      amount: feeAmount,
       transaction_type: 'Registration Fee',
       payment_method: 'Balance Deduction',
       remarks: `Registration fee payment (${customer.registration_type})`,
@@ -341,11 +347,17 @@ exports.feeDeduction = async (req, res) => {
 
     // Commit transaction
     await session.commitTransaction();
-  
+    console.log('Registration fee processed successfully:', {
+      receiverId: receiver_id,
+      feeId: savedFee._id.toString(),
+      transactionId: savedTransaction._id.toString(),
+      registrationType: customer.registration_type,
+      amountDeducted: feeAmount,
+    });
 
     res.status(200).json({
       success: true,
-      message: `Registration fee of ${feeAmountStr} deducted and recorded successfully`,
+      message: `Registration fee of ${feeAmount} deducted and recorded successfully`,
       balance: updatedBalance,
       fee: savedFee,
       transaction: savedTransaction,
@@ -363,7 +375,6 @@ exports.feeDeduction = async (req, res) => {
     session.endSession();
   }
 };
-
 
 exports.getAllFeesAdmin = async (req, res) => {
    try {
@@ -490,3 +501,4 @@ exports.getAllFeesAdmin = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+

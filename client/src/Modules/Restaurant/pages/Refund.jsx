@@ -67,7 +67,7 @@ export default function Refund() {
     try {
       await html5QrCode.start(
         { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 300, height: 250 } },
+        { fps: 30, qrbox: { width: 400, height: 500 } },
         async (decodedText) => {
           await handleScanSuccess(decodedText);
           stopScanner();

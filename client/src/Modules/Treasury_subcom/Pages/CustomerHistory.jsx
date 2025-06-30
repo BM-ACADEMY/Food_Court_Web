@@ -63,7 +63,7 @@ export default function CustomerHistory() {
 
       await html5QrCode.start(
         { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 300, height: 350 } },
+        { fps: 30, qrbox: { width: 400, height: 500 } },
         handleScanSuccess,
         (error) => console.warn("QR scan error:", error)
       );
