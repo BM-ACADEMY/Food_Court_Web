@@ -94,6 +94,7 @@ export default function CustomerList() {
     onlineCount: 0,
     totalPages: 0,
   });
+  const [allCustomers, setAllCustomers] = useState([]); // New state for all customers
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -102,7 +103,7 @@ export default function CustomerList() {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [registrationType, setRegistrationType] = useState("all");
 
-  // Fetch data from backend
+  // Fetch paginated customers for display
   useEffect(() => {
     const fetchCustomers = async () => {
       setLoading(true);
@@ -117,8 +118,8 @@ export default function CustomerList() {
               status,
               lastActive,
               regDate: regDate ? format(new Date(regDate), "yyyy-MM-dd") : "",
-              registration_type: registrationType, // Add new parameter
-              sortBy: sortBy === "name" ? sortOrder : sort, // Map to backend sortBy
+              registration_type: registrationType,
+              sortBy: sortBy === "name" ? sortOrder : sort,
               page,
               pageSize,
             },
@@ -137,19 +138,50 @@ export default function CustomerList() {
     fetchCustomers();
   }, [search, status, registrationType, lastActive, sort, regDate, page, pageSize]);
 
+  // Fetch all customers for export when export modal is opened
+  useEffect(() => {
+    if (isExportModalOpen) {
+      const fetchAllCustomers = async () => {
+        try {
+          const response = await axios.get(
+            `${import.meta.env.VITE_BASE_URL}/customers/fetch-all-customer-details`,
+            {
+              params: {
+                search,
+                status,
+                lastActive,
+                regDate: regDate ? format(new Date(regDate), "yyyy-MM-dd") : "",
+                registration_type: registrationType,
+                sortBy: sort.split("-")[0] === "name" ? sort.split("-")[1] : sort,
+                page: 1,
+                pageSize: 1000, // Set a high pageSize to fetch all records
+              },
+            }
+          );
+          setAllCustomers(response.data.customers);
+        } catch (err) {
+          console.error("Error fetching all customers for export:", err);
+          toast.error("Failed to fetch all customers for export.");
+        }
+      };
+      fetchAllCustomers();
+    }
+  }, [isExportModalOpen, search, status, lastActive, regDate, registrationType, sort]);
+
   const { customers, totalCustomers, totalBalance, onlineCount, totalPages } = data;
 
   // Memoized paginated data
   const paginatedCustomers = useMemo(() => customers, [customers]);
 
-  // Export functions
+  // Export functions using allCustomers
   const exportToExcel = () => {
-    const data = paginatedCustomers.map((customer) => ({
+    const data = allCustomers.map((customer) => ({
       "Customer ID": customer.id,
-      Name: customer.name,
+      "Name (Role)": `${customer.name || "Unknown"} (${customer.role || "Unknown"})`,
       Phone: customer.phone,
       Balance: `₹${customer.balance.toLocaleString()}`,
       Status: customer.status,
+      "Registration Type": customer.registration_type,
       "Last Active": customer.lastActive,
     }));
     const ws = XLSX.utils.json_to_sheet(data);
@@ -161,12 +193,13 @@ export default function CustomerList() {
   };
 
   const exportToCSV = () => {
-    const data = paginatedCustomers.map((customer) => ({
+    const data = allCustomers.map((customer) => ({
       "Customer ID": customer.id,
-      Name: customer.name,
+      "Name (Role)": `${customer.name || "Unknown"} (${customer.role || "Unknown"})`,
       Phone: customer.phone,
       Balance: `₹${customer.balance.toLocaleString()}`,
       Status: customer.status,
+      "Registration Type": customer.registration_type,
       "Last Active": customer.lastActive,
     }));
     const ws = XLSX.utils.json_to_sheet(data);
@@ -181,13 +214,14 @@ export default function CustomerList() {
       doc.text("Customer List", 14, 20);
       autoTable(doc, {
         startY: 30,
-        head: [["Customer ID", "Name", "Phone", "Balance", "Status", "Last Active"]],
-        body: paginatedCustomers.map((customer) => [
+        head: [["Customer ID", "Name (Role)", "Phone", "Balance", "Status", "Registration Type", "Last Active"]],
+        body: allCustomers.map((customer) => [
           customer.id || "N/A",
-          customer.name || "Unknown",
+          `${customer.name || "Unknown"} (${customer.role || "Unknown"})`,
           customer.phone || "N/A",
           `₹${customer.balance.toLocaleString()}` || "₹0",
           customer.status || "N/A",
+          customer.registration_type || "N/A",
           customer.lastActive || "N/A",
         ]),
         theme: "grid",
@@ -204,6 +238,10 @@ export default function CustomerList() {
   };
 
   const handleExport = () => {
+    if (allCustomers.length === 0) {
+      toast.error("No data available to export. Please try again.");
+      return;
+    }
     switch (exportFormat) {
       case "xlsx":
         exportToExcel();
@@ -318,10 +356,7 @@ export default function CustomerList() {
           {/* Sort */}
           <div className="flex flex-col gap-1">
             <Label className="text-sm px-1 mb-3">Sort</Label>
-            <Select
-              value={sort}
-              onValueChange={setSort}
-            >
+            <Select value={sort} onValueChange={setSort}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Sort" />
               </SelectTrigger>
@@ -387,12 +422,11 @@ export default function CustomerList() {
             </Button>
           </div>
           <div className="w-full overflow-x-auto">
-            <Table className="min-w-[1200px]">
+            <Table className="min-w-[1000px]">
               <TableHeader>
                 <TableRow>
                   <TableHead className="whitespace-nowrap">Customer ID</TableHead>
-                  <TableHead className="whitespace-nowrap">Sender Name</TableHead>
-                  <TableHead className="whitespace-nowrap">Receiver Name</TableHead>
+                  <TableHead className="whitespace-nowrap">Customer Name</TableHead>
                   <TableHead className="whitespace-nowrap">Phone</TableHead>
                   <TableHead className="whitespace-nowrap">Balance</TableHead>
                   <TableHead className="whitespace-nowrap">Status</TableHead>
@@ -401,92 +435,67 @@ export default function CustomerList() {
                   <TableHead className="whitespace-nowrap">Actions</TableHead>
                 </TableRow>
               </TableHeader>
-
               <TableBody>
                 {paginatedCustomers?.map((customer) => (
                   <TableRow key={customer.id}>
                     <TableCell className="font-medium whitespace-nowrap">#{customer.id}</TableCell>
-
-                    {/* Sender Name */}
-                    {/* <TableCell className="whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <Avatar name={customer.sender_name} />
-                        <div className="flex flex-col gap-1">
-                          <span className="font-medium">{customer.sender_name}</span>
-                          <span className="text-sm text-gray-500">{customer.sender_role}</span>
-                        </div>
-                      </div>
-                    </TableCell> */}
-
-                    {/* Receiver Name */}
                     <TableCell className="whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        <Avatar name={customer.sender_name} />
+                        <Avatar name={customer.name} />
                         <div className="flex flex-col gap-1">
-                          <span className="font-medium">{customer.sender_name}</span>
-                          <span className="text-sm text-gray-500">({customer.sender_role})</span>
+                          <span className="font-medium">{customer.name || "Unknown"}</span>
+                          <span
+                            className={`text-sm ${
+                              customer.role === "Customer"
+                                ? "text-blue-500"
+                                : customer.role === "Restaurant"
+                                ? "text-orange-500"
+                                : "text-gray-400"
+                            }`}
+                          >
+                            {customer.role || "Unknown"}
+                          </span>
                         </div>
                       </div>
                     </TableCell>
-
-                    {/* Phone (Name + Number) */}
-                    <TableCell className="whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <Avatar name={customer.receiver_name} />
-                       <div className="flex flex-col gap-1">
-                         <span className="font-medium">{customer.receiver_name}</span>
-                        <span className="font-medium">({customer.receiver_role})</span>
-                       </div>
-                      </div>
-                    </TableCell>
-
-                    <TableCell className="whitespace-nowrap">{customer.phone}</TableCell>
-
-                    {/* Balance */}
+                    <TableCell className="whitespace-nowrap">{customer.phone || "N/A"}</TableCell>
                     <TableCell className="whitespace-nowrap">
                       <span
-                        className={`font-semibold ${customer.balance > 0
+                        className={`font-semibold ${
+                          customer.balance > 0
                             ? "text-green-600"
                             : customer.balance < 0
-                              ? "text-red-600"
-                              : "text-gray-500"
-                          }`}
+                            ? "text-red-600"
+                            : "text-gray-500"
+                        }`}
                       >
                         ₹{customer.balance.toLocaleString()}
                       </span>
                     </TableCell>
-
-                    {/* Status */}
                     <TableCell className="whitespace-nowrap">
                       <Badge
                         variant="ghost"
-                        className={`text-white ${customer.status.toLowerCase() === "online"
-                            ? "bg-green-500"
-                            : "bg-red-500"
-                          }`}
+                        className={`text-white ${
+                          customer.status.toLowerCase() === "online" ? "bg-green-500" : "bg-red-500"
+                        }`}
                       >
                         {customer.status}
                       </Badge>
                     </TableCell>
-
-                    {/* Registration Type */}
                     <TableCell className="whitespace-nowrap">
                       <span
-                        className={`px-2 py-1 rounded text-white text-sm font-medium ${customer.registration_type === "online"
+                        className={`px-2 py-1 rounded text-white text-sm font-medium ${
+                          customer.registration_type === "online"
                             ? "bg-pink-500"
                             : customer.registration_type === "offline"
-                              ? "bg-blue-600"
-                              : "bg-gray-400"
-                          }`}
+                            ? "bg-blue-600"
+                            : "bg-gray-400"
+                        }`}
                       >
-                        {customer.registration_type}
+                        {customer.registration_type || "Unknown"}
                       </span>
                     </TableCell>
-
-                    {/* Last Active */}
-                    <TableCell className="whitespace-nowrap">{customer.lastActive}</TableCell>
-
-                    {/* Actions */}
+                    <TableCell className="whitespace-nowrap">{customer.lastActive || "N/A"}</TableCell>
                     <TableCell className="whitespace-nowrap">
                       <div className="flex gap-2">
                         <Button
@@ -503,8 +512,6 @@ export default function CustomerList() {
               </TableBody>
             </Table>
           </div>
-
-
         </div>
       )}
       <div className="w-full max-w-none">
