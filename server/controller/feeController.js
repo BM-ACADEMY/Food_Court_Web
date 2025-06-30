@@ -133,6 +133,10 @@ exports.feeDeduction = async (req, res) => {
       return res.status(200).json({ success: true, message: 'Registration fee already paid' });
     }
 
+    // Determine fee amount based on registration_type
+    const feeAmount = customer.registration_type === 'online' ? '20.00' : '50.00';
+    const feeAmountFloat = parseFloat(feeAmount);
+
     // Check balance
     const balanceResponse = await UserBalance.findOne({ user_id: receiver_id }).session(session);
     if (!balanceResponse) {
@@ -140,8 +144,8 @@ exports.feeDeduction = async (req, res) => {
     }
 
     const currentBalance = parseFloat(balanceResponse.balance.toString());
-    if (isNaN(currentBalance) || currentBalance < 20) {
-      return res.status(400).json({ success: false, message: 'Insufficient balance to deduct registration fee' });
+    if (isNaN(currentBalance) || currentBalance < feeAmountFloat) {
+      return res.status(400).json({ success: false, message: `Insufficient balance to deduct registration fee of ${feeAmount}` });
     }
 
     // Check for existing fee
@@ -154,7 +158,7 @@ exports.feeDeduction = async (req, res) => {
     // Deduct balance
     const updatedBalance = await UserBalance.findOneAndUpdate(
       { user_id: receiver_id },
-      { $inc: { balance: new mongoose.Types.Decimal128("-20.00") } },
+      { $inc: { balance: new mongoose.Types.Decimal128(`-${feeAmount}`) } },
       { new: true, session }
     );
     if (!updatedBalance) {
@@ -164,7 +168,7 @@ exports.feeDeduction = async (req, res) => {
     // Create Fee record
     const fee = new Fee({
       user_id: new mongoose.Types.ObjectId(receiver_id),
-      amount: new mongoose.Types.Decimal128("20.00"),
+      amount: new mongoose.Types.Decimal128(feeAmount),
     });
     const savedFee = await fee.save({ session });
     console.log('Fee record saved:', {
@@ -177,10 +181,10 @@ exports.feeDeduction = async (req, res) => {
     const transaction = new Transaction({
       sender_id: new mongoose.Types.ObjectId(receiver_id),
       receiver_id: new mongoose.Types.ObjectId(sender_id),
-      amount: '20.00',
+      amount: feeAmount,
       transaction_type: 'Registration Fee',
       payment_method: 'Balance Deduction',
-      remarks: 'Registration fee payment',
+      remarks: `Registration fee payment (${customer.registration_type})`,
       status: 'Success',
     });
     const savedTransaction = await transaction.save({ session });
@@ -201,11 +205,13 @@ exports.feeDeduction = async (req, res) => {
       receiverId: receiver_id,
       feeId: savedFee._id.toString(),
       transactionId: savedTransaction._id.toString(),
+      registrationType: customer.registration_type,
+      amountDeducted: feeAmount,
     });
 
     res.status(200).json({
       success: true,
-      message: 'Registration fee deducted and recorded successfully',
+      message: `Registration fee of ${feeAmount} deducted and recorded successfully`,
       balance: updatedBalance,
       fee: savedFee,
       transaction: savedTransaction,
