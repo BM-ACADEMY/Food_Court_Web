@@ -122,6 +122,7 @@ exports.deleteRestaurant = async (req, res) => {
   }
 };
 
+
 exports.getAllRestaurantDetails = async (req, res) => {
   try {
     const {
@@ -324,7 +325,7 @@ exports.getAllRestaurantDetails = async (req, res) => {
           restaurant_id: "$restaurant.restaurant_id",
           restaurant_name: "$restaurant.restaurant_name",
           category: "$location.city",
-          sales: { $toDouble: "$restaurant.treasury_to_customer_refund" },
+          sales: { $toDouble: { $ifNull: ["$balance.balance", 0] } }, // Use balance.balance from userbalances
           created_at: 1,
           status: {
             $cond: [
@@ -364,6 +365,7 @@ exports.getAllRestaurantDetails = async (req, res) => {
 
     const restaurants = await User.aggregate(pipeline);
     debug("Aggregated restaurants:", restaurants.length);
+    debug("Sample restaurant data:", restaurants[0]); // Log first result for debugging
 
     // Format data
     let formattedRestaurants = restaurants.map((r) => {
@@ -404,7 +406,7 @@ exports.getAllRestaurantDetails = async (req, res) => {
       );
     }
 
-    // Statistics
+    // Statistics pipeline
     const statsPipeline = [
       { $match: userQuery },
       {
@@ -415,24 +417,42 @@ exports.getAllRestaurantDetails = async (req, res) => {
           as: "restaurant",
         },
       },
-      { $unwind: "$restaurant" },
+      { $unwind: { path: "$restaurant", preserveNullAndEmptyArrays: false } },
+      {
+        $lookup: {
+          from: "userbalances",
+          localField: "_id",
+          foreignField: "user_id",
+          as: "balance",
+        },
+      },
+      { $unwind: { path: "$balance", preserveNullAndEmptyArrays: true } },
       {
         $group: {
           _id: null,
           totalRestaurants: { $sum: 1 },
           totalSales: {
-            $sum: { $toDouble: "$restaurant.treasury_to_customer_refund" },
+            $sum: { $toDouble: { $ifNull: ["$balance.balance", 0] } },
           },
         },
       },
     ];
     const statsResult = await User.aggregate(statsPipeline);
     const { totalRestaurants = 0, totalSales = 0 } = statsResult[0] || {};
+    debug("Stats result:", { totalRestaurants, totalSales });
 
     // Online count
     const onlineCount = formattedRestaurants.filter(
       (r) => r.status === "Online"
     ).length;
+
+    // Data integrity check for user_id mismatches
+    const mismatchedUserBalances = await UserBalance.find({
+      user_id: { $nin: await User.distinct("_id") },
+    }).select("user_id");
+    if (mismatchedUserBalances.length > 0) {
+      debug("Mismatched user_ids in UserBalance:", mismatchedUserBalances);
+    }
 
     res.json({
       restaurants: formattedRestaurants,
@@ -446,6 +466,7 @@ exports.getAllRestaurantDetails = async (req, res) => {
     res.status(500).json({ error: "Server error", details: error.message });
   }
 };
+
 exports.getRestaurantDetails = async (req, res) => {
   try {
     const { restaurantId } = req.params;
