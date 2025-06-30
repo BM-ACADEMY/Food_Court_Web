@@ -328,7 +328,6 @@ exports.getAllTreasurySubcomDetails = async (req, res) => {
   }
 };
 
-
 exports.getTreasuryDetails = async (req, res) => {
   try {
     const { treasuryId } = req.params;
@@ -485,7 +484,6 @@ exports.getTreasuryTransactions = async (req, res) => {
   }
 };
 
-
 exports.getSessionReport = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -495,34 +493,45 @@ exports.getSessionReport = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid userId format" });
     }
 
+    console.log("Fetching session for userId:", userId);
+
     // Find the most recent active login session (no logout_time, status: true)
     const currentSession = await LoginLog.findOne({
       user_id: mongoose.Types.ObjectId.createFromHexString(userId),
       logout_time: { $exists: false },
-      status: true, // Ensure active session
+      status: true,
     })
       .sort({ login_time: -1 }) // Most recent first
       .populate("location_id", "name")
       .populate("upi_id", "upiId")
+      .populate("user_id", "name") // Populate user_id for treasury_name
       .lean();
 
     if (!currentSession) {
-
+      console.log("No active session found for userId:", userId);
       return res.status(404).json({ success: false, message: "No active session found for this user" });
     }
 
- 
+    console.log("Current session:", currentSession);
 
-    const { login_time, location_id, upi_id } = currentSession;
+    const { login_time, location_id, upi_id, user_id } = currentSession;
 
-    // Use current time as end time (04:04 AM IST, June 30, 2025)
-    const endTime = new Date("2025-06-30T04:04:00+05:30");
-    const durationMs = endTime - new Date(login_time);
-    const duration = {
-      hours: Math.floor(durationMs / (1000 * 60 * 60)),
-      minutes: Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60)),
-      seconds: Math.floor((durationMs % (1000 * 60)) / 1000),
-    };
+    // Use current time as end time (09:31 PM IST, June 30, 2025)
+    const endTime = new Date("2025-06-30T21:31:00+05:30");
+    let duration = "N/A";
+    if (login_time && !isNaN(new Date(login_time).getTime())) {
+      const durationMs = endTime - new Date(login_time);
+      if (durationMs >= 0) {
+        duration = {
+          hours: Math.floor(durationMs / (1000 * 60 * 60)),
+          minutes: Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60)),
+          seconds: Math.floor((durationMs % (1000 * 60)) / 1000),
+        };
+        duration = `${duration.hours}h ${duration.minutes}m ${duration.seconds}s`;
+      } else {
+        duration = "Invalid duration";
+      }
+    }
 
     // Fetch transactions for this session
     const transactions = await Transaction.find({
@@ -534,22 +543,26 @@ exports.getSessionReport = async (req, res) => {
       status: "Success",
     }).lean();
 
-
+    console.log("Transactions found:", transactions.length, transactions);
 
     // Calculate transaction summaries
     let totalOutgoing = 0;
     let totalIncoming = 0;
     let refundOutgoingCount = 0;
     let topUpOutgoingCount = 0;
-    const paymentMethodSummary = {};
+    const paymentMethodSummary = {
+      Cash: 0,
+      "Mess bill": 0,
+      Gpay: 0,
+      Other: 0,
+    };
     const transactionTypeCounts = {};
 
     transactions.forEach((txn) => {
-      const amount = parseFloat(txn.amount);
-      const isSender = txn.sender_id.toString() === userId;
-      const isReceiver = txn.receiver_id.toString() === userId;
+      const amount = parseFloat(txn.amount) || 0;
+      const isSender = txn.sender_id?.toString() === userId;
+      const isReceiver = txn.receiver_id?.toString() === userId;
 
-      // Total outgoing and incoming amounts
       if (isSender) {
         totalOutgoing += amount;
         if (txn.transaction_type === "Refund") refundOutgoingCount += 1;
@@ -559,34 +572,36 @@ exports.getSessionReport = async (req, res) => {
         totalIncoming += amount;
       }
 
-      // Payment method summary
-      const paymentMethod = txn.payment_method || "Unknown";
-      if (!paymentMethodSummary[paymentMethod]) {
-        paymentMethodSummary[paymentMethod] = 0;
-      }
-      paymentMethodSummary[paymentMethod] += amount;
+      const paymentMethod = txn.payment_method || "Other";
+      paymentMethodSummary[paymentMethod] = (paymentMethodSummary[paymentMethod] || 0) + amount;
 
-      // Transaction type counts
-      const transactionType = txn.transaction_type;
-      if (!transactionTypeCounts[transactionType]) {
-        transactionTypeCounts[transactionType] = 0;
-      }
-      transactionTypeCounts[transactionType] += 1;
+      const transactionType = txn.transaction_type || "Unknown";
+      transactionTypeCounts[transactionType] = (transactionTypeCounts[transactionType] || 0) + 1;
     });
+
+    console.log("Payment Method Summary:", paymentMethodSummary);
 
     // Format the response
     const report = {
       session: {
-        start_time: login_time.toLocaleString(),
-        end_time: endTime.toLocaleString(),
-        duration: `${duration.hours}h ${duration.minutes}m ${duration.seconds}s`,
+        session_id: currentSession._id?.toString() || "N/A",
+        treasury_name: user_id?.name || "Unknown",
+        start_time: login_time ? login_time.toLocaleString("en-IN") : "N/A",
+        end_time: "Active",
+        duration,
         location: location_id?.name || "N/A",
         upi_id: upi_id?.upiId || "N/A",
       },
-      payment_methods: Object.entries(paymentMethodSummary).map(([method, amount]) => ({
-        method,
-        amount: `₹${amount.toFixed(2)}`,
-      })),
+      payment_methods: {
+        cash_total: `₹${(paymentMethodSummary.Cash || 0).toFixed(2)}`,
+        mess_bill_total: `₹${(paymentMethodSummary["Mess bill"] || 0).toFixed(2)}`,
+        gpay_total: `₹${(paymentMethodSummary.Gpay || 0).toFixed(2)}`,
+        other_total: `₹${(paymentMethodSummary.Other || 0).toFixed(2)}`,
+        all_methods: Object.entries(paymentMethodSummary).map(([method, amount]) => ({
+          method,
+          amount: `₹${amount.toFixed(2)}`,
+        })),
+      },
       transaction_types: Object.entries(transactionTypeCounts).map(([type, count]) => ({
         type,
         count,
@@ -595,6 +610,14 @@ exports.getSessionReport = async (req, res) => {
       total_incoming: `₹${totalIncoming.toFixed(2)}`,
       refund_outgoing_count: refundOutgoingCount,
       topup_outgoing_count: topUpOutgoingCount,
+      transactions: transactions.map((txn) => ({
+        id: txn._id?.toString() || "N/A",
+        type: txn.transaction_type || "Unknown",
+        amount: `₹${(parseFloat(txn.amount) || 0).toFixed(2)}`,
+        payment_method: txn.payment_method || "N/A",
+        date: txn.created_at ? txn.created_at.toLocaleString("en-IN") : "N/A",
+        description: txn.description || "No description",
+      })),
     };
 
     res.status(200).json({

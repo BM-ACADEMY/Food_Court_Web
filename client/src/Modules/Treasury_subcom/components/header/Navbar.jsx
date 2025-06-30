@@ -22,6 +22,14 @@ import { useAuth } from "@/context/AuthContext";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 const TreasuryDashboardHeader = () => {
   const { user, setUser, logout } = useAuth();
@@ -41,9 +49,12 @@ const TreasuryDashboardHeader = () => {
       }
 
       const response = await axios.get(
-       `${import.meta.env.VITE_BASE_URL}/treasurySubcom/fetch-session-report/${user._id}`,
+        `${import.meta.env.VITE_BASE_URL}/treasurySubcom/fetch-session-report/${user._id}`,
         { withCredentials: true }
       );
+
+      console.log("Session report response:", response.data);
+      console.log("Transactions in report:", response.data?.data?.transactions?.length);
 
       if (response?.data?.success) {
         setReport(response.data.data);
@@ -75,7 +86,6 @@ const TreasuryDashboardHeader = () => {
 
   useEffect(() => {
     if (user) {
-
       setEditData({
         name: user.name || "",
         email: user.email || "",
@@ -90,7 +100,6 @@ const TreasuryDashboardHeader = () => {
   };
 
   const handleSave = async () => {
-  
     if (!editData.name || !editData.phone_number) {
       setError("Name and phone number are required");
       toast.error("Name and phone number are required", {
@@ -140,7 +149,6 @@ const TreasuryDashboardHeader = () => {
         position: "top-center",
         autoClose: 3000,
       });
-
     } catch (err) {
       const message = err.response?.data?.message || "Failed to update account";
       console.error("handleSave: Error details:", {
@@ -157,7 +165,6 @@ const TreasuryDashboardHeader = () => {
   };
 
   const handleLogout = () => {
-
     sessionStorage.removeItem("dropdownSubmitted");
     logout();
     setShowLogoutDialog(false);
@@ -310,7 +317,7 @@ const TreasuryDashboardHeader = () => {
 
       {/* Session History Dialog */}
       <Dialog open={showSessionHistoryDialog} onOpenChange={setShowSessionHistoryDialog}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[600px] max-w-[90vw] max-h-[80vh] overflow-y-auto p-6">
           <DialogHeader>
             <DialogTitle>Session History</DialogTitle>
             <DialogDescription>
@@ -319,10 +326,10 @@ const TreasuryDashboardHeader = () => {
           </DialogHeader>
           {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
           {report ? (
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div>
                 <h3 className="font-semibold text-lg">Session Details</h3>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
                   <p><strong>Start Time:</strong> {report.session.start_time}</p>
                   <p><strong>End Time:</strong> {report.session.end_time}</p>
                   <p><strong>Duration:</strong> {report.session.duration}</p>
@@ -331,9 +338,18 @@ const TreasuryDashboardHeader = () => {
                 </div>
               </div>
               <div>
-                <h3 className="font-semibold text-lg">Payment Methods</h3>
-                <ul className="list-disc pl-5">
-                  {report.payment_methods.map((pm) => (
+                <h3 className="font-semibold text-lg">Payment Method Totals</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+                  <p><strong>Cash Total:</strong> {report.payment_methods.cash_total}</p>
+                  <p><strong>Mess Bill Total:</strong> {report.payment_methods.mess_bill_total}</p>
+                  <p><strong>Gpay Total:</strong> {report.payment_methods.gpay_total}</p>
+                  <p><strong>Other Total:</strong> {report.payment_methods.other_total}</p>
+                </div>
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg">All Payment Methods</h3>
+                <ul className="list-disc pl-5 mt-2">
+                  {report.payment_methods.all_methods.map((pm) => (
                     <li key={pm.method} className="text-gray-700">
                       {pm.method}: {pm.amount}
                     </li>
@@ -342,7 +358,7 @@ const TreasuryDashboardHeader = () => {
               </div>
               <div>
                 <h3 className="font-semibold text-lg">Transaction Types</h3>
-                <ul className="list-disc pl-5">
+                <ul className="list-disc pl-5 mt-2">
                   {report.transaction_types.map((tt) => (
                     <li key={tt.type} className="text-gray-700">
                       {tt.type}: {tt.count}
@@ -352,13 +368,58 @@ const TreasuryDashboardHeader = () => {
               </div>
               <div>
                 <h3 className="font-semibold text-lg">Transaction Summary</h3>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
                   <p><strong>Total Outgoing:</strong> {report.total_outgoing}</p>
                   <p><strong>Total Incoming:</strong> {report.total_incoming}</p>
                   <p><strong>Refund Outgoing Count:</strong> {report.refund_outgoing_count}</p>
                   <p><strong>TopUp Outgoing Count:</strong> {report.topup_outgoing_count}</p>
                 </div>
               </div>
+              {/* <div>
+                <h3 className="font-semibold text-lg">Transactions</h3>
+                {report.transactions.length > 0 ? (
+                  <div className="overflow-x-hidden mt-2">
+                    <Table className="w-full table-auto text-sm">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="min-w-[100px] whitespace-nowrap">Date</TableHead>
+                          <TableHead className="min-w-[80px] whitespace-nowrap">ID</TableHead>
+                          <TableHead className="min-w-[100px] whitespace-nowrap">Type</TableHead>
+                          <TableHead className="min-w-[120px] whitespace-nowrap">Payment Method</TableHead>
+                          <TableHead className="min-w-[100px] whitespace-nowrap">Amount</TableHead>
+                          <TableHead className="min-w-[150px] whitespace-nowrap">Description</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {report.transactions.map((txn) => (
+                          <TableRow key={txn.id}>
+                            <TableCell className="whitespace-nowrap overflow-hidden text-ellipsis">
+                              {txn.date}
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap overflow-hidden text-ellipsis">
+                              {txn.id}
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap overflow-hidden text-ellipsis">
+                              {txn.type}
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap overflow-hidden text-ellipsis">
+                              {txn.payment_method}
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap overflow-hidden text-ellipsis">
+                              {txn.amount}
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px]">
+                              {txn.description}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <p className="text-gray-500 mt-2">No transactions found for this session.</p>
+                )}
+              </div> */}
             </div>
           ) : (
             <p className="text-gray-500">No session data available.</p>

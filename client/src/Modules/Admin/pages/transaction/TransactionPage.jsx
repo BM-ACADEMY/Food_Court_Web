@@ -1,5 +1,4 @@
 
-
 import {
   Card,
   CardContent,
@@ -91,7 +90,6 @@ const Avatar = ({ name = "" }) => {
   );
 };
 
-
 export default function TransactionHistory() {
   const { user } = useAuth();
   const [transactionType, setTransactionType] = useState("all");
@@ -157,8 +155,8 @@ export default function TransactionHistory() {
           userType,
           location: selectedLocation,
           paymentMethod,
-          sortBy, // New
-          sortOrder, // New
+          sortBy,
+          sortOrder,
           fromDate: fromDate ? format(fromDate, "yyyy-MM-dd") : undefined,
           toDate: toDate ? format(toDate, "yyyy-MM-dd") : undefined,
           quickFilter: fromDate || toDate ? undefined : quickFilter,
@@ -171,19 +169,25 @@ export default function TransactionHistory() {
           { params }
         );
         setTransactions(transactionResponse.data.transactions || []);
-        setStats(transactionResponse.data.stats || {
-          totalTransactions: 0,
-          totalRevenue: 0,
-          avgTransactionValue: 0,
-          totalRefunds: 0,
-        });
-        setChartData(transactionResponse.data.chartData || { hourly: [], daily: [], weekly: [] });
-        setPagination(transactionResponse.data.pagination || {
-          page: 1,
-          limit: 10,
-          totalPages: 1,
-          totalTransactions: 0,
-        });
+        setStats(
+          transactionResponse.data.stats || {
+            totalTransactions: 0,
+            totalRevenue: 0,
+            avgTransactionValue: 0,
+            totalRefunds: 0,
+          }
+        );
+        setChartData(
+          transactionResponse.data.chartData || { hourly: [], daily: [], weekly: [] }
+        );
+        setPagination(
+          transactionResponse.data.pagination || {
+            page: 1,
+            limit: 10,
+            totalPages: 1,
+            totalTransactions: 0,
+          }
+        );
       } catch (err) {
         console.error("Error fetching data:", err);
         setError(err.response?.data?.error || "Failed to load data. Please try again.");
@@ -234,15 +238,15 @@ export default function TransactionHistory() {
           prev.map((txn) =>
             txn.id === transactionId
               ? {
-                ...txn,
-                amount: parseFloat(editFormData.amount),
-                type: editFormData.transaction_type,
-                paymentMethod: editFormData.payment_method,
-                status: editFormData.status,
-                description: editFormData.remarks,
-                location: editFormData.location_id,
-                edited_at: new Date(),
-              }
+                  ...txn,
+                  amount: parseFloat(editFormData.amount),
+                  type: editFormData.transaction_type,
+                  paymentMethod: editFormData.payment_method,
+                  status: editFormData.status,
+                  description: editFormData.remarks,
+                  location: editFormData.location_id,
+                  edited_at: new Date(),
+                }
               : txn
           )
         );
@@ -287,190 +291,242 @@ export default function TransactionHistory() {
   };
 
   // Prepare export data
-const prepareExportData = (transactions) => {
-  return transactions.map((txn, index) => ({
-    "S.No": index + 1,
-    "Date & Time": txn.datetime || format(new Date(), "yyyy-MM-dd HH:mm:ss"),
-    "Transaction ID": txn.id || "Unknown",
-    "User Name": txn.user?.name || "Unknown",
-    "User Type": txn.user?.type || "Unknown",
-    Type: txn.type || "Unknown",
-    Description: txn.description || txn.remarks || "No description",
-    "Amount (₹)": txn.amount ? parseFloat(txn.amount) : 0,
-    "Formatted Amount": txn.amount < 0 ? `-₹${Math.abs(txn.amount).toFixed(2)}` : `₹${txn.amount.toFixed(2)}`,
-    Status: txn.status || "Unknown",
-  }));
-};
+  const prepareExportData = (transactions) => {
+    return transactions.map((txn, index) => ({
+      "S.No": index + 1,
+      "Date & Time": txn.datetime || format(new Date(), "yyyy-MM-dd HH:mm:ss"),
+      "Transaction ID": txn.id || "Unknown",
+      "Sender Name": txn.sender?.name || "Unknown",
+      "Sender Role": txn.sender?.role || "Unknown",
+      "Receiver Name": txn.receiver?.name || "Unknown",
+      "Receiver Role": txn.receiver?.role || "Unknown",
+      Type: txn.type || "Unknown",
+      Description: txn.description || txn.remarks || "No description",
+      "Payment Method": txn.paymentMethod || "Unknown",
+      "Amount (₹)": txn.amount ? parseFloat(txn.amount) : 0,
+      "Formatted Amount": txn.amount < 0 ? `-₹${Math.abs(txn.amount).toFixed(2)}` : `₹${txn.amount.toFixed(2)}`,
+      Status: txn.status || "Unknown",
+    }));
+  };
 
-// Export to Excel with totals
-const exportToExcel = async () => {
-  try {
-    const allTransactions = await fetchAllTransactions();
-    const data = prepareExportData(allTransactions);
-    
-    // Calculate total amount
-    const totalAmount = data.reduce((sum, item) => sum + item["Amount (₹)"], 0);
-    
-    // Add total row
-    const dataWithTotal = [
-      ...data,
-      {
-        "S.No": "TOTAL",
-        "Date & Time": "",
-        "Transaction ID": "",
-        "User Name": "",
-        "User Type": "",
-        Type: "",
-        Description: "",
-        "Amount (₹)": totalAmount,
-        "Formatted Amount": `₹${totalAmount.toFixed(2)}`,
-        Status: "",
-      }
-    ];
+  // Export to Excel with totals
+  const exportToExcel = async () => {
+    try {
+      const allTransactions = await fetchAllTransactions();
+      const data = prepareExportData(allTransactions);
 
-    const ws = XLSX.utils.json_to_sheet(dataWithTotal);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Transactions");
-    
-    // Style the total row
-    const totalRow = data.length + 2; // +2 because header is row 1 and data starts at row 2
-    ws[`A${totalRow}`].s = { font: { bold: true } };
-    ws[`H${totalRow}`].s = { font: { bold: true } };
-    ws[`I${totalRow}`].s = { font: { bold: true } };
+      // Calculate total amount
+      const totalAmount = data.reduce((sum, item) => sum + item["Amount (₹)"], 0);
 
-    const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-    const file = new Blob([excelBuffer], { type: "application/octet-stream" });
-    saveAs(file, `transactions_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
-  } catch (error) {
-    console.error("Error exporting to Excel:", error);
-    setError("Failed to export Excel. Please try again.");
-  }
-};
+      // Add total row
+      const dataWithTotal = [
+        ...data,
+        {
+          "S.No": "TOTAL",
+          "Date & Time": "",
+          "Transaction ID": "",
+          "Sender Name": "",
+          "Sender Role": "",
+          "Receiver Name": "",
+          "Receiver Role": "",
+          Type: "",
+          Description: "",
+          "Payment Method": "",
+          "Amount (₹)": totalAmount,
+          "Formatted Amount": `₹${totalAmount.toFixed(2)}`,
+          Status: "",
+        },
+      ];
 
-// Export to CSV with totals
-const exportToCSV = async () => {
-  try {
-    const allTransactions = await fetchAllTransactions();
-    const data = prepareExportData(allTransactions);
-    
-    // Calculate total amount
-    const totalAmount = data.reduce((sum, item) => sum + item["Amount (₹)"], 0);
-    
-    // Add total row
-    const dataWithTotal = [
-      ...data,
-      {
-        "S.No": "TOTAL",
-        "Date & Time": "",
-        "Transaction ID": "",
-        "User Name": "",
-        "User Type": "",
-        Type: "",
-        Description: "",
-        "Amount (₹)": "",
-        "Formatted Amount": `₹${totalAmount.toFixed(2)}`,
-        Status: "",
-      }
-    ];
+      const ws = XLSX.utils.json_to_sheet(dataWithTotal);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Transactions");
 
-    const ws = XLSX.utils.json_to_sheet(dataWithTotal);
-    const csv = XLSX.utils.sheet_to_csv(ws);
-    const file = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    saveAs(file, `transactions_${format(new Date(), "yyyy-MM-dd")}.csv`);
-  } catch (error) {
-    console.error("Error exporting to CSV:", error);
-    setError("Failed to export CSV. Please try again.");
-  }
-};
+      // Style the total row
+      const totalRow = data.length + 2; // +2 because header is row 1 and data starts at row 2
+      ws[`A${totalRow}`].s = { font: { bold: true } };
+      ws[`K${totalRow}`].s = { font: { bold: true } };
+      ws[`L${totalRow}`].s = { font: { bold: true } };
 
-// Export to PDF with totals and serial numbers
-const exportToPDF = async () => {
-  try {
-    const allTransactions = await fetchAllTransactions();
-    const data = prepareExportData(allTransactions);
-    
-    // Calculate total amount
-    const totalAmount = data.reduce((sum, item) => sum + item["Amount (₹)"], 0);
-    
-    const doc = new jsPDF();
-    
-    // Title and metadata
-    doc.setFontSize(16);
-    doc.text("Transaction History Report", 14, 15);
-    doc.setFontSize(10);
-    doc.text(`Generated on: ${format(new Date(), "yyyy-MM-dd HH:mm")}`, 14, 22);
-    doc.text(`Total Transactions: ${data.length}`, 14, 28);
-    doc.text(`Total Amount: ₹${totalAmount.toFixed(2)}`, 14, 34);
+      const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+      const file = new Blob([excelBuffer], { type: "application/octet-stream" });
+      saveAs(file, `transactions_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+    } catch (error) {
+      console.error("Error exporting to Excel:", error);
+      setError("Failed to export Excel. Please try again.");
+    }
+  };
 
-    // Prepare table data
-    const tableData = data.map(item => [
-      item["S.No"],
-      item["Date & Time"],
-      item["Transaction ID"],
-      item["User Name"],
-      item.Type,
-      item.Description,
-      item["Formatted Amount"],
-      item.Status
-    ]);
+  // Export to CSV with totals
+  const exportToCSV = async () => {
+    try {
+      const allTransactions = await fetchAllTransactions();
+      const data = prepareExportData(allTransactions);
 
-    // Add total row
-    const footerData = [
-      ["", "", "", "", "", "TOTAL", `₹${totalAmount.toFixed(2)}`, ""]
-    ];
+      // Calculate total amount
+      const totalAmount = data.reduce((sum, item) => sum + item["Amount (₹)"], 0);
 
-    autoTable(doc, {
-      startY: 40,
-      head: [["S.No", "Date", "ID", "User", "Type", "Description", "Amount", "Status"]],
-      body: tableData,
-      foot: footerData,
-      theme: "grid",
-      styles: { 
-        fontSize: 8,
-        cellPadding: 2,
-        overflow: "linebreak"
-      },
-      headStyles: { 
-        fillColor: [0, 0, 77],
-        textColor: 255,
-        fontStyle: 'bold'
-      },
-      footStyles: {
-        fillColor: [220, 220, 220],
-        textColor: 0,
-        fontStyle: 'bold'
-      },
-      columnStyles: {
-        0: { cellWidth: 'auto' }, // S.No
-        1: { cellWidth: 'auto' }, // Date
-        2: { cellWidth: 'auto' }, // ID
-        3: { cellWidth: 'auto' }, // User
-        4: { cellWidth: 'auto' }, // Type
-        5: { cellWidth: 40 },     // Description (wider)
-        6: { cellWidth: 'auto' }, // Amount
-        7: { cellWidth: 'auto' }  // Status
-      },
-      didDrawPage: function(data) {
-        // Page numbers
-        const pageCount = doc.internal.getNumberOfPages();
-        doc.setFontSize(10);
-        for (let i = 1; i <= pageCount; i++) {
-          doc.setPage(i);
+      // Add total row
+      const dataWithTotal = [
+        ...data,
+        {
+          "S.No": "TOTAL",
+          "Date & Time": "",
+          "Transaction ID": "",
+          "Sender Name": "",
+          "Sender Role": "",
+          "Receiver Name": "",
+          "Receiver Role": "",
+          Type: "",
+          Description: "",
+          "Payment Method": "",
+          "Amount (₹)": "",
+          "Formatted Amount": `₹${totalAmount.toFixed(2)}`,
+          Status: "",
+        },
+      ];
+
+      const ws = XLSX.utils.json_to_sheet(dataWithTotal);
+      const csv = XLSX.utils.sheet_to_csv(ws);
+      const file = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      saveAs(file, `transactions_${format(new Date(), "yyyy-MM-dd")}.csv`);
+    } catch (error) {
+      console.error("Error exporting to CSV:", error);
+      setError("Failed to export CSV. Please try again.");
+    }
+  };
+
+  // Export to PDF with totals and proper margins
+  const exportToPDF = async () => {
+    try {
+      const allTransactions = await fetchAllTransactions();
+      const data = prepareExportData(allTransactions);
+
+      // Calculate total amount
+      const totalAmount = data.reduce((sum, item) => sum + item["Amount (₹)"], 0);
+
+      const doc = new jsPDF();
+
+      // Title and metadata
+      doc.setFontSize(16);
+      doc.text("Transaction History Report", 15, 15);
+      doc.setFontSize(10);
+      doc.text(`Generated on: ${format(new Date(), "yyyy-MM-dd HH:mm")}`, 15, 22);
+      doc.text(`Total Transactions: ${data.length}`, 15, 28);
+      doc.text(`Total Amount: ₹${totalAmount.toFixed(2)}`, 15, 34);
+
+      // Prepare table data
+      const tableData = data.map((item) => [
+        item["S.No"],
+        item["Date & Time"],
+        item["Transaction ID"],
+        item["Sender Name"],
+        item["Sender Role"],
+        item["Receiver Name"],
+        item["Receiver Role"],
+        item.Type,
+        item.Description,
+        item["Payment Method"],
+        item["Formatted Amount"],
+        item.Status,
+      ]);
+
+      // Add total row
+      const footerData = [
+        ["", "", "", "", "", "", "", "", "", "TOTAL", `₹${totalAmount.toFixed(2)}`, ""],
+      ];
+
+      // Calculate total table width for debugging
+      const columnWidths = [10, 20, 15, 18, 14, 18, 14, 14, 20, 14, 14, 15];
+      const totalTableWidth = columnWidths.reduce((sum, width) => sum + width, 0);
+      console.log("Total Table Width:", totalTableWidth, "mm (Page Width: 180mm with 15mm margins)");
+
+      autoTable(doc, {
+        startY: 40,
+        head: [
+          [
+            "S.No",
+            "Date",
+            "ID",
+            "Sender Name",
+            "Sender Role",
+            "Receiver Name",
+            "Receiver Role",
+            "Type",
+            "Description",
+            "Payment Method",
+            "Amount",
+            "Status",
+          ],
+        ],
+        body: tableData,
+        foot: footerData,
+        theme: "grid",
+        margin: { left: 15, right: 15 }, // 15mm margins on both sides
+        tableWidth: "wrap", // Center table within margins
+        styles: {
+          fontSize: 8,
+          cellPadding: 2,
+          overflow: "ellipsize", // Truncate long text with ellipsis
+        },
+        headStyles: {
+          fillColor: [0, 0, 77],
+          textColor: 255,
+          fontStyle: "bold",
+        },
+        footStyles: {
+          fillColor: [220, 220, 220],
+          textColor: 0,
+          fontStyle: "bold",
+        },
+        columnStyles: {
+          0: { cellWidth: 10 }, // S.No
+          1: { cellWidth: 20 }, // Date
+          2: { cellWidth: 15 }, // ID
+          3: { cellWidth: 18 }, // Sender Name
+          4: { cellWidth: 14 }, // Sender Role
+          5: { cellWidth: 18 }, // Receiver Name
+          6: { cellWidth: 14 }, // Receiver Role
+          7: { cellWidth: 14 }, // Type
+          8: { cellWidth: 20 }, // Description
+          9: { cellWidth: 14 }, // Payment Method
+          10: { cellWidth: 14 }, // Amount
+          11: { cellWidth: 15 }, // Status
+        },
+        didParseCell: function (data) {
+          // Truncate long text in Description column
+          if (data.section === "body" && data.column.index === 8) {
+            const text = data.cell.text.join("");
+            if (text.length > 30) {
+              data.cell.text = [text.substring(0, 27) + "..."];
+            }
+          }
+          // Debug cell content
+          if (data.section === "body") {
+            console.log(`Row ${data.row.index}, Column ${data.column.index}:`, data.cell.text);
+          }
+        },
+        didDrawPage: function (data) {
+          // Add page numbers
+          const pageCount = doc.internal.getNumberOfPages();
+          doc.setFontSize(10);
           doc.text(
-            `Page ${i} of ${pageCount}`,
-            data.settings.margin.left,
+            `Page ${data.pageNumber} of ${pageCount}`,
+            15, // Align with left margin
             doc.internal.pageSize.height - 10
           );
-        }
-      }
-    });
+        },
+      });
 
-    doc.save(`transactions_${format(new Date(), "yyyy-MM-dd")}.pdf`);
-  } catch (error) {
-    console.error("Error exporting to PDF:", error);
-    setError("Failed to export PDF. Please try again.");
-  }
-};
+      // Log final PDF content
+      console.log("PDF Generated with", tableData.length, "rows on", doc.internal.getNumberOfPages(), "pages");
+
+      doc.save(`transactions_${format(new Date(), "yyyy-MM-dd")}.pdf`);
+    } catch (error) {
+      console.error("Error exporting to PDF:", error);
+      setError("Failed to export PDF. Please try again.");
+    }
+  };
 
   // Handle export
   const handleExport = () => {
@@ -591,7 +647,7 @@ const exportToPDF = async () => {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="mx-auto max-w-full">
         <CardContent className="p-6 space-y-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
             <h2 className="text-lg font-semibold">All Transactions</h2>
@@ -793,197 +849,179 @@ const exportToPDF = async () => {
             ))}
           </div>
 
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date & Time</TableHead>
-                  <TableHead>Transaction ID</TableHead>
-                  <TableHead>Sender Name</TableHead>
-                  <TableHead>Receiver Name</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Payment Method</TableHead>
-                  {/* <TableHead>Location</TableHead> */}
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {transactions.map((txn) => (
-                  <TableRow key={txn.id}>
-                    <TableCell>{txn.datetime}</TableCell>
-                    <TableCell className="font-semibold">{txn.id}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Avatar name={txn.sender.name} />
-                        <div className="font-medium">{txn.sender.name}</div>
-                      </div>
-                      <div className="text-xs text-muted-foreground">({txn.sender.role})</div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Avatar name={txn.receiver.name} />
-                        <div className="font-medium">{txn.receiver.name}</div>
-                      </div>
-                      <div className="text-xs text-muted-foreground">({txn.receiver.role})</div>
-                    </TableCell>
-                    <TableCell>
-                      {editingTransactionId === txn.id ? (
-                        <Select
-                          value={editFormData.transaction_type}
-                          onValueChange={(value) =>
-                            setEditFormData((prev) => ({ ...prev, transaction_type: value }))
-                          }
-                        >
-                          <SelectTrigger className="w-[120px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {["Transfer", "TopUp", "Refund", "Credit"].map((type) => (
-                              <SelectItem key={type} value={type}>
-                                {type}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <span
-                          className={`capitalize rounded px-2 py-1 text-xs font-medium
-                                  ${txn.type === "Transfer"
-                              ? "bg-blue-100 text-blue-700"
-                              : txn.type === "TopUp"
+          <div className="overflow-x-hidden">
+            <div className="mx-auto max-w-full">
+              <Table className="w-full table-auto text-sm">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[120px] whitespace-nowrap">Date & Time</TableHead>
+                    <TableHead className="min-w-[100px] whitespace-nowrap">Transaction ID</TableHead>
+                    <TableHead className="min-w-[150px] whitespace-nowrap">Sender Name</TableHead>
+                    <TableHead className="min-w-[150px] whitespace-nowrap">Receiver Name</TableHead>
+                    <TableHead className="min-w-[100px] whitespace-nowrap">Type</TableHead>
+                    <TableHead className="min-w-[150px] whitespace-nowrap">Description</TableHead>
+                    <TableHead className="min-w-[120px] whitespace-nowrap">Payment Method</TableHead>
+                    <TableHead className="min-w-[100px] text-right whitespace-nowrap">Amount</TableHead>
+                    <TableHead className="min-w-[80px] text-right whitespace-nowrap">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {transactions.map((txn) => (
+                    <TableRow key={txn.id}>
+                      <TableCell className="whitespace-nowrap overflow-hidden text-ellipsis">
+                        {txn.datetime}
+                      </TableCell>
+                      <TableCell className="font-semibold whitespace-nowrap overflow-hidden text-ellipsis">
+                        {txn.id}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap overflow-hidden text-ellipsis">
+                        <div className="flex items-center gap-2">
+                          <Avatar name={txn.sender.name} />
+                          <div className="font-medium">{txn.sender.name}</div>
+                        </div>
+                        <div className="text-xs text-muted-foreground">({txn.sender.role})</div>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap overflow-hidden text-ellipsis">
+                        <div className="flex items-center gap-2">
+                          <Avatar name={txn.receiver.name} />
+                          <div className="font-medium">{txn.receiver.name}</div>
+                        </div>
+                        <div className="text-xs text-muted-foreground">({txn.receiver.role})</div>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap overflow-hidden text-ellipsis">
+                        {editingTransactionId === txn.id ? (
+                          <Select
+                            value={editFormData.transaction_type}
+                            onValueChange={(value) =>
+                              setEditFormData((prev) => ({ ...prev, transaction_type: value }))
+                            }
+                          >
+                            <SelectTrigger className="w-[120px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {["Transfer", "TopUp", "Refund", "Credit"].map((type) => (
+                                <SelectItem key={type} value={type}>
+                                  {type}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <span
+                            className={`capitalize rounded px-2 py-1 text-xs font-medium
+                              ${txn.type === "Transfer"
+                                ? "bg-blue-100 text-blue-700"
+                                : txn.type === "TopUp"
                                 ? "bg-purple-100 text-purple-700"
                                 : txn.type === "Refund"
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : txn.type === "Credit"
-                                    ? "bg-green-100 text-green-700"
-                                    : "bg-gray-100 text-gray-600"
-                            }`}
-                        >
-                          {txn.type || "N/A"}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {editingTransactionId === txn.id ? (
-                        <Input
-                          value={editFormData.remarks}
-                          onChange={(e) =>
-                            setEditFormData((prev) => ({ ...prev, remarks: e.target.value }))
-                          }
-                          placeholder="Enter remarks"
-                        />
-                      ) : (
-                        txn.description
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {editingTransactionId === txn.id ? (
-                        <Select
-                          value={editFormData.payment_method}
-                          onValueChange={(value) =>
-                            setEditFormData((prev) => ({ ...prev, payment_method: value }))
-                          }
-                        >
-                          <SelectTrigger className="w-[150px]">
-                            <SelectValue placeholder="Select payment method" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {["Cash", "Gpay", "Mess bill", "Balance Deduction"].map((method) => (
-                              <SelectItem key={method} value={method}>
-                                {method}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <span
-                          className={`font-medium px-2 py-1 rounded-full  ${txn.paymentMethod === "Cash"
-                              ? "bg-green-100 text-green-800"
-                              : txn.paymentMethod === "Gpay"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : txn.type === "Credit"
+                                ? "bg-green-100 text-green-700"
+                                : "bg-gray-100 text-gray-600"
+                              }`}
+                          >
+                            {txn.type || "N/A"}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px]">
+                        {editingTransactionId === txn.id ? (
+                          <Input
+                            value={editFormData.remarks}
+                            onChange={(e) =>
+                              setEditFormData((prev) => ({ ...prev, remarks: e.target.value }))
+                            }
+                            placeholder="Enter remarks"
+                          />
+                        ) : (
+                          txn.description
+                        )}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap overflow-hidden text-ellipsis">
+                        {editingTransactionId === txn.id ? (
+                          <Select
+                            value={editFormData.payment_method}
+                            onValueChange={(value) =>
+                              setEditFormData((prev) => ({ ...prev, payment_method: value }))
+                            }
+                          >
+                            <SelectTrigger className="w-[120px]">
+                              <SelectValue placeholder="Select payment method" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {["Cash", "Gpay", "Mess bill", "Balance Deduction"].map((method) => (
+                                <SelectItem key={method} value={method}>
+                                  {method}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <span
+                            className={`font-medium px-2 py-1 rounded-full
+                              ${txn.paymentMethod === "Cash"
+                                ? "bg-green-100 text-green-800"
+                                : txn.paymentMethod === "Gpay"
                                 ? "bg-blue-100 text-blue-800"
                                 : txn.paymentMethod === "Mess bill"
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : txn.paymentMethod === "Balance Deduction"
-                                    ? "bg-red-100 text-red-800"
-                                    : "bg-gray-100 text-gray-800"
-                            }`}
-                        >
-                          {txn.paymentMethod}
-                        </span>
-                      )}
-                    </TableCell>
-
-                    {/* <TableCell>
-                            {editingTransactionId === txn.id ? (
-                              <Select
-                                value={editFormData.location_id}
-                                onValueChange={(value) =>
-                                  setEditFormData((prev) => ({ ...prev, location_id: value }))
-                                }
-                              >
-                                <SelectTrigger className="w-[150px]">
-                                  <SelectValue placeholder="Select Location" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {locations.map((loc) => (
-                                    <SelectItem key={loc._id} value={loc._id}>
-                                      {loc.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              txn.location
-                            )}
-                          </TableCell> */}
-                    <TableCell className="text-right font-semibold">
-                      {editingTransactionId === txn.id ? (
-                        <Input
-                          type="number"
-                          value={editFormData.amount}
-                          onChange={(e) =>
-                            setEditFormData((prev) => ({ ...prev, amount: e.target.value }))
-                          }
-                          placeholder="Enter amount"
-                        />
-                      ) : txn.amount < 0 ? (
-                        <span className="text-red-500">- ₹{Math.abs(txn.amount)}</span>
-                      ) : (
-                        <span className="text-green-600">+ ₹{txn.amount}</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {editingTransactionId === txn.id ? (
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => handleSaveEdit(txn.id)}
-                          aria-label="Save transaction"
-                        >
-                          <Save className="size-4 mr-2" />
-                          Save
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditClick(txn)}
-                          aria-label="Edit transaction"
-                        >
-                          <Pencil className="size-4 mr-2" />
-                          Edit
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                                ? "bg-yellow-100 text-yellow-800"
+                                : txn.paymentMethod === "Balance Deduction"
+                                ? "bg-red-100 text-red-800"
+                                : "bg-gray-100 text-gray-800"
+                              }`}
+                          >
+                            {txn.paymentMethod}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold whitespace-nowrap overflow-hidden text-ellipsis">
+                        {editingTransactionId === txn.id ? (
+                          <Input
+                            type="number"
+                            value={editFormData.amount}
+                            onChange={(e) =>
+                              setEditFormData((prev) => ({ ...prev, amount: e.target.value }))
+                            }
+                            placeholder="Enter amount"
+                          />
+                        ) : txn.amount < 0 ? (
+                          <span className="text-red-500">- ₹{Math.abs(txn.amount)}</span>
+                        ) : (
+                          <span className="text-green-600">+ ₹{txn.amount}</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        {editingTransactionId === txn.id ? (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => handleSaveEdit(txn.id)}
+                            aria-label="Save transaction"
+                          >
+                            <Save className="size-4 mr-2" />
+                            Save
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditClick(txn)}
+                            aria-label="Edit transaction"
+                          >
+                            <Pencil className="size-4 mr-2" />
+                            Edit
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
-          <div className="pt-4 w-full overflow-x-auto">
-            <div className="min-w-[300px] whitespace-nowrap flex justify-end">
+          <div className="pt-4 w-full">
+            <div className="mx-auto max-w-[300px]">
               <Pagination>
                 <PaginationContent>
                   <PaginationItem>

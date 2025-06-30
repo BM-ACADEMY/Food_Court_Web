@@ -15,48 +15,50 @@ function TopUpSuccess({ data, onNewTopUp, customer }) {
   const { user } = useAuth();
 
  const handleBackToHome = async () => {
-  try {
-    console.log('Customer data:', customer);
-    if (!customer || !customer.receiver_id || !customer.sender_id) {
-      throw new Error('Customer data, receiver_id, or sender_id is missing.');
-    }
-    if (!user || !user._id) {
-      throw new Error('Authenticated user ID is missing.');
-    }
-    console.log(customer,"customer");
+//   try {
+//     console.log('Customer data:', customer);
+//     if (!customer || !customer.receiver_id || !customer.sender_id) {
+//       throw new Error('Customer data, receiver_id, or sender_id is missing.');
+//     }
+//     if (!user || !user._id) {
+//       throw new Error('Authenticated user ID is missing.');
+//     }
+//     console.log(customer,"customer");
     
-    const objectIdPattern = /^[0-9a-fA-F]{24}$/;
-    if (!objectIdPattern.test(customer.receiver_id._id) || !objectIdPattern.test(customer.sender_id)) {
-      console.warn('Invalid ID format:', { receiver_id: customer.receiver_id._id, sender_id: customer.sender_id });
-      navigate('/home');
-      return;
-    }
+//     const objectIdPattern = /^[0-9a-fA-F]{24}$/;
+//     if (!objectIdPattern.test(customer.receiver_id._id) || !objectIdPattern.test(customer.sender_id)) {
+//       console.warn('Invalid ID format:', { receiver_id: customer.receiver_id._id, sender_id: customer.sender_id });
+//       navigate('/home');
+//       return;
+//     }
 
-    const response = await axios.post(
-      `${import.meta.env.VITE_BASE_URL}/fees/fee-deduction`,
-      {
-        sender_id: customer.sender_id,
-        receiver_id: customer.receiver_id._id,
-      },
-      { withCredentials: true }
-    );
+//     const response = await axios.post(
+//       `${import.meta.env.VITE_BASE_URL}/fees/fee-deduction`,
+//       {
+//         sender_id: customer.sender_id,
+//         receiver_id: customer.receiver_id._id,
+//       },
+//       { withCredentials: true }
+//     );
 
-    console.log('Fee deduction response:', response.data);
-    if (response.data.success) {
-      navigate('/');
-    } else {
-      throw new Error(response.data.message || 'Failed to process registration fee');
-    }
-  } catch (err) {
-  console.error('Back to Home error:', {
-    message: err.message,
-    response: err.response?.data, 
-    status: err.response?.status,
-    customer: customer,
-  });
-  alert(`Error processing registration fee: ${err.response?.data?.message || err.message || 'Unknown error'}`);
-  navigate('/home');
-}
+//     console.log('Fee deduction response:', response.data);
+//     if (response.data.success) {
+//       navigate('/');
+//     } else {
+//       throw new Error(response.data.message || 'Failed to process registration fee');
+//     }
+//   } catch (err) {
+//   console.error('Back to Home error:', {
+//     message: err.message,
+//     response: err.response?.data, 
+//     status: err.response?.status,
+//     customer: customer,
+//   });
+//   alert(`Error processing registration fee: ${err.response?.data?.message || err.message || 'Unknown error'}`);
+
+// }
+
+  navigate('/');
 };
 
   return (
