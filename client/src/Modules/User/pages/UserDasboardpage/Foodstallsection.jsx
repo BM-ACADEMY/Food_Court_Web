@@ -29,7 +29,7 @@ const gradientPool = [
 
 // Single icon for all restaurants
 const restaurantIcon = <ShoppingCart size={48} />;
-
+``
 const FoodStalls = ({ handlePayNow }) => {
   const [search, setSearch] = useState("");
   const [restaurants, setRestaurants] = useState([]);
@@ -219,12 +219,24 @@ const FoodStalls = ({ handlePayNow }) => {
               onClick={() => handleShowDetails(restaurant)}
             >
               <div className={`p-6 text-white ${restaurant.gradient}`}>
-                <div className="flex flex-col items-center text-center gap-2">
-                  {restaurant.icon}
-                  <h3 className="text-lg sm:text-xl font-semibold">{restaurant.restaurant_name}</h3>
-                  <p className="text-sm opacity-90">{restaurant.user_id?.name || "Unknown Owner"}</p>
-                </div>
-              </div>
+  <div className="flex flex-col items-center text-center gap-2">
+    {restaurant.icon}
+    {/* Restaurant name with truncation and tooltip */}
+    <h3 
+      className="text-lg sm:text-xl font-semibold truncate max-w-[180px] sm:max-w-[220px] w-full"
+      title={restaurant.restaurant_name}
+    >
+      {restaurant.restaurant_name}
+    </h3>
+    {/* Owner name with truncation and tooltip */}
+    <p 
+      className="text-sm opacity-90 truncate max-w-[160px] sm:max-w-[200px] w-full"
+      title={restaurant.user_id?.name || "Unknown Owner"}
+    >
+      {restaurant.user_id?.name || "Unknown Owner"}
+    </p>
+  </div>
+</div>
               <CardContent className="p-4">
                 <Button
                   className="w-full bg-[#00004d] hover:bg-[#000060] text-white"
@@ -249,35 +261,67 @@ const FoodStalls = ({ handlePayNow }) => {
 
       {/* Details Dialog */}
       <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
-        <DialogContent className="sm:max-w-md w-[90vw] max-h-[90Vh] overflow-y-auto rounded-lg bg-white shadow-2xl border border-gray-200">
+        <DialogContent className="sm:max-w-md w-[90vw] max-h-[90vh] overflow-y-auto rounded-lg bg-white shadow-2xl border border-gray-200">
+          {/* Header with truncated restaurant name */}
           <DialogHeader className="border-b pb-3">
             <div className="flex items-center gap-3">
               <Info className="w-6 h-6 text-[#00004d] flex-shrink-0" />
-              <DialogTitle className="text-xl sm:text-2xl font-bold text-[#00004d] truncate">
+              <DialogTitle
+                className="text-xl sm:text-2xl font-bold text-[#00004d] truncate max-w-[200px] sm:max-w-[290px]"
+                title={selectedRestaurant?.restaurant_name}
+              >
                 {selectedRestaurant?.restaurant_name}
               </DialogTitle>
             </div>
           </DialogHeader>
+
+          {/* Content with all fields */}
           <div className="space-y-4 py-4">
             <div className="grid gap-3 text-sm">
+              {/* Owner field with truncation */}
               <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                 <span className="font-semibold text-gray-700 w-28">Owner:</span>
-                <p className="text-gray-600">{selectedRestaurant?.owner_name || "N/A"}</p>
+                <p
+                  className="text-gray-600 truncate max-w-[160px] sm:max-w-[220px]"
+                  title={selectedRestaurant?.owner_name}
+                >
+                  {selectedRestaurant?.owner_name || "N/A"}
+                </p>
               </div>
+
+              {/* Restaurant ID field with truncation */}
               <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                 <span className="font-semibold text-gray-700 w-28">Restaurant ID:</span>
-                <p className="text-gray-600">{selectedRestaurant?.restaurant_id || "N/A"}</p>
+                <p
+                  className="text-gray-600 truncate max-w-[160px] sm:max-w-[220px]"
+                  title={selectedRestaurant?.restaurant_id}
+                >
+                  {selectedRestaurant?.restaurant_id || "N/A"}
+                </p>
               </div>
+
+              {/* QR Code field with truncation */}
               <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                 <span className="font-semibold text-gray-700 w-28">QR Code:</span>
-                <p className="text-gray-600 truncate">{selectedRestaurant?.qr_code || "N/A"}</p>
+                <p
+                  className="text-gray-600 truncate max-w-[160px] sm:max-w-[220px]"
+                  title={selectedRestaurant?.qr_code}
+                >
+                  {selectedRestaurant?.qr_code || "N/A"}
+                </p>
               </div>
+
+              {/* Status field */}
               <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                 <span className="font-semibold text-gray-700 w-28">Status:</span>
-                <p className="text-gray-600">{selectedRestaurant?.status || "N/A"}</p>
+                <p className="text-gray-600">
+                  {selectedRestaurant?.status || "N/A"}
+                </p>
               </div>
             </div>
           </div>
+
+          {/* Footer with action buttons */}
           <DialogFooter className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
             <Button
               onClick={() => setShowDetailsDialog(false)}
@@ -295,7 +339,6 @@ const FoodStalls = ({ handlePayNow }) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
       {/* Payment Dialog */}
       <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
         <DialogContent className="sm:max-w-md w-[90vw] max-h-[90vh] overflow-y-auto rounded-lg bg-white shadow-2xl border border-gray-200">
@@ -304,7 +347,7 @@ const FoodStalls = ({ handlePayNow }) => {
               Pay to {selectedRestaurant?.restaurant_name}
             </DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-2">
             <label htmlFor="paymentAmount" className="text-sm font-medium text-gray-700">
               Amount to Pay
@@ -323,21 +366,21 @@ const FoodStalls = ({ handlePayNow }) => {
               />
             </div>
             <div className="bg-[#f4f6ff] border text-sm text-gray-700 px-4 py-2 rounded mb-4 space-y-1">
-            <p>
-              <span className="font-medium text-[#00004d]">Store:</span>{" "}
-              {selectedRestaurant?.restaurant_name || "N/A"}
-            </p>
-            <p>
-              <span className="font-medium text-[#00004d]">Owner:</span>{" "}
-              {selectedRestaurant?.owner_name || "N/A"}
-            </p>
-            <p>
-              <span className="font-medium text-[#00004d]">QR Code:</span>{" "}
-              {selectedRestaurant?.qr_code?.length > 50
-                ? selectedRestaurant.qr_code.slice(0, 50) + "..."
-                : selectedRestaurant?.qr_code || "N/A"}
-            </p>
-          </div>
+              <p>
+                <span className="font-medium text-[#00004d]">Store:</span>{" "}
+                {selectedRestaurant?.restaurant_name || "N/A"}
+              </p>
+              <p>
+                <span className="font-medium text-[#00004d]">Owner:</span>{" "}
+                {selectedRestaurant?.owner_name || "N/A"}
+              </p>
+              <p>
+                <span className="font-medium text-[#00004d]">QR Code:</span>{" "}
+                {selectedRestaurant?.qr_code?.length > 50
+                  ? selectedRestaurant.qr_code.slice(0, 50) + "..."
+                  : selectedRestaurant?.qr_code || "N/A"}
+              </p>
+            </div>
           </div>
           <DialogFooter className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
             {/* <Button
@@ -374,9 +417,8 @@ const FoodStalls = ({ handlePayNow }) => {
           </DialogHeader>
           <div className="flex flex-col items-center text-center gap-4 py-6">
             <div
-              className={`w-16 h-16 rounded-full flex items-center justify-center ${
-                isSuccess ? "bg-green-100" : "bg-red-100"
-              }`}
+              className={`w-16 h-16 rounded-full flex items-center justify-center ${isSuccess ? "bg-green-100" : "bg-red-100"
+                }`}
             >
               {isSuccess ? (
                 <CheckCircle2 className="w-10 h-10 text-green-600" />
@@ -394,11 +436,10 @@ const FoodStalls = ({ handlePayNow }) => {
           <DialogFooter className="flex justify-center pt-4 border-t">
             <Button
               onClick={() => setShowResultDialog(false)}
-              className={`w-full sm:w-auto ${
-                isSuccess
+              className={`w-full sm:w-auto ${isSuccess
                   ? "bg-green-600 hover:bg-green-700"
                   : "bg-red-600 hover:bg-red-700"
-              } text-white transition-colors`}
+                } text-white transition-colors`}
             >
               {isSuccess ? "Continue" : "Try Again"}
             </Button>
