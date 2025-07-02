@@ -251,19 +251,7 @@ export default function Refund() {
                   </p>
                 </div>
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="manualQrCode" className="text-sm sm:text-base">
-                  Manual QR Code Input
-                </Label>
-                <Input
-                  id="manualQrCode"
-                  type="text"
-                  className="h-8 px-3 text-sm sm:text-base"
-                  placeholder="Enter QR code manually"
-                  onChange={(e) => handleManualQrInput(e.target.value)}
-                  disabled={isLoading || !user}
-                />
-              </div>
+             
               <div className="space-y-1">
                 <Label htmlFor="refundAmount" className="text-sm sm:text-base">
                   Refund Amount

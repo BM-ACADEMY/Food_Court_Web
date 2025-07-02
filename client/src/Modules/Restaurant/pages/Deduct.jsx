@@ -250,23 +250,7 @@ export default function Deduct() {
                   </p>
                 </div>
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="manualQrCode" className="text-sm sm:text-base">
-                  Manual QR Code Input
-                </Label>
-                <Input
-                  id="manualQrCode"
-                  type="text"
-                  className="h-8 px-3 text-sm sm:text-base"
-                  placeholder="Enter QR code manually"
-                  onChange={e => {
-                    if (e.target.value) {
-                      handleScanSuccess(e.target.value);
-                    }
-                  }}
-                  disabled={isLoading || !user}
-                />
-              </div>
+           
               <div className="space-y-1">
                 <Label htmlFor="deductAmount" className="text-sm sm:text-base">
                   Deduct Amount

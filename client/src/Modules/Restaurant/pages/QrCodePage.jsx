@@ -12,7 +12,8 @@ const QrCodePage = () => {
   const { user, loading } = useAuth();
   const [qrCodeImage, setQrCodeImage] = useState(null);
   const [error, setError] = useState(null);
-  const qrImageRef = useRef(null); // QR image reference
+  const [restaurantName, setRestaurantName] = useState("");
+  const qrImageRef = useRef(null);
 
   useEffect(() => {
     if (!loading && user) {
@@ -23,8 +24,12 @@ const QrCodePage = () => {
             { withCredentials: true }
           );
 
-          const qrCodeData = res.data.data.qr_code;
+          const restaurantData = res.data.data;
+          const qrCodeData = restaurantData.qr_code;
+
           if (qrCodeData) {
+            setRestaurantName(restaurantData.restaurant_name || "restaurant");
+
             const qrCodeUrl = await QRCode.toDataURL(qrCodeData, {
               width: 200,
               margin: 2,
@@ -51,7 +56,11 @@ const QrCodePage = () => {
     if (qrCodeImage) {
       const link = document.createElement("a");
       link.href = qrCodeImage;
-      link.download = "restaurant-qr-code.png";
+
+      // Clean and format restaurant name for filename
+      const safeName = restaurantName.trim().replace(/\s+/g, "_").toLowerCase();
+      link.download = `${safeName || "restaurant"}-restaurant_qr.png`;
+
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -77,7 +86,11 @@ const QrCodePage = () => {
                 alt="Restaurant QR Code"
                 className="mx-auto mb-4"
               />
-              <Button onClick={handleDownload} variant="outline" className="gap-2 mt-2 cursor-pointer">
+              <Button
+                onClick={handleDownload}
+                variant="outline"
+                className="gap-2 mt-2 cursor-pointer"
+              >
                 <Download className="h-4 w-4" />
                 Download QR Code
               </Button>

@@ -106,7 +106,7 @@ const transactionSchema = new mongoose.Schema(
     transaction_type: {
       type: String,
       required: true,
-      enum: ["Transfer", "TopUp", "Refund", "Credit", "Registration Fee"], // Added "Registration Fee"
+      enum: ["Transfer", "TopUp", "Refund", "Credit", "Registration Fee"],
     },
     payment_method: {
       type: String,

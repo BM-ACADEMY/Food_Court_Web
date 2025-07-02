@@ -33,7 +33,7 @@ const dashboardRoute = require('./route/dashboardRoute');
 const app = express();
 const server = http.createServer(app);
 
-// ✅ CORS setup with origin validation
+
 const allowedOrigins = [
   "https://pegasus2025.com",
   "https://www.pegasus2025.com"
@@ -87,3 +87,9 @@ connectDB().then(() => {
     console.log(`🚀 Server + Socket.IO running on ${PORT}`);
   });
 });
+
+
+// const allowedOrigins = [
+//   "http://localhost:5173",
+
+// ];

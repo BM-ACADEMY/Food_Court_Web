@@ -44,13 +44,14 @@ import { FileText, FileSpreadsheet, FileSignature, Download } from "lucide-react
 import { toast } from "react-toastify";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import "jspdf-autotable"; // Import as a side-effect
 
 const UserHistory = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [transactions, setTransactions] = useState([]);
   const [totalTransactions, setTotalTransactions] = useState(0);
+  const [todaysTransactions, setTodaysTransactions] = useState(0);
   const [initialTotalTransactions, setInitialTotalTransactions] = useState(0);
   const [page, setPage] = useState(1);
   const limit = 10;
@@ -104,9 +105,8 @@ const UserHistory = () => {
         quickFilter: timeFilter,
         type: typeFilter,
       });
-      const userId=user._id
       const response = await axios.get(
-        `${import.meta.env.VITE_BASE_URL}/transactions/history/user/${userId}`,
+        `${import.meta.env.VITE_BASE_URL}/transactions/history/user/${user._id}`,
         {
           params: { page, limit, search, quickFilter: timeFilter, type: typeFilter },
           withCredentials: true,
@@ -118,27 +118,30 @@ const UserHistory = () => {
         pagination: response.data.pagination,
       });
 
-      const { transactions: fetchedTransactions, pagination } = response.data;
-
       if (!response.data.success) {
         throw new Error(response.data.message || "Failed to fetch transactions");
       }
 
-      if (fetchedTransactions.length === 0 && page > 1) {
+      const { transactions: fetchedTransactions, pagination, todaysTransactions } = response.data;
+
+      setTransactions(fetchedTransactions);
+      setTotalTransactions(pagination.totalTransactions || 0);
+      setTodaysTransactions(todaysTransactions || 0);
+      if (isFirstFetch) {
+        setInitialTotalTransactions(pagination.totalTransactions || 0);
+        setIsFirstFetch(false);
+      }
+
+      if (fetchedTransactions.length === 0) {
         setNoMoreData(true);
-        setTransactions([]);
-        toast.info("No more transactions available", {
-          position: "top-center",
-          autoClose: 3000,
-        });
+        if (page > 1) {
+          toast.info("No more transactions available", {
+            position: "top-center",
+            autoClose: 3000,
+          });
+        }
       } else {
         setNoMoreData(false);
-        setTransactions(fetchedTransactions);
-        setTotalTransactions(pagination.totalTransactions || 0);
-        if (isFirstFetch) {
-          setInitialTotalTransactions(pagination.totalTransactions || 0);
-          setIsFirstFetch(false);
-        }
       }
     } catch (err) {
       console.error("Fetch transactions error:", err.response?.data || err.message);
@@ -159,7 +162,7 @@ const UserHistory = () => {
 
   // Fetch transactions when dependencies change
   useEffect(() => {
-    setPage(1); // Reset to page 1 when filters change
+    setPage(1);
     fetchTransactions();
   }, [user, search, timeFilter, typeFilter]);
 
@@ -175,8 +178,9 @@ const UserHistory = () => {
   };
 
   const handleTypeFilterChange = (value) => {
-    setTypeFilter(value);
-    setPage(1); // Reset page to 1 when type filter changes
+    const capitalizedValue = value === "all" ? "all" : value.charAt(0).toUpperCase() + value.slice(1);
+    setTypeFilter(capitalizedValue);
+    setPage(1);
   };
 
   const exportData = async () => {
@@ -211,8 +215,6 @@ const UserHistory = () => {
       }
 
       const exportTransactions = response.data.transactions;
-
-      console.log("Export transactions:", exportTransactions);
 
       if (!exportTransactions || exportTransactions.length === 0) {
         toast.info("No transactions available for export", {
@@ -265,7 +267,7 @@ const UserHistory = () => {
 
         tableData.push(["", "", "", "", "", "Total Transactions", totalCount.toString()]);
 
-        autoTable(doc, {
+        doc.autoTable({
           startY: 40,
           head: [["S.No", "Transaction ID", "Customer", "Amount", "Transaction Type", "Date & Time", "Status"]],
           body: tableData,
@@ -281,15 +283,7 @@ const UserHistory = () => {
       setOpenDialog(false);
     } catch (err) {
       toast.dismiss("export-loading");
-      const errorMessage = err.response?.data?.message || err.message || "Unknown error occurred";
-      console.error("Export error:", {
-        status: err.response?.status,
-        data: err.response?.data,
-        message: err.message,
-        url: err.config?.url,
-        params: err.config?.params,
-      });
-      toast.error(`Failed to export transactions: ${errorMessage}`, {
+      toast.error(`Failed to export transactions: ${err.response?.data?.message || err.message}`, {
         position: "top-center",
         autoClose: 5000,
       });
@@ -340,11 +334,7 @@ const UserHistory = () => {
                 <CardTitle className="text-sm font-medium">Today's Transactions</CardTitle>
               </CardHeader>
               <CardContent className="p-4">
-                <p className="text-base sm:text-lg font-bold">{transactions.filter(txn => {
-                  const today = new Date();
-                  const txnDate = new Date(txn.datetime);
-                  return txnDate.toDateString() === today.toDateString();
-                }).length}</p>
+                <p className="text-base sm:text-lg font-bold">{todaysTransactions}</p>
               </CardContent>
             </Card>
           </div>
@@ -361,19 +351,19 @@ const UserHistory = () => {
                 <SelectItem value="last7days">Last 7 Days</SelectItem>
               </SelectContent>
             </Select>
-         <Select value={typeFilter} onValueChange={handleTypeFilterChange}>
-  <SelectTrigger className="w-full sm:w-[180px] text-xs sm:text-sm">
-    <SelectValue placeholder="All Types" />
-  </SelectTrigger>
-  <SelectContent>
-    <SelectItem value="all">All Types</SelectItem>
-    {transactionTypes.map((type) => (
-      <SelectItem key={type} value={type}>
-        {type}
-      </SelectItem>
-    ))}
-  </SelectContent>
-</Select>
+            <Select value={typeFilter} onValueChange={handleTypeFilterChange}>
+              <SelectTrigger className="w-full sm:w-[180px] text-xs sm:text-sm">
+                <SelectValue placeholder="All Types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                {transactionTypes.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Input
               className="w-full sm:w-[300px] text-xs sm:text-sm"
               placeholder="Search by name, ID, or customer ID"
@@ -410,9 +400,11 @@ const UserHistory = () => {
                       <td className="px-2 sm:px-4 py-2">{(page - 1) * limit + index + 1}</td>
                       <td className="px-2 sm:px-4 py-2">{transaction.id || "N/A"}</td>
                       <td className="px-2 sm:px-4 py-2">{transaction.customer_id || "N/A"}</td>
-                      <td className="px-2 sm:px-4 py-2"><div className="flex flex-col gap-1">
-                        {transaction.user.name || "N/A"} <span>({transaction.user.type}  )</span>
-                        </div></td>
+                      <td className="px-2 sm:px-4 py-2">
+                        <div className="flex flex-col gap-1">
+                          {transaction.user.name || "N/A"} <span>({transaction.user.type})</span>
+                        </div>
+                      </td>
                       <td className="px-2 sm:px-4 py-2" style={{ color: transaction.amount > 0 ? 'green' : 'red' }}>
                         {transaction.amount !== undefined
                           ? (transaction.amount > 0
@@ -435,10 +427,11 @@ const UserHistory = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={7} className="px-2 sm:px-4 py-2 text-center">
-                      {noMoreData && page > 1
-                        ? "No more transactions available"
-                        : `No transactions found${typeFilter !== "all" ? ` for type "${transactionTypes.find(t => t.toLowerCase() === typeFilter) || typeFilter}"` : ""}`}
+                    <td colSpan={8} className="px-2 sm:px-4 py-2 text-center">
+                      No transactions found
+                      {typeFilter !== "all" ? ` for type "${typeFilter}"` : ""}
+                      {search ? ` matching "${search}"` : ""}
+                      {timeFilter !== "all" ? ` for selected time period` : ""}
                     </td>
                   </tr>
                 )}
