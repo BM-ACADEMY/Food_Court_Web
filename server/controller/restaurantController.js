@@ -32,9 +32,6 @@ exports.createRestaurant = async (req, res) => {
   }
 };
 
-
-
-
 exports.getRestaurants = async (req, res) => {
   try {
     const restaurants = await Restaurant.find()
@@ -121,7 +118,6 @@ exports.deleteRestaurant = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
 
 exports.getAllRestaurantDetails = async (req, res) => {
   try {
@@ -225,15 +221,6 @@ exports.getAllRestaurantDetails = async (req, res) => {
       { $unwind: { path: "$restaurant", preserveNullAndEmptyArrays: false } },
       {
         $lookup: {
-          from: "userbalances",
-          localField: "_id",
-          foreignField: "user_id",
-          as: "balance",
-        },
-      },
-      { $unwind: { path: "$balance", preserveNullAndEmptyArrays: true } },
-      {
-        $lookup: {
           from: "locations",
           localField: "restaurant.location",
           foreignField: "_id",
@@ -257,10 +244,7 @@ exports.getAllRestaurantDetails = async (req, res) => {
             {
               $match: {
                 $expr: {
-                  $or: [
-                    { $eq: ["$sender_id", "$$user_id"] },
-                    { $eq: ["$receiver_id", "$$user_id"] },
-                  ],
+                  $eq: ["$receiver_id", "$$user_id"], // Only match transactions where restaurant is receiver
                 },
               },
             },
@@ -325,7 +309,6 @@ exports.getAllRestaurantDetails = async (req, res) => {
           restaurant_id: "$restaurant.restaurant_id",
           restaurant_name: "$restaurant.restaurant_name",
           category: "$location.city",
-          sales: { $toDouble: { $ifNull: ["$balance.balance", 0] } }, // Use balance.balance from userbalances
           created_at: 1,
           status: {
             $cond: [
@@ -365,7 +348,16 @@ exports.getAllRestaurantDetails = async (req, res) => {
 
     const restaurants = await User.aggregate(pipeline);
     debug("Aggregated restaurants:", restaurants.length);
-    debug("Sample restaurant data:", restaurants[0]); // Log first result for debugging
+    debug("Sample restaurant data:", restaurants[0]);
+
+    // Fetch latest balances
+    const restaurantUserIds = restaurants.map((r) => r.user_id);
+    const balances = await UserBalance.find({
+      user_id: { $in: restaurantUserIds },
+    }).select("user_id balance");
+    const balanceMap = new Map(
+      balances.map((b) => [b.user_id.toString(), parseFloat(b.balance.toString())])
+    );
 
     // Format data
     let formattedRestaurants = restaurants.map((r) => {
@@ -386,7 +378,7 @@ exports.getAllRestaurantDetails = async (req, res) => {
         id: r.restaurant_id,
         name: r.restaurant_name,
         category: r.category || "Unknown",
-        sales: parseFloat(r.sales.toString()),
+        sales: balanceMap.get(r.user_id?.toString()) || 0,
         status: r.status,
         lastActive,
         is_flagged: r.is_flagged || false,
@@ -406,40 +398,16 @@ exports.getAllRestaurantDetails = async (req, res) => {
       );
     }
 
-    // Statistics pipeline
-    const statsPipeline = [
-      { $match: userQuery },
-      {
-        $lookup: {
-          from: "restaurants",
-          localField: "_id",
-          foreignField: "user_id",
-          as: "restaurant",
-        },
-      },
-      { $unwind: { path: "$restaurant", preserveNullAndEmptyArrays: false } },
-      {
-        $lookup: {
-          from: "userbalances",
-          localField: "_id",
-          foreignField: "user_id",
-          as: "balance",
-        },
-      },
-      { $unwind: { path: "$balance", preserveNullAndEmptyArrays: true } },
-      {
-        $group: {
-          _id: null,
-          totalRestaurants: { $sum: 1 },
-          totalSales: {
-            $sum: { $toDouble: { $ifNull: ["$balance.balance", 0] } },
-          },
-        },
-      },
-    ];
-    const statsResult = await User.aggregate(statsPipeline);
-    const { totalRestaurants = 0, totalSales = 0 } = statsResult[0] || {};
-    debug("Stats result:", { totalRestaurants, totalSales });
+    // Statistics
+    const statsUserIds = await User.find(userQuery).distinct("_id");
+    const statsBalances = await UserBalance.find({
+      user_id: { $in: statsUserIds },
+    }).select("balance");
+    const totalRestaurants = statsUserIds.length;
+    const totalSales = statsBalances.reduce(
+      (sum, b) => sum + parseFloat(b.balance.toString()),
+      0
+    );
 
     // Online count
     const onlineCount = formattedRestaurants.filter(
@@ -559,7 +527,7 @@ exports.getRestaurantDetails = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch restaurant details" });
   }
 };
-// Fetch transactions for a restaurant
+
 // Fetch transactions for a restaurant with filtering and pagination
 exports.getRestaurantTransactions = async (req, res) => {
   try {

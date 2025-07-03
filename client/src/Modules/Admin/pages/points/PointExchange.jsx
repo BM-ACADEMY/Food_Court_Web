@@ -176,7 +176,7 @@ const PointExchange = () => {
     };
 
     return (
-        <div className="p-6 min-h-screen">
+        <div className=" min-h-screen">
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <div>
@@ -403,7 +403,7 @@ const PointExchange = () => {
                 </Dialog>
             </div>
 
-            <div className="container mx-auto p-6" ref={transactionRef}>
+            <div className="mt-3" ref={transactionRef}>
                 <RecentTransactions />
             </div>
         </div>

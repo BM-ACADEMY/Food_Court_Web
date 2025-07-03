@@ -38,4 +38,6 @@ router.get("/fetch-by-customer-id", customerController.getCustomerByCustomerId);
 router.get("/fetch-by-user-id/:id", customerController.getCustomerByUserId);
 // In routes/customer.js
 router.get("/fetch-customer-details-by-phone", customerController.getCustomerDetailsByPhone);
+
+router.get("/:customerId/transactions", customerController.getTreasuryCustomerTransactions);
 module.exports = router;

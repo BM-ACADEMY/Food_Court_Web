@@ -1,4 +1,4 @@
-import React, { useState, useEffect,useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
     Select,
     SelectTrigger,
@@ -106,11 +106,11 @@ const PointExchange = () => {
     const [page, setPage] = useState(1);
     const [selectedReceiver, setSelectedReceiver] = useState(null);
     const [openModal, setOpenModal] = useState(false);
-      const transactionRef = useRef(null);
+    const transactionRef = useRef(null);
 
-  const scrollToTransactions = () => {
-    transactionRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+    const scrollToTransactions = () => {
+        transactionRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
     const loadMore = () => {
         setVisibleTransactions(transactions);
     };
@@ -172,7 +172,7 @@ const PointExchange = () => {
     };
 
     return (
-        <div className="p-6 min-h-screen">
+        <div className=" min-h-screen">
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <div>
@@ -181,16 +181,18 @@ const PointExchange = () => {
                         Add and manage funds for treasury subcommittee members
                     </p>
                 </div>
-                <div className="flex gap-2">
-
-                    <Button variant="secondary" className="cursor-pointer" onClick={() => setOpen(true)}>
-                        <PiggyBank className="w-4 h-4 mr-2" /> Credit Master admin Point
+                <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-start">
+                    {/* Credit Master Admin Point Button */}
+                    <Button variant="secondary" className="w-full sm:w-auto" onClick={() => setOpen(true)}>
+                        <PiggyBank className="w-4 h-4 mr-2" /> Credit Master Admin Point
                     </Button>
 
-                    <Button variant="outline" className="cursor-pointer" onClick={scrollToTransactions}>
+                    {/* Transaction History Button */}
+                    <Button variant="outline" className="w-full sm:w-auto" onClick={scrollToTransactions}>
                         <History className="w-4 h-4 mr-2" /> Transaction History
                     </Button>
-                    {/* ✅ Modal for Credit Point */}
+
+                    {/* Modal Dialog */}
                     <Dialog open={open} onOpenChange={setOpen}>
                         <DialogContent className="max-w-sm">
                             <DialogHeader>
@@ -200,16 +202,16 @@ const PointExchange = () => {
                                 </DialogTitle>
                             </DialogHeader>
 
-                            {/* You can use your form component or inline form */}
                             <AddPointForm onSuccess={() => setOpen(false)} />
                         </DialogContent>
                     </Dialog>
                 </div>
+
             </div>
 
             {/* Cards */}
             <div >
-               <DashboardCards />
+                <DashboardCards />
             </div>
 
             {/* Search and Filters */}
@@ -395,7 +397,7 @@ const PointExchange = () => {
                 </Dialog>
             </div>
 
-            <div className="container mx-auto p-6" ref={transactionRef}>
+            <div className="mt-3" ref={transactionRef}>
                 <RecentTransactions />
             </div>
         </div>

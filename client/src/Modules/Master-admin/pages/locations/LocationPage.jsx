@@ -107,7 +107,7 @@ export function LocationManager() {
   }, []);
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
+    <div className="max-w-4xl mx-auto">
       <h1 className="text-3xl font-bold mb-6  text-[#00004D]">Location Management</h1>
 
       {/* Success/Error Messages */}
@@ -163,7 +163,7 @@ export function LocationManager() {
       </Dialog>
 
       {/* Location List */}
-      <div className="bg-white p-6 rounded-lg shadow-md">
+      <div className="bg-white p-1 rounded-lg shadow-md">
         <h2 className="text-xl font-semibold mb-4">Locations</h2>
         {locations.length === 0 ? (
           <p className="text-gray-500">No locations found.</p>
@@ -177,17 +177,26 @@ export function LocationManager() {
                 <span>
                   {location.name} (Created: {new Date(location.created_at).toLocaleDateString()})
                 </span>
-                <div className="space-x-2">
-                  <Button variant="outline" onClick={() => handleEdit(location)}>
-                    <Edit className="mr-2 h-4 w-4" /> Edit
+              <div className="flex  gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handleEdit(location)}
+                    aria-label="Edit"
+                  >
+                    <Edit className="w-4 h-4" />
                   </Button>
+
                   <Button
                     variant="destructive"
+                    size="icon"
                     onClick={() => handleOpenDeleteDialog(location)}
+                    aria-label="Delete"
                   >
-                    <Trash2 className="mr-2 h-4 w-4" /> Delete
+                    <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
+
               </li>
             ))}
           </ul>

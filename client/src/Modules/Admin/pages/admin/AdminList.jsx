@@ -18,6 +18,8 @@ import {
   Download,
   Eye,
   Pencil,
+  Unlock,
+  Lock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
@@ -111,7 +113,6 @@ export default function AdminList() {
     setIsDetailsModalOpen(true);
   };
   const handleTransactionEdit = (admin) => {
-
 
   };
 
@@ -220,6 +221,24 @@ export default function AdminList() {
     }
     setIsExportModalOpen(false);
   };
+
+
+  // const handleToggleRestrict = async (user) => {
+  //   try {
+  //     const id = user._id;
+  //     const updated = await axios.put(`${import.meta.env.VITE_BASE_URL}/users/update-user-flag/${id}`, {
+  //       is_flagged: !user.is_flagged,
+  //     });
+
+  //     if (updated.data.success) {
+  //       toast.success(`User ${!user.is_flagged ? "restricted" : "unrestricted"} successfully`);
+  //       fetchUsers(); // Refresh list
+  //     }
+  //   } catch (err) {
+  //     console.error("Failed to toggle restriction", err);
+  //     toast.error("Failed to update restriction");
+  //   }
+  // };
 
   return (
     <div className="space-y-6">
@@ -373,6 +392,8 @@ export default function AdminList() {
                   <TableHead>Balance</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Last Active</TableHead>
+                  {/* <TableHead>Permission</TableHead> */}
+
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -414,10 +435,10 @@ export default function AdminList() {
                       <TableCell>
                         <span
                           className={`font-medium ${admin.balance > 10000
-                              ? "text-green-600"
-                              : admin.balance > 0
-                                ? "text-yellow-600"
-                                : "text-red-600"
+                            ? "text-green-600"
+                            : admin.balance > 0
+                              ? "text-yellow-600"
+                              : "text-red-600"
                             }`}
                         >
                           ₹{admin.balance.toLocaleString()}
@@ -427,14 +448,29 @@ export default function AdminList() {
                         <Badge
                           variant="ghost"
                           className={`text-white ${admin.status.toLowerCase() === "online"
-                              ? "bg-green-500"
-                              : "bg-red-500"
+                            ? "bg-green-500"
+                            : "bg-red-500"
                             }`}
                         >
                           {admin.status}
                         </Badge>
                       </TableCell>
                       <TableCell>{admin.lastActive}</TableCell>
+                      {/* <TableCell className="text-center">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="cursor-pointer"
+                          onClick={() => handleToggleRestrict(admin)}
+                          title={admin.is_flagged ? "Unrestrict User" : "Restrict User"}
+                        >
+                          {admin.is_flagged ? (
+                            <Lock className="w-4 h-4 text-red-600" />
+                          ) : (
+                            <Unlock className="w-4 h-4 text-green-600" />
+                          )}
+                        </Button>
+                      </TableCell> */}
                       <TableCell className="flex gap-2">
                         <Button
                           variant="link"
@@ -505,7 +541,7 @@ export default function AdminList() {
 
       {/* Pagination */}
       {!loading && !error && totalPages > 0 && (
-        <div className="flex items-center justify-between mt-4">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 mt-4">
           <p className="text-sm text-muted-foreground">
             Showing {(page - 1) * pageSize + 1} to{" "}
             {Math.min(page * pageSize, totalAdmins)} of {totalAdmins} admins

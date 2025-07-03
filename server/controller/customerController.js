@@ -958,3 +958,86 @@ exports.getCustomerDetailsByPhone = async (req, res) => {
 };
 
 
+
+// Get Customer Transactions
+exports.getTreasuryCustomerTransactions = async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    const { page = 1, limit = 10, quickFilter, payment_method } = req.query;
+
+    const customer = await Customer.findOne({ customer_id: customerId });
+    if (!customer) {
+      return res.status(404).json({ success: false, error: "Customer not found" });
+    }
+
+    let query = {
+      $or: [{ sender_id: customer.user_id }, { receiver_id: customer.user_id }],
+      transaction_type: { $in: ["Transfer", "TopUp", "Refund", "Credit"] },
+    };
+
+    if (payment_method && payment_method !== "all") {
+      query.payment_method = payment_method;
+    }
+
+    if (quickFilter && quickFilter !== "all") {
+      const now = new Date();
+      let startDate;
+      if (quickFilter === "today") {
+        startDate = new Date(now.setHours(0, 0, 0, 0));
+      } else if (quickFilter === "yesterday") {
+        startDate = new Date(now.setHours(0, 0, 0, 0));
+        startDate.setDate(startDate.getDate() - 1);
+      } else if (quickFilter === "last7days") {
+        startDate = new Date(now.setHours(0, 0, 0, 0));
+        startDate.setDate(startDate.getDate() - 7);
+      }
+      if (startDate) {
+        query.created_at = { $gte: startDate };
+      }
+    }
+
+    const pageNum = parseInt(page, 10) || 1;
+    const limitNum = parseInt(limit, 10) || 10;
+    const skip = (pageNum - 1) * limitNum;
+
+    const transactions = await Transaction.find(query)
+      .populate("sender_id", "name")
+      .populate("receiver_id", "name")
+      .skip(skip)
+      .limit(limitNum)
+      .lean();
+
+    const totalTransactions = await Transaction.countDocuments(query);
+
+    const formattedTransactions = transactions.map((tx) => ({
+      id: tx.transaction_id,
+      type: tx.transaction_type.toLowerCase(),
+      amount: parseFloat(tx.amount),
+      date: tx.created_at,
+      payment_method: tx.payment_method || "N/A",
+      status: tx.status || "Completed",
+      customer_id: customerId,
+      description:
+        tx.transaction_type === "Transfer"
+          ? `To ${tx.receiver_id.name}`
+          : tx.transaction_type === "Refund"
+          ? `From ${tx.sender_id.name}`
+          : tx.remarks || `${tx.transaction_type} transaction`,
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: formattedTransactions,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(totalTransactions / limitNum),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching transactions:", error);
+    res.status(500).json({ success: false, error: "Failed to fetch transactions" });
+  }
+};
+
+

@@ -95,7 +95,7 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState("xlsx");
-  const itemsPerPage = 20; // Last 20 transactions
+  const itemsPerPage = 10; // Last 20 transactions
   const [paymentMethod, setPaymentMethod] = useState("all");
 
   const totalPages = Math.ceil(totalRecords / itemsPerPage);
@@ -170,7 +170,7 @@ export default function Dashboard() {
         params: {
           transactionType: transactionType === "all" ? undefined : transactionType,
           userType: userType === "all" ? undefined : userType,
-           paymentMethod: paymentMethod === "all" ? undefined : paymentMethod,
+          paymentMethod: paymentMethod === "all" ? undefined : paymentMethod,
           fromDate: fromDate ? format(fromDate, "yyyy-MM-dd") : undefined,
           toDate: toDate ? format(toDate, "yyyy-MM-dd") : undefined,
           page: currentPage,
@@ -258,146 +258,144 @@ export default function Dashboard() {
   const handlePageChange = (page) => {
     if (page >= 1 && page <= totalPages) setCurrentPage(page);
   };
+  const exportToExcel = (data) => {
+    // Add serial numbers and format data
+    const formattedData = data.map((item, index) => ({
+      "S.No": index + 1,
+      "Transaction ID": item.id || "N/A",
+      "Time": item.time || "N/A",
+      "Type": item.type || "N/A",
+      "From": item.from || "Unknown",
+      "To": item.to || "Unknown",
+      "Amount": item.amount ? parseFloat(item.amount.replace(/[^0-9.-]+/g, "")) : 0,
+      "Status": item.status || "N/A",
+    }));
 
-const exportToExcel = (data) => {
-  // Add serial numbers and format data
-  const formattedData = data.map((item, index) => ({
-    "S.No": index + 1,
-    "Transaction ID": item.id || "N/A",
-    "Time": item.time || "N/A",
-    "Type": item.type || "N/A",
-    "From": item.from || "Unknown",
-    "To": item.to || "Unknown",
-    "Amount": item.amount ? parseFloat(item.amount.replace(/[^0-9.-]+/g,"")) : 0,
-    "Status": item.status || "N/A",
-  }));
+    // Calculate total amount
+    const totalAmount = formattedData.reduce((sum, item) => sum + item.Amount, 0);
 
-  // Calculate total amount
-  const totalAmount = formattedData.reduce((sum, item) => sum + item.Amount, 0);
+    // Add total row
+    formattedData.push({
+      "S.No": "TOTAL",
+      "Transaction ID": "",
+      "Time": "",
+      "Type": "",
+      "From": "",
+      "To": "",
+      "Amount": totalAmount,
+      "Status": "",
+    });
 
-  // Add total row
-  formattedData.push({
-    "S.No": "TOTAL",
-    "Transaction ID": "",
-    "Time": "",
-    "Type": "",
-    "From": "",
-    "To": "",
-    "Amount": totalAmount,
-    "Status": "",
-  });
+    const ws = XLSX.utils.json_to_sheet(formattedData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Transactions");
 
-  const ws = XLSX.utils.json_to_sheet(formattedData);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Transactions");
+    // Style the total row
+    const totalRow = data.length + 2; // +2 because header is row 1 and data starts at row 2
+    ws[`A${totalRow}`].s = { font: { bold: true } };
+    ws[`G${totalRow}`].s = { font: { bold: true } };
 
-  // Style the total row
-  const totalRow = data.length + 2; // +2 because header is row 1 and data starts at row 2
-  ws[`A${totalRow}`].s = { font: { bold: true } };
-  ws[`G${totalRow}`].s = { font: { bold: true } };
+    XLSX.writeFile(wb, `transactions_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+  };
 
-  XLSX.writeFile(wb, `transactions_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
-};
+  const exportToCSV = (data) => {
+    // Add serial numbers and format data
+    const formattedData = data.map((item, index) => ({
+      "S.No": index + 1,
+      "Transaction ID": item.id || "N/A",
+      "Time": item.time || "N/A",
+      "Type": item.type || "N/A",
+      "From": item.from || "Unknown",
+      "To": item.to || "Unknown",
+      "Amount": item.amount || "₹0",
+      "Status": item.status || "N/A",
+    }));
 
-const exportToCSV = (data) => {
-  // Add serial numbers and format data
-  const formattedData = data.map((item, index) => ({
-    "S.No": index + 1,
-    "Transaction ID": item.id || "N/A",
-    "Time": item.time || "N/A",
-    "Type": item.type || "N/A",
-    "From": item.from || "Unknown",
-    "To": item.to || "Unknown",
-    "Amount": item.amount || "₹0",
-    "Status": item.status || "N/A",
-  }));
+    // Calculate total amount
+    const totalAmount = formattedData.reduce((sum, item) => {
+      const amount = parseFloat(item.Amount.replace(/[^0-9.-]+/g, "")) || 0;
+      return sum + amount;
+    }, 0);
 
-  // Calculate total amount
-  const totalAmount = formattedData.reduce((sum, item) => {
-    const amount = parseFloat(item.Amount.replace(/[^0-9.-]+/g,"")) || 0;
-    return sum + amount;
-  }, 0);
+    // Add total row
+    formattedData.push({
+      "S.No": "TOTAL",
+      "Transaction ID": "",
+      "Time": "",
+      "Type": "",
+      "From": "",
+      "To": "",
+      "Amount": `₹${totalAmount.toFixed(2)}`,
+      "Status": "",
+    });
 
-  // Add total row
-  formattedData.push({
-    "S.No": "TOTAL",
-    "Transaction ID": "",
-    "Time": "",
-    "Type": "",
-    "From": "",
-    "To": "",
-    "Amount": `₹${totalAmount.toFixed(2)}`,
-    "Status": "",
-  });
+    const ws = XLSX.utils.json_to_sheet(formattedData);
+    const csv = XLSX.utils.sheet_to_csv(ws);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    saveAs(blob, `transactions_${format(new Date(), "yyyy-MM-dd")}.csv`);
+  };
 
-  const ws = XLSX.utils.json_to_sheet(formattedData);
-  const csv = XLSX.utils.sheet_to_csv(ws);
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  saveAs(blob, `transactions_${format(new Date(), "yyyy-MM-dd")}.csv`);
-};
+  const exportToPDF = (data) => {
+    const doc = new jsPDF();
 
-const exportToPDF = (data) => {
-  const doc = new jsPDF();
-  
-  // Title and date
-  doc.setFontSize(16);
-  doc.text("Transaction Report", 14, 15);
-  doc.setFontSize(10);
-  doc.text(`Generated on: ${format(new Date(), "yyyy-MM-dd HH:mm")}`, 14, 22);
+    // Title and date
+    doc.setFontSize(16);
+    doc.text("Transaction Report", 14, 15);
+    doc.setFontSize(10);
+    doc.text(`Generated on: ${format(new Date(), "yyyy-MM-dd HH:mm")}`, 14, 22);
 
-  // Prepare data with serial numbers
-  const tableData = data.map((item, index) => [
-    index + 1, // Serial number
-    item.id || "N/A",
-    item.time || "N/A",
-    item.type || "N/A",
-    item.from || "Unknown",
-    item.to || "Unknown",
-    item.amount || "₹0",
-    item.status || "N/A",
-  ]);
+    // Prepare data with serial numbers
+    const tableData = data.map((item, index) => [
+      index + 1, // Serial number
+      item.id || "N/A",
+      item.time || "N/A",
+      item.type || "N/A",
+      item.from || "Unknown",
+      item.to || "Unknown",
+      item.amount || "₹0",
+      item.status || "N/A",
+    ]);
 
-  // Calculate total amount
-  const totalAmount = data.reduce((sum, item) => {
-    const amount = parseFloat(item.amount?.replace(/[^0-9.-]+/g,"") || 0);
-    return sum + amount;
-  }, 0);
+    // Calculate total amount
+    const totalAmount = data.reduce((sum, item) => {
+      const amount = parseFloat(item.amount?.replace(/[^0-9.-]+/g, "") || 0);
+      return sum + amount;
+    }, 0);
 
-  autoTable(doc, {
-    startY: 30,
-    head: [["S.No", "ID", "Time", "Type", "From", "To", "Amount", "Status"]],
-    body: tableData,
-    foot: [["", "", "", "", "", "TOTAL", `₹${totalAmount.toFixed(2)}`, ""]],
-    theme: "grid",
-    styles: { fontSize: 8 },
-    headStyles: { 
-      fillColor: [0, 0, 77],
-      textColor: 255,
-      fontStyle: 'bold'
-    },
-    footStyles: {
-      fillColor: [220, 220, 220],
-      textColor: 0,
-      fontStyle: 'bold'
-    },
-    didDrawPage: function(data) {
-      // Page numbers
-      const pageCount = doc.internal.getNumberOfPages();
-      doc.setFontSize(10);
-      for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.text(
-          `Page ${i} of ${pageCount}`,
-          data.settings.margin.left,
-          doc.internal.pageSize.height - 10
-        );
+    autoTable(doc, {
+      startY: 30,
+      head: [["S.No", "ID", "Time", "Type", "From", "To", "Amount", "Status"]],
+      body: tableData,
+      foot: [["", "", "", "", "", "TOTAL", `₹${totalAmount.toFixed(2)}`, ""]],
+      theme: "grid",
+      styles: { fontSize: 8 },
+      headStyles: {
+        fillColor: [0, 0, 77],
+        textColor: 255,
+        fontStyle: 'bold'
+      },
+      footStyles: {
+        fillColor: [220, 220, 220],
+        textColor: 0,
+        fontStyle: 'bold'
+      },
+      didDrawPage: function (data) {
+        // Page numbers
+        const pageCount = doc.internal.getNumberOfPages();
+        doc.setFontSize(10);
+        for (let i = 1; i <= pageCount; i++) {
+          doc.setPage(i);
+          doc.text(
+            `Page ${i} of ${pageCount}`,
+            data.settings.margin.left,
+            doc.internal.pageSize.height - 10
+          );
+        }
       }
-    }
-  });
+    });
 
-  doc.save(`transactions_${format(new Date(), "yyyy-MM-dd")}.pdf`);
-};
-
+    doc.save(`transactions_${format(new Date(), "yyyy-MM-dd")}.pdf`);
+  };
   const handleExport = async () => {
     try {
       setIsLoading(true);
@@ -431,7 +429,7 @@ const exportToPDF = (data) => {
   };
 
   return (
-    <div className="p-6 space-y-6 font-sans">
+    <div className=" space-y-6 font-sans">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-[#00004D]">Dashboard Overview</h1>
         <Button
@@ -462,7 +460,7 @@ const exportToPDF = (data) => {
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-lg">Live Transactions</CardTitle>
           <div className="flex items-center gap-2">
-            <span className="text-green-600 text-sm">● Live Updates</span>
+            {/* <span className="text-green-600 text-sm">● Live Updates</span> */}
             <Button
               size="sm"
               className="bg-[#00004D] cursor-pointer"
@@ -592,7 +590,13 @@ const exportToPDF = (data) => {
               <TableBody>
                 {transactions.map((tx) => (
                   <TableRow key={tx.id}>
-                    <TableCell>{tx.time || "N/A"}</TableCell>
+                    <TableCell className="whitespace-nowrap truncate">
+                      {new Date(tx.time).toLocaleString("en-IN", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                        timeZone: "Asia/Kolkata",
+                      })}
+                    </TableCell>
                     <TableCell>#{tx.id || "N/A"}</TableCell>
                     <TableCell>
                       <span
@@ -671,28 +675,37 @@ const exportToPDF = (data) => {
                 ))}
               </TableBody>
             </Table>
-
-            <div className="mt-2 flex justify-between items-center">
+            <div className="mt-2 flex flex-col sm:flex-row justify-between items-center gap-2">
               <p className="text-sm text-muted-foreground">
                 Showing {(currentPage - 1) * itemsPerPage + 1}–
                 {Math.min(currentPage * itemsPerPage, totalRecords)} of {totalRecords} records
               </p>
+
               <Pagination>
                 <PaginationContent>
+                  {/* Prev Button */}
                   <PaginationItem>
                     <PaginationPrevious
                       href="#"
                       onClick={(e) => {
                         e.preventDefault();
-                        handlePageChange(currentPage - 1);
+                        if (currentPage > 1) handlePageChange(currentPage - 1);
                       }}
+                      className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
                     />
                   </PaginationItem>
+
+                  {/* Page numbers (3 max visible: currentPage in center) */}
                   {(() => {
-                    const pagesPerBlock = 5;
-                    const currentBlock = Math.floor((currentPage - 1) / pagesPerBlock);
-                    const start = currentBlock * pagesPerBlock + 1;
-                    const end = Math.min(start + pagesPerBlock - 1, totalPages);
+                    const pagesToShow = 3;
+                    const half = Math.floor(pagesToShow / 2);
+                    let start = Math.max(1, currentPage - half);
+                    let end = start + pagesToShow - 1;
+
+                    if (end > totalPages) {
+                      end = totalPages;
+                      start = Math.max(1, end - pagesToShow + 1);
+                    }
 
                     return Array.from({ length: end - start + 1 }).map((_, i) => {
                       const pageNum = start + i;
@@ -712,18 +725,22 @@ const exportToPDF = (data) => {
                       );
                     });
                   })()}
+
+                  {/* Next Button */}
                   <PaginationItem>
                     <PaginationNext
                       href="#"
                       onClick={(e) => {
                         e.preventDefault();
-                        handlePageChange(currentPage + 1);
+                        if (currentPage < totalPages) handlePageChange(currentPage + 1);
                       }}
+                      className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
                     />
                   </PaginationItem>
                 </PaginationContent>
               </Pagination>
             </div>
+
           </div>
         </CardContent>
       </Card>

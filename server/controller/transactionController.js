@@ -1314,7 +1314,7 @@ exports.getTransactionHistory = async (req, res) => {
 
     // Format transactions for frontend
     const formattedTransactions = transactions.map((txn) => ({
-      datetime: moment(txn.created_at).format("MMM DD, YYYY HH:mm"),
+      datetime: txn.created_at,
       id: txn.transaction_id,
       sender: {
         name: txn.sender_id?.name || "Unknown",

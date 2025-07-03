@@ -552,7 +552,6 @@ exports.sendOtpController = async (req, res) => {
   }
 };
 
-
 // Get all users with pagination, search, and role filter
 exports.getUsers = async (req, res) => {
   try {
@@ -871,7 +870,6 @@ exports.getUserById = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
 // Update user
 exports.updateUser = async (req, res) => {
   try {
@@ -1210,7 +1208,6 @@ exports.getUsersWithBalanceByRole = async (req, res) => {
   }
 };
 
-
 exports.getUserByPhone = async (req, res) => {
   try {
     const { phone_number } = req.query;
@@ -1348,7 +1345,6 @@ exports.verifyCredentials = async (req, res) => {
   }
 };
 
-
 exports.forgotPassword = async (req, res) => {
   const { email } = req.body;
 
@@ -1416,4 +1412,7 @@ exports.resetPassword = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+
+
 

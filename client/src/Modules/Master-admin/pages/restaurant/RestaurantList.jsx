@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import { format } from "date-fns";
@@ -57,6 +58,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { toast } from "react-toastify";
 import RestaurantDetailsModal from "./RestaurantDetailsModel";
+
 const getRandomColor = () => {
   const colors = ["#FF6B6B", "#4ECDC4", "#556270", "#C7F464", "#FFA500"];
   return colors[Math.floor(Math.random() * colors.length)];
@@ -169,20 +171,19 @@ export default function RestaurantList() {
   // Memoized paginated data
   const paginatedRestaurants = useMemo(() => restaurants, [restaurants]);
 
-  // Export functions using allRestaurants
+  // Export to Excel
   const exportToExcel = () => {
     if (allRestaurants.length === 0) {
       toast.error("No data available to export. Please try again.");
       return;
     }
     const data = allRestaurants.map((restaurant) => ({
-      "Restaurant ID": restaurant.id,
-      Name: restaurant.name,
-      Role: restaurant.sender_role_name || "Restaurant",
-      Category: restaurant.category,
-      Sales: `₹${restaurant.sales.toLocaleString()}`,
-      Status: restaurant.status,
-      "Last Active": restaurant.lastActive,
+      "Restaurant ID": restaurant.id || "N/A",
+      Name: restaurant.name || "Unknown",
+      Role: restaurant.receiver_role_name || "Restaurant", // Changed to receiver_role_name
+      Sales: `₹${restaurant.sales.toLocaleString()}` || "₹0", // Fixed INR formatting
+      Status: restaurant.status || "N/A",
+      "Last Active": restaurant.lastActive || "N/A",
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
@@ -192,19 +193,19 @@ export default function RestaurantList() {
     saveAs(file, `restaurants_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
   };
 
+  // Export to CSV
   const exportToCSV = () => {
     if (allRestaurants.length === 0) {
       toast.error("No data available to export. Please try again.");
       return;
     }
     const data = allRestaurants.map((restaurant) => ({
-      "Restaurant ID": restaurant.id,
-      Name: restaurant.name,
-      Role: restaurant.sender_role_name || "Restaurant",
-      Category: restaurant.category,
-      Sales: `₹${restaurant.sales.toLocaleString()}`,
-      Status: restaurant.status,
-      "Last Active": restaurant.lastActive,
+      "Restaurant ID": restaurant.id || "N/A",
+      Name: restaurant.name || "Unknown",
+      Role: restaurant.receiver_role_name || "Restaurant", // Changed to receiver_role_name
+      Sales: `₹${restaurant.sales.toLocaleString()}` || "₹0", // Fixed INR formatting
+      Status: restaurant.status || "N/A",
+      "Last Active": restaurant.lastActive || "N/A",
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const csv = XLSX.utils.sheet_to_csv(ws);
@@ -212,6 +213,7 @@ export default function RestaurantList() {
     saveAs(file, `restaurants_${format(new Date(), "yyyy-MM-dd")}.csv`);
   };
 
+  // Export to PDF
   const exportToPDF = () => {
     if (allRestaurants.length === 0) {
       toast.error("No data available to export. Please try again.");
@@ -223,14 +225,13 @@ export default function RestaurantList() {
       autoTable(doc, {
         startY: 30,
         head: [
-          ["Restaurant ID", "Name", "Role", "Category", "Sales", "Status", "Last Active"],
+          ["Restaurant ID", "Name", "Role", "Sales", "Status", "Last Active"], // Removed Category
         ],
         body: allRestaurants.map((restaurant) => [
           restaurant.id || "N/A",
           restaurant.name || "Unknown",
-          restaurant.sender_role_name || "Restaurant",
-          restaurant.category || "N/A",
-          `₹${restaurant.sales.toLocaleString()}` || "₹0",
+          restaurant.receiver_role_name || "Restaurant", // Changed to receiver_role_name
+          `₹${restaurant.sales.toLocaleString()}` || "₹0", // Fixed INR formatting
           restaurant.status || "N/A",
           restaurant.lastActive || "N/A",
         ]),
@@ -462,7 +463,6 @@ export default function RestaurantList() {
                   <TableHead>Restaurant ID</TableHead>
                   <TableHead>Sender Name</TableHead>
                   <TableHead>Role</TableHead>
-                  {/* <TableHead>Category</TableHead> */}
                   <TableHead>Sales</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Last Active</TableHead>
@@ -472,7 +472,7 @@ export default function RestaurantList() {
               <TableBody>
                 {paginatedRestaurants.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center">
+                    <TableCell colSpan={7} className="text-center">
                       No restaurants found
                     </TableCell>
                   </TableRow>
@@ -491,7 +491,6 @@ export default function RestaurantList() {
                           {restaurant.receiver_role_name || "Restaurant"}
                         </span>
                       </TableCell>
-                      {/* <TableCell>{restaurant.category || "N/A"}</TableCell> */}
                       <TableCell>
                         <span
                           className={`font-medium ${
@@ -602,51 +601,72 @@ export default function RestaurantList() {
 
       {/* Pagination */}
       {!loading && !error && totalPages > 0 && (
-        <div className="flex items-center justify-between mt-4">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 mt-4">
           <p className="text-sm text-muted-foreground">
             Showing {(page - 1) * pageSize + 1} to{" "}
-            {Math.min(page * pageSize, totalRestaurants)} of {totalRestaurants}{" "}
-            restaurants
+            {Math.min(page * pageSize, totalRestaurants)} of {totalRestaurants} restaurants
           </p>
-          <div className="float-end">
-            <Pagination>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setPage((p) => Math.max(1, p - 1));
-                    }}
-                  />
-                </PaginationItem>
-                {[...Array(Math.min(totalPages, 5))].map((_, i) => (
-                  <PaginationItem key={i}>
-                    <PaginationLink
-                      href="#"
-                      isActive={page === i + 1}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setPage(i + 1);
-                      }}
-                    >
-                      {i + 1}
-                    </PaginationLink>
-                  </PaginationItem>
-                ))}
-                <PaginationItem>
-                  <PaginationNext
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setPage((p) => Math.min(totalPages, p + 1));
-                    }}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-          </div>
+
+          <Pagination>
+            <PaginationContent>
+              {/* Prev */}
+              <PaginationItem>
+                <PaginationPrevious
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (page > 1) setPage((p) => p - 1);
+                  }}
+                  className={page === 1 ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+
+              {/* Show only 3 page numbers, centered around current page */}
+              {(() => {
+                const pagesToShow = 3;
+                const half = Math.floor(pagesToShow / 2);
+                let start = Math.max(1, page - half);
+                let end = start + pagesToShow - 1;
+
+                if (end > totalPages) {
+                  end = totalPages;
+                  start = Math.max(1, end - pagesToShow + 1);
+                }
+
+                return Array.from({ length: end - start + 1 }).map((_, i) => {
+                  const pageNum = start + i;
+                  return (
+                    <PaginationItem key={pageNum}>
+                      <PaginationLink
+                        href="#"
+                        isActive={page === pageNum}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setPage(pageNum);
+                        }}
+                      >
+                        {pageNum}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                });
+              })()}
+
+              {/* Next */}
+              <PaginationItem>
+                <PaginationNext
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (page < totalPages) setPage((p) => p + 1);
+                  }}
+                  className={page === totalPages ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
         </div>
+
       )}
     </div>
   );

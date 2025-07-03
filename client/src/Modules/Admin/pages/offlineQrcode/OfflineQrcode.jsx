@@ -141,7 +141,7 @@ const GenerateQr=()=> {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center ">
       <Card className="w-full max-w-xl shadow-md">
         <CardHeader className="bg-[#070149] rounded-t-md px-6 py-4">
           <CardTitle className="text-xl font-semibold text-white text-center">

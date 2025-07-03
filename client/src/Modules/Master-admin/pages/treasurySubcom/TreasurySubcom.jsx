@@ -409,7 +409,7 @@ export default function TreasurySubcomList() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      {/* <TableCell>
                         <div className="flex items-center gap-2">
                           <Avatar name={subcom.receiver_name} />
                           <div className="flex flex-col gap-1">
@@ -419,7 +419,7 @@ export default function TreasurySubcomList() {
                             </span>
                           </div>
                         </div>
-                      </TableCell>
+                      </TableCell> */}
                       <TableCell>
                         <span
                           className={`font-medium ${subcom.balance > 10000
@@ -520,10 +520,9 @@ export default function TreasurySubcomList() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
       {/* Pagination */}
       {!loading && !error && totalPages > 0 && (
-        <div className="flex items-center justify-between mt-4">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 mt-4">
           <p className="text-sm text-muted-foreground">
             Showing {(page - 1) * pageSize + 1} to{" "}
             {Math.min(page * pageSize, totalTreasurySubcoms)} of{" "}
