@@ -13,6 +13,44 @@ import {
     PaginationPrevious,
 } from '@/components/ui/pagination';
 import { IndianRupee } from "lucide-react"
+
+
+
+const renderPaginationItems = () => {
+    const total = pagination.pages;
+    const current = pagination.page;
+    const maxVisible = 3;
+    const half = Math.floor(maxVisible / 2);
+
+    let start = Math.max(1, current - half);
+    let end = Math.min(start + maxVisible - 1, total);
+
+    if (end - start + 1 < maxVisible) {
+        start = Math.max(1, end - maxVisible + 1);
+    }
+
+    const pages = [];
+    for (let i = start; i <= end; i++) {
+        pages.push(
+            <PaginationItem key={i}>
+                <PaginationLink
+                    href="#"
+                    isActive={pagination.page === i}
+                    onClick={(e) => {
+                        e.preventDefault();
+                        handlePageChange(i);
+                    }}
+                >
+                    {i}
+                </PaginationLink>
+            </PaginationItem>
+        );
+    }
+
+    return pages;
+};
+
+
 const FeesTable = () => {
     const [fees, setFees] = useState([]);
     const [totalAmount, setTotalAmount] = useState(0);
@@ -120,16 +158,17 @@ const FeesTable = () => {
 
     return (
         <div className="p-4">
-            <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center gap-4">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4">
+                {/* 🔍 Search & Filter Section */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full sm:w-auto">
                     <Input
                         placeholder="Search by name or phone..."
                         value={search}
                         onChange={handleSearch}
-                        className="w-64"
+                        className="w-full sm:w-64"
                     />
                     <Select value={filter} onValueChange={handleFilterChange}>
-                        <SelectTrigger className="w-40">
+                        <SelectTrigger className="w-full sm:w-40">
                             <SelectValue placeholder="Select filter" />
                         </SelectTrigger>
                         <SelectContent>
@@ -140,12 +179,15 @@ const FeesTable = () => {
                         </SelectContent>
                     </Select>
                 </div>
+
+                {/* 💰 Total Amount Section */}
                 <div className="text-lg font-semibold">
-                   <div className='flex gap-1 items-center'>
-                           Total Amount: <IndianRupee className='w-4 h-4' /> <span>{totalAmount.toFixed(2)}</span>
+                    <div className="flex gap-1 items-center">
+                        Total Amount: <IndianRupee className="w-4 h-4" /> <span>{totalAmount.toFixed(2)}</span>
                     </div>
                 </div>
             </div>
+
 
             <Table>
                 <TableHeader>
@@ -189,7 +231,9 @@ const FeesTable = () => {
                             className={pagination.page === 1 ? 'pointer-events-none opacity-50' : ''}
                         />
                     </PaginationItem>
+
                     {renderPaginationItems()}
+
                     <PaginationItem>
                         <PaginationNext
                             href="#"
@@ -202,6 +246,7 @@ const FeesTable = () => {
                     </PaginationItem>
                 </PaginationContent>
             </Pagination>
+
         </div>
     );
 };

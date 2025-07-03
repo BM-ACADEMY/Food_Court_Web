@@ -238,15 +238,15 @@ export default function TransactionHistory() {
           prev.map((txn) =>
             txn.id === transactionId
               ? {
-                  ...txn,
-                  amount: parseFloat(editFormData.amount),
-                  type: editFormData.transaction_type,
-                  paymentMethod: editFormData.payment_method,
-                  status: editFormData.status,
-                  description: editFormData.remarks,
-                  location: editFormData.location_id,
-                  edited_at: new Date(),
-                }
+                ...txn,
+                amount: parseFloat(editFormData.amount),
+                type: editFormData.transaction_type,
+                paymentMethod: editFormData.payment_method,
+                status: editFormData.status,
+                description: editFormData.remarks,
+                location: editFormData.location_id,
+                edited_at: new Date(),
+              }
               : txn
           )
         );
@@ -555,7 +555,7 @@ export default function TransactionHistory() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className=" space-y-6">
       <h1 className="text-3xl font-bold text-[#00004D]">Transaction History</h1>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
@@ -849,46 +849,49 @@ export default function TransactionHistory() {
             ))}
           </div>
 
-          <div className="overflow-x-hidden">
-            <div className="mx-auto max-w-full">
+          <div className="overflow-x-auto">
+            <div className="w-full">
               <Table className="w-full table-auto text-sm">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="min-w-[120px] whitespace-nowrap">Date & Time</TableHead>
-                    <TableHead className="min-w-[100px] whitespace-nowrap">Transaction ID</TableHead>
-                    <TableHead className="min-w-[150px] whitespace-nowrap">Sender Name</TableHead>
-                    <TableHead className="min-w-[150px] whitespace-nowrap">Receiver Name</TableHead>
-                    <TableHead className="min-w-[100px] whitespace-nowrap">Type</TableHead>
-                    <TableHead className="min-w-[150px] whitespace-nowrap">Description</TableHead>
-                    <TableHead className="min-w-[120px] whitespace-nowrap">Payment Method</TableHead>
-                    <TableHead className="min-w-[100px] text-right whitespace-nowrap">Amount</TableHead>
-                    <TableHead className="min-w-[80px] text-right whitespace-nowrap">Actions</TableHead>
+                    <TableHead className="whitespace-nowrap">Date & Time</TableHead>
+                    <TableHead className="whitespace-nowrap">Transaction ID</TableHead>
+                    <TableHead className="whitespace-nowrap">Sender Name</TableHead>
+                    <TableHead className="whitespace-nowrap">Receiver Name</TableHead>
+                    <TableHead className="whitespace-nowrap">Type</TableHead>
+                    <TableHead className="whitespace-nowrap">Description</TableHead>
+                    <TableHead className="whitespace-nowrap">Payment Method</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">Amount</TableHead>
+                    {/* <TableHead className="hidden md:table-cell text-right whitespace-nowrap">Actions</TableHead> */}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {transactions.map((txn) => (
                     <TableRow key={txn.id}>
-                      <TableCell className="whitespace-nowrap overflow-hidden text-ellipsis">
-                        {txn.datetime}
-                      </TableCell>
-                      <TableCell className="font-semibold whitespace-nowrap overflow-hidden text-ellipsis">
-                        {txn.id}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap overflow-hidden text-ellipsis">
+                      {/* <TableCell className="whitespace-nowrap truncate">{txn.datetime}</TableCell> */}
+                      <TableCell className="whitespace-nowrap truncate">
+                                            {new Date(txn.datetime).toLocaleString("en-IN", {
+                                              dateStyle: "medium",
+                                              timeStyle: "short",
+                                              timeZone: "Asia/Kolkata",
+                                            })}
+                                          </TableCell>
+                      <TableCell className="font-semibold whitespace-nowrap truncate">{txn.id}</TableCell>
+                      <TableCell className="max-w-[150px] truncate">
                         <div className="flex items-center gap-2">
                           <Avatar name={txn.sender.name} />
                           <div className="font-medium">{txn.sender.name}</div>
                         </div>
                         <div className="text-xs text-muted-foreground">({txn.sender.role})</div>
                       </TableCell>
-                      <TableCell className="whitespace-nowrap overflow-hidden text-ellipsis">
+                      <TableCell className="max-w-[150px] truncate">
                         <div className="flex items-center gap-2">
                           <Avatar name={txn.receiver.name} />
                           <div className="font-medium">{txn.receiver.name}</div>
                         </div>
                         <div className="text-xs text-muted-foreground">({txn.receiver.role})</div>
                       </TableCell>
-                      <TableCell className="whitespace-nowrap overflow-hidden text-ellipsis">
+                      <TableCell className="whitespace-nowrap truncate">
                         {editingTransactionId === txn.id ? (
                           <Select
                             value={editFormData.transaction_type}
@@ -910,22 +913,22 @@ export default function TransactionHistory() {
                         ) : (
                           <span
                             className={`capitalize rounded px-2 py-1 text-xs font-medium
-                              ${txn.type === "Transfer"
+                        ${txn.type === "Transfer"
                                 ? "bg-blue-100 text-blue-700"
                                 : txn.type === "TopUp"
-                                ? "bg-purple-100 text-purple-700"
-                                : txn.type === "Refund"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : txn.type === "Credit"
-                                ? "bg-green-100 text-green-700"
-                                : "bg-gray-100 text-gray-600"
+                                  ? "bg-purple-100 text-purple-700"
+                                  : txn.type === "Refund"
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : txn.type === "Credit"
+                                      ? "bg-green-100 text-green-700"
+                                      : "bg-gray-100 text-gray-600"
                               }`}
                           >
                             {txn.type || "N/A"}
                           </span>
                         )}
                       </TableCell>
-                      <TableCell className="whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px]">
+                      <TableCell className="max-w-[120px] truncate">
                         {editingTransactionId === txn.id ? (
                           <Input
                             value={editFormData.remarks}
@@ -938,7 +941,7 @@ export default function TransactionHistory() {
                           txn.description
                         )}
                       </TableCell>
-                      <TableCell className="whitespace-nowrap overflow-hidden text-ellipsis">
+                      <TableCell className="whitespace-nowrap truncate">
                         {editingTransactionId === txn.id ? (
                           <Select
                             value={editFormData.payment_method}
@@ -960,22 +963,22 @@ export default function TransactionHistory() {
                         ) : (
                           <span
                             className={`font-medium px-2 py-1 rounded-full
-                              ${txn.paymentMethod === "Cash"
+                        ${txn.paymentMethod === "Cash"
                                 ? "bg-green-100 text-green-800"
                                 : txn.paymentMethod === "Gpay"
-                                ? "bg-blue-100 text-blue-800"
-                                : txn.paymentMethod === "Mess bill"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : txn.paymentMethod === "Balance Deduction"
-                                ? "bg-red-100 text-red-800"
-                                : "bg-gray-100 text-gray-800"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : txn.paymentMethod === "Mess bill"
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : txn.paymentMethod === "Balance Deduction"
+                                      ? "bg-red-100 text-red-800"
+                                      : "bg-gray-100 text-gray-800"
                               }`}
                           >
                             {txn.paymentMethod}
                           </span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right font-semibold whitespace-nowrap overflow-hidden text-ellipsis">
+                      <TableCell className="text-right font-semibold whitespace-nowrap truncate">
                         {editingTransactionId === txn.id ? (
                           <Input
                             type="number"
@@ -991,7 +994,7 @@ export default function TransactionHistory() {
                           <span className="text-green-600">+ ₹{txn.amount}</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right whitespace-nowrap">
+                      <TableCell className="hidden md:table-cell text-right whitespace-nowrap">
                         {editingTransactionId === txn.id ? (
                           <Button
                             variant="default"
@@ -1003,15 +1006,16 @@ export default function TransactionHistory() {
                             Save
                           </Button>
                         ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEditClick(txn)}
-                            aria-label="Edit transaction"
-                          >
-                            <Pencil className="size-4 mr-2" />
-                            Edit
-                          </Button>
+                          // <Button
+                          //   variant="outline"
+                          //   size="sm"
+                          //   onClick={() => handleEditClick(txn)}
+                          //   aria-label="Edit transaction"
+                          // >
+                          //   <Pencil className="size-4 mr-2" />
+                          //   Edit
+                          // </Button>
+                          <></>
                         )}
                       </TableCell>
                     </TableRow>
@@ -1021,39 +1025,71 @@ export default function TransactionHistory() {
             </div>
           </div>
           <div className="pt-4 w-full">
-            <div className="mx-auto max-w-[300px]">
+            <div className="mx-auto max-w-[300px] sm:max-w-full flex flex-col sm:flex-row justify-center sm:justify-between items-center gap-2">
               <Pagination>
                 <PaginationContent>
+                  {/* Prev Button */}
                   <PaginationItem>
                     <PaginationPrevious
                       href="#"
-                      onClick={() =>
+                      onClick={(e) => {
+                        e.preventDefault();
                         setPagination((prev) => ({
                           ...prev,
                           page: Math.max(prev.page - 1, 1),
-                        }))
-                      }
+                        }));
+                      }}
+                      className={pagination.page === 1 ? "pointer-events-none opacity-50" : ""}
                     />
                   </PaginationItem>
-                  {Array.from({ length: pagination.totalPages || 1 }, (_, i) => i + 1).map((p) => (
-                    <PaginationItem key={p}>
-                      <PaginationLink
-                        href="#"
-                        isActive={p === pagination.page}
-                        onClick={() => setPagination((prev) => ({ ...prev, page: p }))}
-                      >
-                        {p}
-                      </PaginationLink>
-                    </PaginationItem>
-                  ))}
+
+                  {/* 3 Dynamic Page Numbers */}
+                  {(() => {
+                    const total = pagination.totalPages || 1;
+                    const current = pagination.page;
+                    const maxVisible = 3;
+                    const half = Math.floor(maxVisible / 2);
+
+                    let start = Math.max(1, current - half);
+                    let end = start + maxVisible - 1;
+
+                    if (end > total) {
+                      end = total;
+                      start = Math.max(1, end - maxVisible + 1);
+                    }
+
+                    return Array.from({ length: end - start + 1 }).map((_, i) => {
+                      const pageNum = start + i;
+                      return (
+                        <PaginationItem key={pageNum}>
+                          <PaginationLink
+                            href="#"
+                            isActive={pagination.page === pageNum}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setPagination((prev) => ({ ...prev, page: pageNum }));
+                            }}
+                          >
+                            {pageNum}
+                          </PaginationLink>
+                        </PaginationItem>
+                      );
+                    });
+                  })()}
+
+                  {/* Next Button */}
                   <PaginationItem>
                     <PaginationNext
                       href="#"
-                      onClick={() =>
+                      onClick={(e) => {
+                        e.preventDefault();
                         setPagination((prev) => ({
                           ...prev,
                           page: Math.min(prev.page + 1, pagination.totalPages),
-                        }))
+                        }));
+                      }}
+                      className={
+                        pagination.page === pagination.totalPages ? "pointer-events-none opacity-50" : ""
                       }
                     />
                   </PaginationItem>
@@ -1061,6 +1097,7 @@ export default function TransactionHistory() {
               </Pagination>
             </div>
           </div>
+
         </CardContent>
       </Card>
 

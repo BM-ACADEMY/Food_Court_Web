@@ -264,7 +264,7 @@ export default function CustomerList() {
   };
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       <h2 className="text-3xl font-bold text-[#00004D]">Customer Check</h2>
 
       {/* Filters */}
@@ -445,13 +445,12 @@ export default function CustomerList() {
                         <div className="flex flex-col gap-1">
                           <span className="font-medium">{customer.name || "Unknown"}</span>
                           <span
-                            className={`text-sm ${
-                              customer.role === "Customer"
+                            className={`text-sm ${customer.role === "Customer"
                                 ? "text-blue-500"
                                 : customer.role === "Restaurant"
-                                ? "text-orange-500"
-                                : "text-gray-400"
-                            }`}
+                                  ? "text-orange-500"
+                                  : "text-gray-400"
+                              }`}
                           >
                             {customer.role || "Unknown"}
                           </span>
@@ -461,13 +460,12 @@ export default function CustomerList() {
                     <TableCell className="whitespace-nowrap">{customer.phone || "N/A"}</TableCell>
                     <TableCell className="whitespace-nowrap">
                       <span
-                        className={`font-semibold ${
-                          customer.balance > 0
+                        className={`font-semibold ${customer.balance > 0
                             ? "text-green-600"
                             : customer.balance < 0
-                            ? "text-red-600"
-                            : "text-gray-500"
-                        }`}
+                              ? "text-red-600"
+                              : "text-gray-500"
+                          }`}
                       >
                         ₹{customer.balance.toLocaleString()}
                       </span>
@@ -475,22 +473,20 @@ export default function CustomerList() {
                     <TableCell className="whitespace-nowrap">
                       <Badge
                         variant="ghost"
-                        className={`text-white ${
-                          customer.status.toLowerCase() === "online" ? "bg-green-500" : "bg-red-500"
-                        }`}
+                        className={`text-white ${customer.status.toLowerCase() === "online" ? "bg-green-500" : "bg-red-500"
+                          }`}
                       >
                         {customer.status}
                       </Badge>
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
                       <span
-                        className={`px-2 py-1 rounded text-white text-sm font-medium ${
-                          customer.registration_type === "online"
+                        className={`px-2 py-1 rounded text-white text-sm font-medium ${customer.registration_type === "online"
                             ? "bg-pink-500"
                             : customer.registration_type === "offline"
-                            ? "bg-blue-600"
-                            : "bg-gray-400"
-                        }`}
+                              ? "bg-blue-600"
+                              : "bg-gray-400"
+                          }`}
                       >
                         {customer.registration_type || "Unknown"}
                       </span>
@@ -557,50 +553,72 @@ export default function CustomerList() {
 
       {/* Pagination */}
       {!loading && !error && totalPages > 0 && (
-        <div className="flex items-center justify-between mt-4">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 mt-4">
           <p className="text-sm text-muted-foreground">
             Showing {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, totalCustomers)} of{" "}
             {totalCustomers} customers
           </p>
-          <div className="float-end">
-            <Pagination>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setPage((p) => Math.max(1, p - 1));
-                    }}
-                  />
-                </PaginationItem>
-                {[...Array(Math.min(totalPages, 5))].map((_, i) => (
-                  <PaginationItem key={i}>
-                    <PaginationLink
-                      href="#"
-                      isActive={page === i + 1}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setPage(i + 1);
-                      }}
-                    >
-                      {i + 1}
-                    </PaginationLink>
-                  </PaginationItem>
-                ))}
-                <PaginationItem>
-                  <PaginationNext
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setPage((p) => Math.min(totalPages, p + 1));
-                    }}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-          </div>
+
+          <Pagination>
+            <PaginationContent>
+              {/* Prev Button */}
+              <PaginationItem>
+                <PaginationPrevious
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (page > 1) setPage((p) => p - 1);
+                  }}
+                  className={page === 1 ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+
+              {/* Show only 3 page buttons (centered around current page) */}
+              {(() => {
+                const pagesToShow = 3;
+                const half = Math.floor(pagesToShow / 2);
+                let start = Math.max(1, page - half);
+                let end = start + pagesToShow - 1;
+
+                if (end > totalPages) {
+                  end = totalPages;
+                  start = Math.max(1, end - pagesToShow + 1);
+                }
+
+                return Array.from({ length: end - start + 1 }).map((_, i) => {
+                  const pageNum = start + i;
+                  return (
+                    <PaginationItem key={pageNum}>
+                      <PaginationLink
+                        href="#"
+                        isActive={page === pageNum}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setPage(pageNum);
+                        }}
+                      >
+                        {pageNum}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                });
+              })()}
+
+              {/* Next Button */}
+              <PaginationItem>
+                <PaginationNext
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (page < totalPages) setPage((p) => p + 1);
+                  }}
+                  className={page === totalPages ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
         </div>
+
       )}
     </div>
   );

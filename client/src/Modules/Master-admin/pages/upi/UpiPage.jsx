@@ -120,7 +120,7 @@ export function UpiManager() {
   }, []);
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
+    <div className="max-w-4xl mx-auto">
       <h1 className="text-3xl font-bold mb-6  text-[#00004D]">UPI Management</h1>
 
       {/* Success/Error Messages */}
@@ -182,7 +182,7 @@ export function UpiManager() {
       </Dialog>
 
       {/* UPI List */}
-      <div className="bg-white p-6 rounded-lg shadow-md">
+      <div className="bg-white p-1 rounded-lg shadow-md">
         <h2 className="text-xl font-semibold mb-4">UPIs</h2>
         {upis.length === 0 ? (
           <p className="text-gray-500">No UPIs found.</p>
@@ -196,17 +196,15 @@ export function UpiManager() {
                 <span>
                   {upi.upiId} ({upi.upiName}, Created: {new Date(upi.created_at).toLocaleDateString()})
                 </span>
-                <div className="space-x-2">
-                  <Button variant="outline" onClick={() => handleEdit(upi)}>
-                    <Edit className="mr-2 h-4 w-4" /> Edit
+                <div className="flex gap-2">
+                  <Button variant="outline" size="icon" onClick={() => handleEdit(upi)}>
+                    <Edit className="w-4 h-4" />
                   </Button>
-                  <Button
-                    variant="destructive"
-                    onClick={() => handleOpenDeleteDialog(upi)}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" /> Delete
+                  <Button variant="destructive" size="icon" onClick={() => handleOpenDeleteDialog(upi)}>
+                    <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
+
               </li>
             ))}
           </ul>

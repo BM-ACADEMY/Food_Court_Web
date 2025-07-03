@@ -17,7 +17,7 @@ import {
   PaginationPrevious,
   PaginationNext,
 } from "@/components/ui/pagination";
-import { QrCode, ScanLine, FileText, FileSpreadsheet, FileSignature } from "lucide-react";
+import { QrCode, ScanLine, FileText, FileSpreadsheet, FileSignature, PlusCircle, ArrowRightLeft } from "lucide-react";
 import { Html5Qrcode } from "html5-qrcode";
 import axios from "axios";
 import * as XLSX from "xlsx";
@@ -30,7 +30,7 @@ import { Label } from "@/components/ui/label";
 
 export default function CustomerHistory() {
   const [showDetails, setShowDetails] = useState(false);
-  const [userId,setUserId]=useState('');
+  const [userId, setUserId] = useState('');
   const [scannedData, setScannedData] = useState(null);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [cameraError, setCameraError] = useState("");
@@ -42,7 +42,7 @@ export default function CustomerHistory() {
   const [openDialog, setOpenDialog] = useState(false);
   const [exportFormat, setExportFormat] = useState("csv");
   const [dateFilter, setDateFilter] = useState("all");
-  const [searchInput, setSearchInput] = useState(""); // New state for search input
+  const [searchInput, setSearchInput] = useState("");
   const qrRef = useRef(null);
   const html5QrCodeRef = useRef(null);
   const [paymentMethod, setPaymentMethod] = useState("all");
@@ -63,7 +63,7 @@ export default function CustomerHistory() {
 
       await html5QrCode.start(
         { facingMode: "environment" },
-        { fps: 30, qrbox: { width: 400, height: 500 } },
+        { fps: 30, qrbox: { width: 300, height: 400 } },
         handleScanSuccess,
         (error) => console.warn("QR scan error:", error)
       );
@@ -123,13 +123,11 @@ export default function CustomerHistory() {
         }
       }
 
-
       if (!customerResponse?.data?.success) {
         throw new Error(customerResponse?.data?.message || "Customer not found.");
       }
 
       const { customer_id, user_id, status, registration_type, created_at } = customerResponse.data.data;
-
 
       let detailsResponse;
       retries = 3;
@@ -150,8 +148,6 @@ export default function CustomerHistory() {
           throw err;
         }
       }
-
-
 
       if (!detailsResponse?.data?.success) {
         throw new Error(detailsResponse?.data?.message || "Customer details not found.");
@@ -178,16 +174,15 @@ export default function CustomerHistory() {
         userId: user_id._id,
       };
 
-
       setShowDetails(true);
       setScannedData(newScannedData);
       setScannerOpen(false);
       await stopScanner();
 
-      if (user_id._id) {
-        await fetchTransactions(user_id._id);
+      if (customer_id) {
+        await fetchTransactions(customer_id);
       } else {
-        setError("No user_id found for transactions.");
+        setError("No customer_id found for transactions.");
         setTransactions([]);
         setFilteredTransactions([]);
       }
@@ -212,14 +207,16 @@ export default function CustomerHistory() {
     }
   };
 
-const fetchTransactions = async (userId, page = 1, dateFilterValue = dateFilter, paymentMethodValue = paymentMethod) => {
+  // Fetch transactions
+  const fetchTransactions = async (customerId, page = 1, dateFilterValue = dateFilter, paymentMethodValue = paymentMethod) => {
     try {
-      console.log("Fetching transactions for userId:", userId, "with dateFilter:", dateFilterValue, "and paymentMethod:", paymentMethodValue);
+      console.log("Fetching transactions for customerId:", customerId, "with dateFilter:", dateFilterValue, "and paymentMethod:", paymentMethodValue);
 
-      if (!userId || typeof userId !== "string") {
-        throw new Error("User ID is missing or invalid.");
+      if (!customerId || typeof customerId !== "string") {
+        throw new Error("Customer ID is missing or invalid.");
       }
-      setUserId(userId)
+      setUserId(customerId);
+
       let queryParams = `page=${page}&limit=${pagination.limit}`;
       if (dateFilterValue !== "all") {
         queryParams += `&quickFilter=${dateFilterValue}`;
@@ -228,30 +225,15 @@ const fetchTransactions = async (userId, page = 1, dateFilterValue = dateFilter,
         queryParams += `&payment_method=${encodeURIComponent(paymentMethodValue)}`;
       }
 
-      let response;
-      let retries = 3;
-      while (retries > 0) {
-        try {
-          response = await axios.get(
-            `${BASE_URL}/transactions/history/user/${userId}/detailed?${queryParams}`,
-            { withCredentials: true }
-          );
-          break;
-        } catch (err) {
-          if (err.response?.status === 500 && retries > 1) {
-            retries--;
-            console.warn(`Retrying /transactions/history/user/${userId}/detailed (attempt ${4 - retries})`);
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-            continue;
-          }
-          throw err;
-        }
-      }
+      const response = await axios.get(
+        `${BASE_URL}/customers/${customerId}/transactions?${queryParams}`,
+        { withCredentials: true }
+      );
 
       console.log("Transaction history response:", response.data);
 
-      if (response?.data?.success && response.data.transactions) {
-        const userTransactions = response.data.transactions;
+      if (response?.data?.success && response.data.data) {
+        const userTransactions = response.data.data;
         console.log("User transactions:", userTransactions);
         setTransactions(userTransactions);
         setFilteredTransactions(userTransactions);
@@ -260,7 +242,7 @@ const fetchTransactions = async (userId, page = 1, dateFilterValue = dateFilter,
         console.warn("No transactions found or empty response.");
         setTransactions([]);
         setFilteredTransactions([]);
-        setError("No transactions found for this user.");
+        setError("No transactions found for this customer.");
       }
     } catch (err) {
       console.error("Transaction fetch error:", {
@@ -271,7 +253,7 @@ const fetchTransactions = async (userId, page = 1, dateFilterValue = dateFilter,
       if (err.response?.status === 401) {
         setError("Authentication failed. Please log in to view transactions.");
       } else if (err.response?.status === 404) {
-        setError("No transactions found for this user.");
+        setError("No transactions found for this customer.");
       } else {
         setError(
           err.response?.data?.message || "Failed to fetch transactions. Please try again."
@@ -280,14 +262,16 @@ const fetchTransactions = async (userId, page = 1, dateFilterValue = dateFilter,
       setTransactions([]);
       setFilteredTransactions([]);
     }
-  }
-  const handlePaymentMethodChange = (value) => {
-    setPaymentMethod(value);
-    fetchTransactions(userId, 1, dateFilter, value);
   };
 
-  // Handle date filter change (existing logic, example)
- 
+  // Handle payment method change
+  const handlePaymentMethodChange = (value) => {
+    setPaymentMethod(value);
+    if (scannedData?.customerId) {
+      fetchTransactions(scannedData.customerId, 1, dateFilter, value);
+    }
+  };
+
   // Handle search by customer_id or phone number
   const handleSearch = async () => {
     if (!searchInput.trim()) {
@@ -305,10 +289,8 @@ const fetchTransactions = async (userId, page = 1, dateFilterValue = dateFilter,
       let userId;
       let input = searchInput.trim();
 
-      // Normalize customer_id to uppercase if it starts with "cust" (case-insensitive)
       if (input.toLowerCase().startsWith("cust")) {
-        input = input.toUpperCase(); // Convert to uppercase
-        // Search by customer_id
+        input = input.toUpperCase();
         const customerResponse = await axios.get(
           `${BASE_URL}/customers/fetch-by-customer-id?customer_id=${encodeURIComponent(input)}`,
           { withCredentials: true }
@@ -321,7 +303,6 @@ const fetchTransactions = async (userId, page = 1, dateFilterValue = dateFilter,
         const { customer_id, user_id, status, registration_type, created_at } = customerResponse.data.data;
         userId = user_id._id;
 
-        // Fetch customer details
         const detailsResponse = await axios.get(
           `${BASE_URL}/customers/fetch-customer-details-by-qr?qr_code=${encodeURIComponent(customerResponse.data.data.qr_code)}`,
           { withCredentials: true }
@@ -354,11 +335,8 @@ const fetchTransactions = async (userId, page = 1, dateFilterValue = dateFilter,
 
         setShowDetails(true);
         setScannedData(newScannedData);
-
-        // Fetch transactions
-        await fetchTransactions(userId);
+        await fetchTransactions(customer_id);
       } else {
-        // Assume input is a phone number
         const userResponse = await axios.get(
           `${BASE_URL}/users/fetch-by-phone?phone_number=${encodeURIComponent(input)}`,
           { withCredentials: true }
@@ -371,7 +349,6 @@ const fetchTransactions = async (userId, page = 1, dateFilterValue = dateFilter,
         const { _id, name, email, phone_number } = userResponse.data.data;
         userId = _id;
 
-        // Fetch customer data to get customer_id and other details
         const customerResponse = await axios.get(
           `${BASE_URL}/customers/fetch-by-user-id/${userId}`,
           { withCredentials: true }
@@ -383,7 +360,6 @@ const fetchTransactions = async (userId, page = 1, dateFilterValue = dateFilter,
 
         const { customer_id, status, registration_type, created_at, qr_code } = customerResponse.data.data;
 
-        // Fetch customer details
         const detailsResponse = await axios.get(
           `${BASE_URL}/customers/fetch-customer-details-by-qr?qr_code=${encodeURIComponent(qr_code)}`,
           { withCredentials: true }
@@ -416,9 +392,7 @@ const fetchTransactions = async (userId, page = 1, dateFilterValue = dateFilter,
 
         setShowDetails(true);
         setScannedData(newScannedData);
-
-        // Fetch transactions
-        await fetchTransactions(userId);
+        await fetchTransactions(customer_id);
       }
     } catch (err) {
       console.error("Search error:", {
@@ -467,22 +441,21 @@ const fetchTransactions = async (userId, page = 1, dateFilterValue = dateFilter,
 
     try {
       setLoading(true);
-      // Fetch all transactions by setting limit=0
-      let queryParams = "limit=0"; // Fetch all transactions
+      let queryParams = "limit=0";
       if (dateFilter !== "all") {
         queryParams += `&quickFilter=${dateFilter}`;
       }
 
       const response = await axios.get(
-        `${BASE_URL}/transactions/history/user/${scannedData.userId}/detailed?${queryParams}`,
+        `${BASE_URL}/customers/${scannedData.customerId}/transactions?${queryParams}`,
         { withCredentials: true }
       );
 
-      if (!response?.data?.success || !response.data.transactions) {
+      if (!response?.data?.success || !response.data.data) {
         throw new Error("No transactions found for export.");
       }
 
-      const transactions = response.data.transactions;
+      const transactions = response.data.data;
       const filename = `transactions_${scannedData.customerId}_${new Date().toISOString().split('T')[0]}`;
 
       if (exportFormat === "csv") {
@@ -520,7 +493,7 @@ const fetchTransactions = async (userId, page = 1, dateFilterValue = dateFilter,
           ]),
           theme: 'striped',
           styles: { fontSize: 10 },
-          headStyles: { fillColor: [11, 7, 66] }, // #0B0742
+          headStyles: { fillColor: [11, 7, 66] },
         });
         doc.save(`${filename}.pdf`);
       }
@@ -537,8 +510,8 @@ const fetchTransactions = async (userId, page = 1, dateFilterValue = dateFilter,
   // Handle date filter change
   const handleDateFilterChange = (value) => {
     setDateFilter(value);
-    if (scannedData?.userId) {
-      fetchTransactions(scannedData.userId, 1, value);
+    if (scannedData?.customerId) {
+      fetchTransactions(scannedData.customerId, 1, value);
     }
   };
 
@@ -546,7 +519,7 @@ const fetchTransactions = async (userId, page = 1, dateFilterValue = dateFilter,
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= pagination.totalPages && scannedData) {
       setPagination({ ...pagination, page: newPage });
-      fetchTransactions(scannedData.userId, newPage, dateFilter);
+      fetchTransactions(scannedData.customerId, newPage, dateFilter);
     }
   };
 
@@ -562,37 +535,45 @@ const fetchTransactions = async (userId, page = 1, dateFilterValue = dateFilter,
     return () => stopScanner();
   }, [scannerOpen]);
 
+  // Render transaction icon based on type
+  const getTransactionIcon = (type) => {
+    switch (type?.toLowerCase()) {
+      case "topup":
+        return <PlusCircle className="w-5 h-5 text-blue-500" />;
+      case "transfer":
+        return <ArrowRightLeft className="w-5 h-5 text-green-500" />;
+      default:
+        return <FileText className="w-5 h-5 text-gray-500" />;
+    }
+  };
+
   return (
-    <div className="flex justify-center items-center min-h-screen bg-gray-100 px-4 py-10">
-      <div className="w-full max-w-3xl bg-white rounded-2xl shadow-lg">
-        {/* Header */}
-        <div className="bg-[#0B0742] text-white text-center py-4 rounded-t-2xl">
-          <h2 className="text-xl font-semibold">Customer History</h2>
+    <div className="flex justify-center items-center min-h-screen bg-gray-50 px-4 py-6 sm:py-8">
+      <div className="w-full max-w-4xl bg-white rounded-2xl shadow-xl overflow-hidden">
+        <div className="bg-[#0B0742] text-white text-center py-4 sm:py-6">
+          <h2 className="text-xl sm:text-2xl font-bold">Customer History</h2>
         </div>
 
-        {/* Scan UI */}
         {!showDetails && (
-          <div className="p-6 text-center">
+          <div className="p-4 sm:p-6 text-center">
             <Dialog open={scannerOpen} onOpenChange={setScannerOpen}>
               <DialogTrigger asChild>
                 <Button
-                  className="bg-[#0B0742] text-white px-6 py-3 rounded-lg font-semibold text-sm"
+                  className="bg-[#0B0742] text-white px-6 py-3 rounded-lg font-semibold text-sm sm:text-base hover:bg-[#3f3b6d] transition-colors"
                   onClick={() => setScannerOpen(true)}
                 >
                   <QrCode className="w-5 h-5 mr-2" />
                   Scan Customer QR Code
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="w-full max-w-md">
                 <DialogHeader>
-                  <DialogTitle>Scan QR Code</DialogTitle>
+                  <DialogTitle className="text-lg sm:text-xl">Scan QR Code</DialogTitle>
                 </DialogHeader>
-                <div
-                  className="relative w-full h-64 bg-gray-100 border border-dashed border-[#070149] rounded-lg overflow-hidden"
-                >
+                <div className="relative w-full h-64 sm:h-80 bg-gray-100 border border-dashed border-[#070149] rounded-lg overflow-hidden">
                   {!html5QrCodeRef.current && (
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <ScanLine className="w-20 h-20 text-[#070149]" />
+                      <ScanLine className="w-16 h-16 sm:w-20 sm:h-20 text-[#070149] animate-pulse" />
                     </div>
                   )}
                   <div id="qr-reader" ref={qrRef} className="w-full h-full" />
@@ -615,13 +596,13 @@ const fetchTransactions = async (userId, page = 1, dateFilterValue = dateFilter,
               </DialogContent>
             </Dialog>
 
-            <p className="mt-4 text-gray-500">Scan customer QR code to view their history</p>
+            <p className="mt-4 text-gray-600 text-sm sm:text-base">Scan a customer QR code to view their history</p>
             <p className="my-2 text-sm text-gray-500">Or search by ID/Phone</p>
-            <div className="flex justify-center mt-3">
+            <div className="flex flex-col sm:flex-row justify-center items-center mt-3 gap-2">
               <input
                 type="text"
                 placeholder="Enter ID or Phone Number"
-                className="px-4 py-2 border border-gray-300 rounded-l-lg w-64"
+                className="px-4 py-2 border border-gray-300 rounded-lg w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-[#0B0742] transition-colors"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 onKeyPress={(e) => {
@@ -631,11 +612,11 @@ const fetchTransactions = async (userId, page = 1, dateFilterValue = dateFilter,
                 }}
               />
               <Button
-                className="bg-[#0B0742] px-4 text-white rounded-r-lg"
+                className="bg-[#0B0742] px-4 py-2 text-white rounded-lg w-full sm:w-auto hover:bg-[#3f3b6d] transition-colors"
                 onClick={handleSearch}
                 disabled={loading}
               >
-                {loading ? "Searching..." : "🔍"}
+                {loading ? "Searching..." : "🔍 Search"}
               </Button>
             </div>
             {error && (
@@ -644,14 +625,18 @@ const fetchTransactions = async (userId, page = 1, dateFilterValue = dateFilter,
           </div>
         )}
 
-        {/* Customer Info */}
         {showDetails && scannedData && (
-          <div className="p-6 space-y-6">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-semibold">Customer Details</h3>
+          <div className="p-4 sm:p-6 space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <h3 className="text-lg sm:text-xl font-semibold text-gray-800">Customer Details</h3>
               <Dialog open={openDialog} onOpenChange={setOpenDialog}>
                 <DialogTrigger asChild>
-                  <button className="text-sm text-[#0B0742] hover:underline">⬇️ Export Data</button>
+                  <Button
+                    variant="outline"
+                    className="text-sm text-[#0B0742] border-[#0B0742] hover:bg-[#0B0742] hover:text-white transition-colors"
+                  >
+                    ⬇️ Export Data
+                  </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-md">
                   <DialogHeader>
@@ -659,19 +644,19 @@ const fetchTransactions = async (userId, page = 1, dateFilterValue = dateFilter,
                   </DialogHeader>
                   <div className="space-y-3">
                     <RadioGroup value={exportFormat} onValueChange={setExportFormat}>
-                      <div className="flex items-center gap-3 p-2 rounded-md hover:bg-muted cursor-pointer">
+                      <div className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-100 cursor-pointer">
                         <RadioGroupItem value="csv" id="export-csv" />
                         <Label htmlFor="export-csv" className="flex items-center gap-2">
                           <FileText size={18} /> CSV
                         </Label>
                       </div>
-                      <div className="flex items-center gap-3 p-2 rounded-md hover:bg-muted cursor-pointer">
+                      <div className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-100 cursor-pointer">
                         <RadioGroupItem value="excel" id="export-excel" />
                         <Label htmlFor="export-excel" className="flex items-center gap-2">
                           <FileSpreadsheet size={18} /> Excel (.xlsx)
                         </Label>
                       </div>
-                      <div className="flex items-center gap-3 p-2 rounded-md hover:bg-muted cursor-pointer">
+                      <div className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-100 cursor-pointer">
                         <RadioGroupItem value="pdf" id="export-pdf" />
                         <Label htmlFor="export-pdf" className="flex items-center gap-2">
                           <FileSignature size={18} /> PDF
@@ -691,7 +676,7 @@ const fetchTransactions = async (userId, page = 1, dateFilterValue = dateFilter,
               </Dialog>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-gray-700">
               <p><strong>Name:</strong> {scannedData.name}</p>
               <p><strong>Email:</strong> {scannedData.email}</p>
               <p><strong>Phone:</strong> {scannedData.phone}</p>
@@ -699,20 +684,21 @@ const fetchTransactions = async (userId, page = 1, dateFilterValue = dateFilter,
               <p><strong>Customer ID:</strong> {scannedData.customerId}</p>
               <p>
                 <strong>Status:</strong>{" "}
-                <span className="text-red-600 bg-red-100 px-2 py-0.5 rounded">{scannedData.status}</span>
+                <span className={`px-2 py-0.5 rounded text-xs font-medium ${scannedData.status === "Online" ? "bg-green-100 text-green-600" : "bg-green-100 text-green-600"}`}>
+                  {scannedData.status}
+                </span>
               </p>
               <p><strong>Current Balance:</strong> ₹{scannedData.currentBalance.toFixed(2)}</p>
               <p><strong>Customer Type:</strong> {scannedData.customerType}</p>
             </div>
 
-            {/* Transaction History */}
             <div className="pt-6 border-t">
-              <div className="flex justify-end items-center mb-4">
-                <div className="flex space-x-2">
+              <div className="flex flex-col sm:flex-row justify-end items-center mb-4 gap-2">
+                <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
                   <input
                     type="text"
                     placeholder="Search transactions"
-                    className="border px-3 py-1 text-sm rounded-md"
+                    className="border px-3 py-2 text-sm rounded-md w-full sm:w-48 focus:outline-none focus:ring-2 focus:ring-[#0B0742] transition-colors"
                     onChange={(e) => {
                       const searchTerm = e.target.value.toLowerCase();
                       const filtered = transactions.filter((txn) =>
@@ -723,19 +709,19 @@ const fetchTransactions = async (userId, page = 1, dateFilterValue = dateFilter,
                     }}
                   />
                   <Select value={paymentMethod} onValueChange={handlePaymentMethodChange}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Select payment method" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Payment Methods</SelectItem>
-            <SelectItem value="Cash">Cash</SelectItem>
-            <SelectItem value="Gpay">Gpay</SelectItem>
-            <SelectItem value="Mess bill">Mess bill</SelectItem>
-            <SelectItem value="Balance Deduction">Balance Deduction</SelectItem>
-          </SelectContent>
-        </Select>
+                    <SelectTrigger className="w-full sm:w-[180px]">
+                      <SelectValue placeholder="Select payment method" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Payment Methods</SelectItem>
+                      <SelectItem value="Cash">Cash</SelectItem>
+                      <SelectItem value="Gpay">Gpay</SelectItem>
+                      <SelectItem value="Mess bill">Mess bill</SelectItem>
+                      <SelectItem value="Balance Deduction">Balance Deduction</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <select
-                    className="border px-3 py-1 text-sm rounded-md"
+                    className="border px-3 py-2 text-sm rounded-md w-full sm:w-36 focus:outline-none focus:ring-2 focus:ring-[#0B0742] transition-colors"
                     value={dateFilter}
                     onChange={(e) => handleDateFilterChange(e.target.value)}
                   >
@@ -750,39 +736,47 @@ const fetchTransactions = async (userId, page = 1, dateFilterValue = dateFilter,
               <div className="space-y-4 text-sm max-h-96 overflow-y-auto" style={{ scrollBehavior: "smooth" }}>
                 {filteredTransactions.length > 0 ? (
                   filteredTransactions.map((txn, index) => (
-                    <div key={index} className="border p-4 rounded-md shadow-sm bg-gray-50">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <div className="flex items-center gap-2 font-medium">
-                            <span>{txn.icon || "📄"}</span>
-                            <span>{txn.type || "N/A"}</span>
+                    <div
+                      key={index}
+                      className="border p-4 rounded-lg shadow-sm bg-white hover:shadow-md transition-shadow duration-200"
+                    >
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div className="flex items-center gap-3">
+                          {getTransactionIcon(txn.type)}
+                          <div>
+                            <div className="flex items-center gap-2 font-medium text-gray-800">
+                              <span className="capitalize">{txn.type || "N/A"}</span>
+                            </div>
+                            <p className="text-gray-600 text-sm">
+                              {txn.date ? new Date(txn.date).toLocaleString() : "N/A"}
+                            </p>
+                            <p className="text-gray-500 text-sm">{txn.payment_method || "N/A"}</p>
+                            <p className="text-xs text-gray-400">ID: {txn.id || "N/A"}</p>
+                            <p className="text-xs text-gray-400">Customer ID: {txn.customer_id || "N/A"}</p>
+                            <p className="text-xs text-gray-400">{txn.description || "N/A"}</p>
                           </div>
-                          <p className="text-gray-600">{txn.date || "N/A"}</p>
-                          <p className="text-gray-500">{txn.payment_method || "N/A"}</p>
-                          <p className="text-xs text-gray-400">ID: {txn.id || "N/A"}</p>
-                          <p className="text-xs text-gray-400">Customer ID: {txn.customer_id || "N/A"}</p>
                         </div>
                         <div className="text-right">
-                          <p className={`${txn.color || "text-gray-600"} font-semibold`}>{txn.amount || "0.00"}</p>
+                          <p className="font-semibold text-gray-800">₹{txn.amount?.toFixed(2) || "0.00"}</p>
                           <p className="text-gray-400 text-xs">Balance: ₹{scannedData.currentBalance.toFixed(2)}</p>
                         </div>
                       </div>
                     </div>
                   ))
                 ) : (
-                  <p className="text-gray-500 text-center">No transactions available.</p>
+                  <p className="text-gray-500 text-center py-4">No transactions available.</p>
                 )}
               </div>
 
-              {/* Pagination Controls */}
               {pagination.totalPages > 1 && (
-                <div className="flex justify-center items-center mt-4">
+                <div className="flex justify-center items-center mt-6">
                   <Pagination>
                     <PaginationContent>
                       <PaginationItem>
                         <PaginationPrevious
                           onClick={() => handlePageChange(pagination.page - 1)}
                           disabled={pagination.page === 1}
+                          className="hover:bg-[#0B0742] hover:text-white transition-colors"
                         />
                       </PaginationItem>
                       {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((pageNum) => (
@@ -790,6 +784,7 @@ const fetchTransactions = async (userId, page = 1, dateFilterValue = dateFilter,
                           <PaginationLink
                             onClick={() => handlePageChange(pageNum)}
                             isActive={pagination.page === pageNum}
+                            className="hover:bg-[#0B0742] hover:text-white transition-colors"
                           >
                             {pageNum}
                           </PaginationLink>
@@ -799,6 +794,7 @@ const fetchTransactions = async (userId, page = 1, dateFilterValue = dateFilter,
                         <PaginationNext
                           onClick={() => handlePageChange(pagination.page + 1)}
                           disabled={pagination.page === pagination.totalPages}
+                          className="hover:bg-[#0B0742] hover:text-white transition-colors"
                         />
                       </PaginationItem>
                     </PaginationContent>

@@ -1,4 +1,3 @@
-
 import {
   Card,
   CardContent,
@@ -33,7 +32,7 @@ import {
   Pencil,
   Save,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -67,7 +66,7 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { useAuth } from "@/context/AuthContext"; // Assuming you have an AuthContext
+import { useAuth } from "@/context/AuthContext";
 
 const getRandomColor = () => {
   const colors = ["#FF6B6B", "#4ECDC4", "#556270", "#C7F464", "#FFA500"];
@@ -100,6 +99,7 @@ export default function TransactionHistory() {
   const [fromDate, setFromDate] = useState(undefined);
   const [toDate, setToDate] = useState(undefined);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState(search); // New debounced search state
   const [quickFilter, setQuickFilter] = useState("last 7 days");
   const [chartView, setChartView] = useState("daily");
   const [openTo, setOpenTo] = useState(false);
@@ -135,6 +135,17 @@ export default function TransactionHistory() {
     location_id: "",
   });
 
+  // Debounce search input
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 500); // 500ms delay
+
+    return () => {
+      clearTimeout(handler); // Cleanup timer
+    };
+  }, [search]);
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -160,7 +171,7 @@ export default function TransactionHistory() {
           fromDate: fromDate ? format(fromDate, "yyyy-MM-dd") : undefined,
           toDate: toDate ? format(toDate, "yyyy-MM-dd") : undefined,
           quickFilter: fromDate || toDate ? undefined : quickFilter,
-          search,
+          search: debouncedSearch, // Use debouncedSearch
           page: pagination.page,
           limit: pagination.limit,
         };
@@ -207,7 +218,7 @@ export default function TransactionHistory() {
     fromDate,
     toDate,
     quickFilter,
-    search,
+    debouncedSearch, // Use debouncedSearch instead of search
     pagination.page,
     pagination.limit,
   ]);
@@ -238,15 +249,15 @@ export default function TransactionHistory() {
           prev.map((txn) =>
             txn.id === transactionId
               ? {
-                  ...txn,
-                  amount: parseFloat(editFormData.amount),
-                  type: editFormData.transaction_type,
-                  paymentMethod: editFormData.payment_method,
-                  status: editFormData.status,
-                  description: editFormData.remarks,
-                  location: editFormData.location_id,
-                  edited_at: new Date(),
-                }
+                ...txn,
+                amount: parseFloat(editFormData.amount),
+                type: editFormData.transaction_type,
+                paymentMethod: editFormData.payment_method,
+                status: editFormData.status,
+                description: editFormData.remarks,
+                location: editFormData.location_id,
+                edited_at: new Date(),
+              }
               : txn
           )
         );
@@ -290,7 +301,6 @@ export default function TransactionHistory() {
     }
   };
 
-  // Prepare export data
   const prepareExportData = (transactions) => {
     return transactions.map((txn, index) => ({
       "S.No": index + 1,
@@ -309,16 +319,11 @@ export default function TransactionHistory() {
     }));
   };
 
-  // Export to Excel with totals
   const exportToExcel = async () => {
     try {
       const allTransactions = await fetchAllTransactions();
       const data = prepareExportData(allTransactions);
-
-      // Calculate total amount
       const totalAmount = data.reduce((sum, item) => sum + item["Amount (₹)"], 0);
-
-      // Add total row
       const dataWithTotal = [
         ...data,
         {
@@ -337,17 +342,13 @@ export default function TransactionHistory() {
           Status: "",
         },
       ];
-
       const ws = XLSX.utils.json_to_sheet(dataWithTotal);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Transactions");
-
-      // Style the total row
-      const totalRow = data.length + 2; // +2 because header is row 1 and data starts at row 2
+      const totalRow = data.length + 2;
       ws[`A${totalRow}`].s = { font: { bold: true } };
       ws[`K${totalRow}`].s = { font: { bold: true } };
       ws[`L${totalRow}`].s = { font: { bold: true } };
-
       const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
       const file = new Blob([excelBuffer], { type: "application/octet-stream" });
       saveAs(file, `transactions_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
@@ -357,16 +358,11 @@ export default function TransactionHistory() {
     }
   };
 
-  // Export to CSV with totals
   const exportToCSV = async () => {
     try {
       const allTransactions = await fetchAllTransactions();
       const data = prepareExportData(allTransactions);
-
-      // Calculate total amount
       const totalAmount = data.reduce((sum, item) => sum + item["Amount (₹)"], 0);
-
-      // Add total row
       const dataWithTotal = [
         ...data,
         {
@@ -385,7 +381,6 @@ export default function TransactionHistory() {
           Status: "",
         },
       ];
-
       const ws = XLSX.utils.json_to_sheet(dataWithTotal);
       const csv = XLSX.utils.sheet_to_csv(ws);
       const file = new Blob([csv], { type: "text/csv;charset=utf-8" });
@@ -396,26 +391,18 @@ export default function TransactionHistory() {
     }
   };
 
-  // Export to PDF with totals and proper margins
   const exportToPDF = async () => {
     try {
       const allTransactions = await fetchAllTransactions();
       const data = prepareExportData(allTransactions);
-
-      // Calculate total amount
       const totalAmount = data.reduce((sum, item) => sum + item["Amount (₹)"], 0);
-
       const doc = new jsPDF();
-
-      // Title and metadata
       doc.setFontSize(16);
       doc.text("Transaction History Report", 15, 15);
       doc.setFontSize(10);
       doc.text(`Generated on: ${format(new Date(), "yyyy-MM-dd HH:mm")}`, 15, 22);
       doc.text(`Total Transactions: ${data.length}`, 15, 28);
       doc.text(`Total Amount: ₹${totalAmount.toFixed(2)}`, 15, 34);
-
-      // Prepare table data
       const tableData = data.map((item) => [
         item["S.No"],
         item["Date & Time"],
@@ -430,17 +417,9 @@ export default function TransactionHistory() {
         item["Formatted Amount"],
         item.Status,
       ]);
-
-      // Add total row
       const footerData = [
         ["", "", "", "", "", "", "", "", "", "TOTAL", `₹${totalAmount.toFixed(2)}`, ""],
       ];
-
-      // Calculate total table width for debugging
-      const columnWidths = [10, 20, 15, 18, 14, 18, 14, 14, 20, 14, 14, 15];
-      const totalTableWidth = columnWidths.reduce((sum, width) => sum + width, 0);
-      console.log("Total Table Width:", totalTableWidth, "mm (Page Width: 180mm with 15mm margins)");
-
       autoTable(doc, {
         startY: 40,
         head: [
@@ -462,12 +441,12 @@ export default function TransactionHistory() {
         body: tableData,
         foot: footerData,
         theme: "grid",
-        margin: { left: 15, right: 15 }, // 15mm margins on both sides
-        tableWidth: "wrap", // Center table within margins
+        margin: { left: 15, right: 15 },
+        tableWidth: "wrap",
         styles: {
           fontSize: 8,
           cellPadding: 2,
-          overflow: "ellipsize", // Truncate long text with ellipsis
+          overflow: "ellipsize",
         },
         headStyles: {
           fillColor: [0, 0, 77],
@@ -480,47 +459,37 @@ export default function TransactionHistory() {
           fontStyle: "bold",
         },
         columnStyles: {
-          0: { cellWidth: 10 }, // S.No
-          1: { cellWidth: 20 }, // Date
-          2: { cellWidth: 15 }, // ID
-          3: { cellWidth: 18 }, // Sender Name
-          4: { cellWidth: 14 }, // Sender Role
-          5: { cellWidth: 18 }, // Receiver Name
-          6: { cellWidth: 14 }, // Receiver Role
-          7: { cellWidth: 14 }, // Type
-          8: { cellWidth: 20 }, // Description
-          9: { cellWidth: 14 }, // Payment Method
-          10: { cellWidth: 14 }, // Amount
-          11: { cellWidth: 15 }, // Status
+          0: { cellWidth: 10 },
+          1: { cellWidth: 20 },
+          2: { cellWidth: 15 },
+          3: { cellWidth: 18 },
+          4: { cellWidth: 14 },
+          5: { cellWidth: 18 },
+          6: { cellWidth: 14 },
+          7: { cellWidth: 14 },
+          8: { cellWidth: 20 },
+          9: { cellWidth: 14 },
+          10: { cellWidth: 14 },
+          11: { cellWidth: 15 },
         },
         didParseCell: function (data) {
-          // Truncate long text in Description column
           if (data.section === "body" && data.column.index === 8) {
             const text = data.cell.text.join("");
             if (text.length > 30) {
               data.cell.text = [text.substring(0, 27) + "..."];
             }
           }
-          // Debug cell content
-          if (data.section === "body") {
-            console.log(`Row ${data.row.index}, Column ${data.column.index}:`, data.cell.text);
-          }
         },
         didDrawPage: function (data) {
-          // Add page numbers
           const pageCount = doc.internal.getNumberOfPages();
           doc.setFontSize(10);
           doc.text(
             `Page ${data.pageNumber} of ${pageCount}`,
-            15, // Align with left margin
+            15,
             doc.internal.pageSize.height - 10
           );
         },
       });
-
-      // Log final PDF content
-      console.log("PDF Generated with", tableData.length, "rows on", doc.internal.getNumberOfPages(), "pages");
-
       doc.save(`transactions_${format(new Date(), "yyyy-MM-dd")}.pdf`);
     } catch (error) {
       console.error("Error exporting to PDF:", error);
@@ -528,7 +497,6 @@ export default function TransactionHistory() {
     }
   };
 
-  // Handle export
   const handleExport = () => {
     switch (exportFormat) {
       case "xlsx":
@@ -555,7 +523,7 @@ export default function TransactionHistory() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <h1 className="text-3xl font-bold text-[#00004D]">Transaction History</h1>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
@@ -647,7 +615,7 @@ export default function TransactionHistory() {
         </CardContent>
       </Card>
 
-      <Card className="mx-auto max-w-full">
+      <Card className="w-full max-w-full">
         <CardContent className="p-6 space-y-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
             <h2 className="text-lg font-semibold">All Transactions</h2>
@@ -663,7 +631,7 @@ export default function TransactionHistory() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <Label htmlFor="transactionType" className="mb-3">Transaction Type</Label>
               <Select value={transactionType} onValueChange={setTransactionType}>
@@ -752,7 +720,7 @@ export default function TransactionHistory() {
               </Select>
             </div>
 
-            <div>
+            <div className="relative">
               <Label htmlFor="search" className="mb-3">Search</Label>
               <Input
                 id="search"
@@ -760,7 +728,36 @@ export default function TransactionHistory() {
                 placeholder="Search by name, phone..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault(); // Prevent form submission
+                  }
+                }}
               />
+              {loading && (
+                <div className="absolute right-2 top-9">
+                  <svg
+                    className="animate-spin h-5 w-5 text-gray-500"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v8z"
+                    ></path>
+                  </svg>
+                </div>
+              )}
             </div>
           </div>
 
@@ -849,46 +846,48 @@ export default function TransactionHistory() {
             ))}
           </div>
 
-          <div className="overflow-x-hidden">
-            <div className="mx-auto max-w-full">
+          <div className="overflow-x-auto">
+            <div className="w-full">
               <Table className="w-full table-auto text-sm">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="min-w-[120px] whitespace-nowrap">Date & Time</TableHead>
-                    <TableHead className="min-w-[100px] whitespace-nowrap">Transaction ID</TableHead>
-                    <TableHead className="min-w-[150px] whitespace-nowrap">Sender Name</TableHead>
-                    <TableHead className="min-w-[150px] whitespace-nowrap">Receiver Name</TableHead>
-                    <TableHead className="min-w-[100px] whitespace-nowrap">Type</TableHead>
-                    <TableHead className="min-w-[150px] whitespace-nowrap">Description</TableHead>
-                    <TableHead className="min-w-[120px] whitespace-nowrap">Payment Method</TableHead>
-                    <TableHead className="min-w-[100px] text-right whitespace-nowrap">Amount</TableHead>
-                    <TableHead className="min-w-[80px] text-right whitespace-nowrap">Actions</TableHead>
+                    <TableHead className="whitespace-nowrap">Date & Time</TableHead>
+                    <TableHead className="whitespace-nowrap">Transaction ID</TableHead>
+                    <TableHead className="whitespace-nowrap">Sender Name</TableHead>
+                    <TableHead className="whitespace-nowrap">Receiver Name</TableHead>
+                    <TableHead className="whitespace-nowrap">Type</TableHead>
+                    <TableHead className="whitespace-nowrap">Description</TableHead>
+                    <TableHead className="whitespace-nowrap">Payment Method</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">Amount</TableHead>
+                    <TableHead className="hidden md:table-cell text-right whitespace-nowrap">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {transactions.map((txn) => (
                     <TableRow key={txn.id}>
-                      <TableCell className="whitespace-nowrap overflow-hidden text-ellipsis">
-                        {txn.datetime}
+                      <TableCell className="whitespace-nowrap truncate">
+                        {new Date(txn.datetime).toLocaleString("en-IN", {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                          timeZone: "Asia/Kolkata",
+                        })}
                       </TableCell>
-                      <TableCell className="font-semibold whitespace-nowrap overflow-hidden text-ellipsis">
-                        {txn.id}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap overflow-hidden text-ellipsis">
+                      <TableCell className="font-semibold whitespace-nowrap truncate">{txn.id}</TableCell>
+                      <TableCell className="max-w-[150px] truncate">
                         <div className="flex items-center gap-2">
                           <Avatar name={txn.sender.name} />
                           <div className="font-medium">{txn.sender.name}</div>
                         </div>
                         <div className="text-xs text-muted-foreground">({txn.sender.role})</div>
                       </TableCell>
-                      <TableCell className="whitespace-nowrap overflow-hidden text-ellipsis">
+                      <TableCell className="max-w-[150px] truncate">
                         <div className="flex items-center gap-2">
                           <Avatar name={txn.receiver.name} />
                           <div className="font-medium">{txn.receiver.name}</div>
                         </div>
                         <div className="text-xs text-muted-foreground">({txn.receiver.role})</div>
                       </TableCell>
-                      <TableCell className="whitespace-nowrap overflow-hidden text-ellipsis">
+                      <TableCell className="whitespace-nowrap truncate">
                         {editingTransactionId === txn.id ? (
                           <Select
                             value={editFormData.transaction_type}
@@ -913,19 +912,19 @@ export default function TransactionHistory() {
                               ${txn.type === "Transfer"
                                 ? "bg-blue-100 text-blue-700"
                                 : txn.type === "TopUp"
-                                ? "bg-purple-100 text-purple-700"
-                                : txn.type === "Refund"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : txn.type === "Credit"
-                                ? "bg-green-100 text-green-700"
-                                : "bg-gray-100 text-gray-600"
+                                  ? "bg-purple-100 text-purple-700"
+                                  : txn.type === "Refund"
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : txn.type === "Credit"
+                                      ? "bg-green-100 text-green-700"
+                                      : "bg-gray-100 text-gray-600"
                               }`}
                           >
                             {txn.type || "N/A"}
                           </span>
                         )}
                       </TableCell>
-                      <TableCell className="whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px]">
+                      <TableCell className="max-w-[120px] truncate">
                         {editingTransactionId === txn.id ? (
                           <Input
                             value={editFormData.remarks}
@@ -938,7 +937,7 @@ export default function TransactionHistory() {
                           txn.description
                         )}
                       </TableCell>
-                      <TableCell className="whitespace-nowrap overflow-hidden text-ellipsis">
+                      <TableCell className="whitespace-nowrap truncate">
                         {editingTransactionId === txn.id ? (
                           <Select
                             value={editFormData.payment_method}
@@ -963,19 +962,19 @@ export default function TransactionHistory() {
                               ${txn.paymentMethod === "Cash"
                                 ? "bg-green-100 text-green-800"
                                 : txn.paymentMethod === "Gpay"
-                                ? "bg-blue-100 text-blue-800"
-                                : txn.paymentMethod === "Mess bill"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : txn.paymentMethod === "Balance Deduction"
-                                ? "bg-red-100 text-red-800"
-                                : "bg-gray-100 text-gray-800"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : txn.paymentMethod === "Mess bill"
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : txn.paymentMethod === "Balance Deduction"
+                                      ? "bg-red-100 text-red-800"
+                                      : "bg-gray-100 text-gray-800"
                               }`}
                           >
                             {txn.paymentMethod}
                           </span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right font-semibold whitespace-nowrap overflow-hidden text-ellipsis">
+                      <TableCell className="text-right font-semibold whitespace-nowrap truncate">
                         {editingTransactionId === txn.id ? (
                           <Input
                             type="number"
@@ -991,7 +990,7 @@ export default function TransactionHistory() {
                           <span className="text-green-600">+ ₹{txn.amount}</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right whitespace-nowrap">
+                      <TableCell className="hidden md:table-cell text-right whitespace-nowrap">
                         {editingTransactionId === txn.id ? (
                           <Button
                             variant="default"
@@ -1021,39 +1020,63 @@ export default function TransactionHistory() {
             </div>
           </div>
           <div className="pt-4 w-full">
-            <div className="mx-auto max-w-[300px]">
+            <div className="mx-auto max-w-[300px] sm:max-w-full flex flex-col sm:flex-row justify-center sm:justify-between items-center gap-2">
               <Pagination>
                 <PaginationContent>
                   <PaginationItem>
                     <PaginationPrevious
                       href="#"
-                      onClick={() =>
+                      onClick={(e) => {
+                        e.preventDefault();
                         setPagination((prev) => ({
                           ...prev,
                           page: Math.max(prev.page - 1, 1),
-                        }))
-                      }
+                        }));
+                      }}
+                      className={pagination.page === 1 ? "pointer-events-none opacity-50" : ""}
                     />
                   </PaginationItem>
-                  {Array.from({ length: pagination.totalPages || 1 }, (_, i) => i + 1).map((p) => (
-                    <PaginationItem key={p}>
-                      <PaginationLink
-                        href="#"
-                        isActive={p === pagination.page}
-                        onClick={() => setPagination((prev) => ({ ...prev, page: p }))}
-                      >
-                        {p}
-                      </PaginationLink>
-                    </PaginationItem>
-                  ))}
+                  {(() => {
+                    const total = pagination.totalPages || 1;
+                    const current = pagination.page;
+                    const maxVisible = 3;
+                    const half = Math.floor(maxVisible / 2);
+                    let start = Math.max(1, current - half);
+                    let end = start + maxVisible - 1;
+                    if (end > total) {
+                      end = total;
+                      start = Math.max(1, end - maxVisible + 1);
+                    }
+                    return Array.from({ length: end - start + 1 }).map((_, i) => {
+                      const pageNum = start + i;
+                      return (
+                        <PaginationItem key={pageNum}>
+                          <PaginationLink
+                            href="#"
+                            isActive={pagination.page === pageNum}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setPagination((prev) => ({ ...prev, page: pageNum }));
+                            }}
+                          >
+                            {pageNum}
+                          </PaginationLink>
+                        </PaginationItem>
+                      );
+                    });
+                  })()}
                   <PaginationItem>
                     <PaginationNext
                       href="#"
-                      onClick={() =>
+                      onClick={(e) => {
+                        e.preventDefault();
                         setPagination((prev) => ({
                           ...prev,
                           page: Math.min(prev.page + 1, pagination.totalPages),
-                        }))
+                        }));
+                      }}
+                      className={
+                        pagination.page === pagination.totalPages ? "pointer-events-none opacity-50" : ""
                       }
                     />
                   </PaginationItem>

@@ -64,7 +64,7 @@ export default function RecentTransactions() {
   const visibleTransactions = transactions.slice(0, visibleCount);
 
   return (
-    <div className="container mx-auto">
+    <div className="">
       <Card>
         <CardHeader>
           <CardTitle>Recent Fund Transfers</CardTitle>

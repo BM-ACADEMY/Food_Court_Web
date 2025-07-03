@@ -394,7 +394,7 @@ export default function AdminList() {
                   <TableHead>Last Active</TableHead>
                   <TableHead>Permission</TableHead>
 
-                  <TableHead>Actions</TableHead>
+                  {/* <TableHead>Actions</TableHead> */}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -456,21 +456,7 @@ export default function AdminList() {
                         </Badge>
                       </TableCell>
                       <TableCell>{admin.lastActive}</TableCell>
-                      {/* <TableCell className="text-center">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="cursor-pointer"
-                          onClick={() => handleToggleRestrict(admin)}
-                          title={admin.is_flagged ? "Unrestrict User" : "Restrict User"}
-                        >
-                          {admin.is_flagged ? (
-                            <Lock className="w-4 h-4 text-red-600" />
-                          ) : (
-                            <Unlock className="w-4 h-4 text-green-600" />
-                          )}
-                        </Button>
-                      </TableCell> */}
+                      
                       <TableCell className="flex gap-2">
                         <Button
                           variant="link"
@@ -541,7 +527,7 @@ export default function AdminList() {
 
       {/* Pagination */}
       {!loading && !error && totalPages > 0 && (
-        <div className="flex items-center justify-between mt-4">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 mt-4">
           <p className="text-sm text-muted-foreground">
             Showing {(page - 1) * pageSize + 1} to{" "}
             {Math.min(page * pageSize, totalAdmins)} of {totalAdmins} admins

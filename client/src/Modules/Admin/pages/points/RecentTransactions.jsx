@@ -81,7 +81,7 @@ export default function RecentTransactions() {
                   <TableHead className="whitespace-nowrap">AMOUNT</TableHead>
                   <TableHead className="whitespace-nowrap">STATUS</TableHead>
                   <TableHead className="whitespace-nowrap">PAYMENT METHOD</TableHead>
-                  <TableHead className="whitespace-nowrap">ACTIONS</TableHead>
+                  {/* <TableHead className="whitespace-nowrap">ACTIONS</TableHead> */}
                 </TableRow>
               </TableHeader>
 
@@ -93,7 +93,13 @@ export default function RecentTransactions() {
 
                   return (
                     <TableRow key={index}>
-                      <TableCell className="whitespace-nowrap">{dateTime}</TableCell>
+                      <TableCell className="whitespace-nowrap truncate">
+                        {new Date(tx.created_at).toLocaleString("en-IN", {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                          timeZone: "Asia/Kolkata",
+                        })}
+                      </TableCell>
                       <TableCell className="whitespace-nowrap">{tx.transaction_id}</TableCell>
 
                       {/* Sender Name */}
@@ -123,12 +129,12 @@ export default function RecentTransactions() {
                       <TableCell className="whitespace-nowrap">
                         <span
                           className={`px-2 py-1 rounded-full text-xs font-medium ${status === "Success"
-                              ? "bg-green-100 text-green-700"
-                              : status === "Pending"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : status === "Failed"
-                                  ? "bg-red-100 text-red-700"
-                                  : "bg-gray-100 text-gray-600"
+                            ? "bg-green-100 text-green-700"
+                            : status === "Pending"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : status === "Failed"
+                                ? "bg-red-100 text-red-700"
+                                : "bg-gray-100 text-gray-600"
                             }`}
                         >
                           {status}
@@ -140,7 +146,7 @@ export default function RecentTransactions() {
                       </TableCell>
 
                       {/* ACTIONS column */}
-                      <TableCell className="whitespace-nowrap">
+                      {/* <TableCell className="whitespace-nowrap">
                         <Button
                           size="sm"
                           variant="ghost"
@@ -149,7 +155,7 @@ export default function RecentTransactions() {
                         >
                           <Eye className="w-4 h-4" /> View
                         </Button>
-                      </TableCell>
+                      </TableCell> */}
                     </TableRow>
                   );
                 })}
