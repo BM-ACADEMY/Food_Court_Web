@@ -172,12 +172,13 @@ export default function Deduct() {
         { withCredentials: true }
       );
 
-      const newCustomerBalance = (customer.balance - deductAmount).toFixed(2);
-      setCustomer(prev => ({
-        ...prev,
-        balance: parseFloat(newCustomerBalance),
-      }));
-      setAmount("");
+      setCustomer({
+        name: "",
+        id: "",
+        balance: 0,
+        customer_id: "",
+      }); // Reset customer state after successful payment
+      setAmount(""); // Reset input field after successful payment
       setResultMessage(
         `Successfully deducted ₹${formattedAmount} from ${customer.name}. ${response.data.message}`
       );
@@ -334,7 +335,7 @@ export default function Deduct() {
               {isSuccess ? "Transaction completed successfully." : "Please try again or contact support."}
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col items-center text-center gap-4 py-4">
+          <div className="flex flex-colamericana items center gap-4 py-4">
             {isSuccess ? (
               <>
                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">

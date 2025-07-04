@@ -167,12 +167,13 @@ export default function Refund() {
         { withCredentials: true }
       );
 
-      const newCustomerBalance = (customer.balance + refundAmount).toFixed(2);
-      setCustomer(prev => ({
-        ...prev,
-        balance: parseFloat(newCustomerBalance),
-      }));
-      setAmount("");
+      setCustomer({
+        name: "",
+        id: "",
+        balance: 0,
+        customer_id: "",
+      }); // Reset customer state after successful refund
+      setAmount(""); // Reset input field after successful refund
       setResultMessage(
         `Successfully refunded ₹${formattedAmount} to ${customer.name}. ${response.data.message}`
       );
