@@ -53,6 +53,7 @@ import { useAuth } from "@/context/AuthContext";
 import { io } from "socket.io-client";
 const socket = io(import.meta.env.VITE_BASE_SOCKET_URL, {
   withCredentials: true,
+    transports: ["websocket", "polling"],
 });
 const PER_PAGE = 15;
 
