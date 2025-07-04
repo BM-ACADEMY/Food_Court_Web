@@ -50,13 +50,9 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { useAuth } from "@/context/AuthContext";
-import { io } from "socket.io-client";
-const socket = io(import.meta.env.VITE_BASE_SOCKET_URL, {
-  withCredentials: true,
-    transports: ["websocket", "polling"],
-});
+import getSocket from "@/socketConfig/Socket";
 const PER_PAGE = 15;
-
+const socket = getSocket();
 export default function History() {
   const { user } = useAuth();
   const [transactions, setTransactions] = useState([]);
@@ -70,7 +66,7 @@ export default function History() {
   const [exportFormat, setExportFormat] = useState("csv");
   const [dateFilter, setDateFilter] = useState("All Time");
   const [typeFilter, setTypeFilter] = useState("All");
- useEffect(() => {
+  useEffect(() => {
     if (user?._id) {
       socket.emit("joinRestaurantRoom", user._id.toString());
 
@@ -127,7 +123,7 @@ export default function History() {
       console.error("Failed to load data:", error);
       setError(
         error.response?.data?.message ||
-          "Failed to load transactions or today's balance."
+        "Failed to load transactions or today's balance."
       );
     } finally {
       setIsLoading(false);
@@ -485,86 +481,85 @@ export default function History() {
       </div>
 
       {/* Table */}
-{/* Table */}
-<div className="bg-white shadow rounded-lg overflow-x-auto">
-  <table className="w-full text-sm text-left border-t">
-    <thead className="bg-gray-100 text-gray-700 uppercase text-xs">
-      <tr>
-        <th className="p-4 font-medium w-12">
-          {/* Empty header for checkbox column */}
-        </th>
-        <th className="p-4 font-medium">Transaction ID</th>
-        <th className="p-4 font-medium">Customer</th>
-        <th className="p-4 font-medium">Customer ID</th>
-        <th className="p-4 font-medium">Amount</th>
-        <th className="p-4 font-medium">Date & Time</th>
-        <th className="p-4 font-medium">Status</th>
-        <th className="p-4 font-medium">Type</th>
-      </tr>
-    </thead>
-    <tbody>
-      {isLoading ? (
-        <tr>
-          <td colSpan={8} className="p-4 text-center">
-            Loading...
-          </td>
-        </tr>
-      ) : paginated.length > 0 ? (
-        paginated.map((txn) => {
-          const customerName =
-            txn.sender_id?._id.toString() === user._id.toString()
-              ? txn.receiver_id?.name || "Unknown"
-              : txn.sender_id?.name || "Unknown";
-          const customerId = txn.customer_id || "N/A";
-          const amountPrefix =
-            txn.sender_id?._id.toString() === user._id.toString()
-              ? "-"
-              : "+";
-          return (
-            <tr key={txn._id} className="border-t hover:bg-gray-50">
-              <td className="p-4 w-12 text-center">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 text-blue-600 border-gray-300 rounded"
-                />
-              </td>
-              <td className="p-4">{txn.transaction_id || txn._id}</td>
-              <td className="p-4">{customerName}</td>
-              <td className="p-4 text-gray-500">{customerId}</td>
-              <td
-                className={`p-4 font-semibold ${
-                  amountPrefix === "+" ? "text-green-600" : "text-red-600"
-                }`}
-              >
-                {amountPrefix}₹{parseFloat(txn.amount || "0.00").toFixed(2)}
-              </td>
-              <td className="p-4">
-                {new Date(txn.created_at).toLocaleString("en-US", {
-                  year: "numeric",
-                  month: "short",
-                  day: "numeric",
-                  hour: "numeric",
-                  minute: "numeric",
-                  hour12: true,
-                })}
-              </td>
-              <td className="p-4 text-green-600 font-medium">
-                {txn.status || "Unknown"}
-              </td>
-              <td className="p-4">{txn.transaction_type || "Unknown"}</td>
+      {/* Table */}
+      <div className="bg-white shadow rounded-lg overflow-x-auto">
+        <table className="w-full text-sm text-left border-t">
+          <thead className="bg-gray-100 text-gray-700 uppercase text-xs">
+            <tr>
+              <th className="p-4 font-medium w-12">
+                {/* Empty header for checkbox column */}
+              </th>
+              <th className="p-4 font-medium">Transaction ID</th>
+              <th className="p-4 font-medium">Customer</th>
+              <th className="p-4 font-medium">Customer ID</th>
+              <th className="p-4 font-medium">Amount</th>
+              <th className="p-4 font-medium">Date & Time</th>
+              <th className="p-4 font-medium">Status</th>
+              <th className="p-4 font-medium">Type</th>
             </tr>
-          );
-        })
-      ) : (
-        <tr>
-          <td colSpan={8} className="p-4 text-center text-gray-400">
-            No results found.
-          </td>
-        </tr>
-      )}
-    </tbody>
-  </table>
-</div>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              <tr>
+                <td colSpan={8} className="p-4 text-center">
+                  Loading...
+                </td>
+              </tr>
+            ) : paginated.length > 0 ? (
+              paginated.map((txn) => {
+                const customerName =
+                  txn.sender_id?._id.toString() === user._id.toString()
+                    ? txn.receiver_id?.name || "Unknown"
+                    : txn.sender_id?.name || "Unknown";
+                const customerId = txn.customer_id || "N/A";
+                const amountPrefix =
+                  txn.sender_id?._id.toString() === user._id.toString()
+                    ? "-"
+                    : "+";
+                return (
+                  <tr key={txn._id} className="border-t hover:bg-gray-50">
+                    <td className="p-4 w-12 text-center">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                      />
+                    </td>
+                    <td className="p-4">{txn.transaction_id || txn._id}</td>
+                    <td className="p-4">{customerName}</td>
+                    <td className="p-4 text-gray-500">{customerId}</td>
+                    <td
+                      className={`p-4 font-semibold ${amountPrefix === "+" ? "text-green-600" : "text-red-600"
+                        }`}
+                    >
+                      {amountPrefix}₹{parseFloat(txn.amount || "0.00").toFixed(2)}
+                    </td>
+                    <td className="p-4">
+                      {new Date(txn.created_at).toLocaleString("en-US", {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "numeric",
+                        hour12: true,
+                      })}
+                    </td>
+                    <td className="p-4 text-green-600 font-medium">
+                      {txn.status || "Unknown"}
+                    </td>
+                    <td className="p-4">{txn.transaction_type || "Unknown"}</td>
+                  </tr>
+                );
+              })
+            ) : (
+              <tr>
+                <td colSpan={8} className="p-4 text-center text-gray-400">
+                  No results found.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
 
       {/* Pagination */}
       <Pagination className="mt-6 justify-end">
