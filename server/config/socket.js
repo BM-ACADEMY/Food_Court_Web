@@ -34,8 +34,6 @@
 //   getIO: () => io,
 // };
 
-
-
 // let io;
 
 // const initSocket = (server) => {
@@ -70,7 +68,6 @@
 
 // module.exports = { initSocket, getIO };
 
-
 let io;
 
 const initSocket = async (server) => {
@@ -82,12 +79,14 @@ const initSocket = async (server) => {
       origin: [
         process.env.DEV_FRONTEND_URL,
         "https://pegasus2025.com",
-        "https://www.pegasus2025.com"
+        "https://www.pegasus2025.com",
       ],
       credentials: true,
-      methods: ["GET", "POST"]
+      methods: ["GET", "POST"],
     },
-    transports: ["websocket", "polling"]
+    transports: ["websocket", "polling"],
+    pingInterval: 25000,
+    pingTimeout: 20000,
   });
 
   // ✅ Redis pub/sub setup with logs
@@ -127,5 +126,5 @@ const getIO = () => io;
 
 module.exports = {
   initSocket,
-  getIO
+  getIO,
 };
