@@ -71,7 +71,6 @@
 // module.exports = { initSocket, getIO };
 
 
-
 let io;
 
 const initSocket = async (server) => {
@@ -91,14 +90,21 @@ const initSocket = async (server) => {
     transports: ["websocket", "polling"]
   });
 
-  // ✅ Redis pub/sub setup
+  // ✅ Redis pub/sub setup with logs
   const pubClient = createClient({ url: "redis://127.0.0.1:6379" });
   const subClient = pubClient.duplicate();
+
+  pubClient.on("connect", () => console.log("✅ Redis PUB connected"));
+  subClient.on("connect", () => console.log("✅ Redis SUB connected"));
+
+  pubClient.on("error", (err) => console.error("❌ Redis PUB error:", err));
+  subClient.on("error", (err) => console.error("❌ Redis SUB error:", err));
 
   await pubClient.connect();
   await subClient.connect();
 
   socketIO.adapter(createAdapter(pubClient, subClient));
+  console.log("🔁 Redis adapter initialized");
 
   io = socketIO;
 
@@ -111,8 +117,8 @@ const initSocket = async (server) => {
       console.log(`📡 Restaurant ${restaurantId} joined room`);
     });
 
-    socket.on("disconnect", () => {
-      console.log("⚠️ Socket disconnected:", socket.id);
+    socket.on("disconnect", (reason) => {
+      console.log("⚠️ Socket disconnected:", socket.id, "Reason:", reason);
     });
   });
 };
