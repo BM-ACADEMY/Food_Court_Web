@@ -72,7 +72,6 @@
 
 
 
-
 let io;
 
 const initSocket = async (server) => {
@@ -87,10 +86,12 @@ const initSocket = async (server) => {
         "https://www.pegasus2025.com"
       ],
       credentials: true,
+      methods: ["GET", "POST"]
     },
+    transports: ["websocket", "polling"]
   });
 
-  // Redis pub/sub setup
+  // ✅ Redis pub/sub setup
   const pubClient = createClient({ url: "redis://127.0.0.1:6379" });
   const subClient = pubClient.duplicate();
 
@@ -101,6 +102,7 @@ const initSocket = async (server) => {
 
   io = socketIO;
 
+  // ✅ Socket.io connection
   socketIO.on("connection", (socket) => {
     console.log("✅ Socket connected:", socket.id);
 
@@ -117,4 +119,7 @@ const initSocket = async (server) => {
 
 const getIO = () => io;
 
-module.exports = { initSocket, getIO };
+module.exports = {
+  initSocket,
+  getIO
+};
