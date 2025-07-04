@@ -98,10 +98,6 @@
 
 
 
-
-
-
-
 const express = require('express');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
@@ -113,12 +109,10 @@ const compression = require('compression');
 const http = require('http');
 const { initSocket } = require('./config/socket');
 
-// Load environment variables
 dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
-initSocket(server);
 
 // ✅ Middleware
 app.use(cookieParser());
@@ -161,18 +155,28 @@ app.use('/api/fees', require('./route/feeRoute'));
 app.use('/api/upis', require('./route/upiRoute'));
 app.use('/api/dashboards', require('./route/dashboardRoute'));
 
-// ✅ Optional: Health check route
+// ✅ Health Check
 app.get('/', (req, res) => {
   res.send('✅ API is running');
 });
 
-// ✅ Start server ONLY if run directly (not imported)
+// ✅ Start server properly with await order
 const PORT = process.env.PORT || 4000;
 
-if (require.main === module) {
-  connectDB().then(() => {
+const startServer = async () => {
+  try {
+    await connectDB();               // 🟢 1. Connect DB
+    await initSocket(server);        // 🟢 2. Setup socket + redis adapter AFTER
+
     server.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server + Socket.IO running on port ${PORT}`);
     });
-  });
+  } catch (err) {
+    console.error("❌ Server startup failed:", err);
+    process.exit(1);
+  }
+};
+
+if (require.main === module) {
+  startServer();
 }
