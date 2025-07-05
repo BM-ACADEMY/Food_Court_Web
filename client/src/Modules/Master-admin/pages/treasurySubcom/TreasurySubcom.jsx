@@ -1,3 +1,4 @@
+
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -16,7 +17,6 @@ import {
   Search,
   Download,
   Eye,
-  Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
@@ -81,7 +81,6 @@ export default function TreasurySubcomList() {
   const [selectedSubcom, setSelectedSubcom] = useState(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
 
-
   const getRandomColor = () => {
     const colors = ["#FF6B6B", "#4ECDC4", "#556270", "#C7F464", "#FFA500"];
     return colors[Math.floor(Math.random() * colors.length)];
@@ -137,16 +136,16 @@ export default function TreasurySubcomList() {
   const { treasurySubcoms, totalTreasurySubcoms, totalBalance, onlineCount, totalPages } = data;
 
   // Memoized filtered data for rendering
-  const paginatedTreasurySubcoms = useMemo(() => treasurySubcoms, [treasurySubcoms]);
+  const paginatedTreasurySubcoms = useMemo(() => {
+    console.log("Paginated treasury subcoms:", treasurySubcoms); // Debug log
+    return treasurySubcoms;
+  }, [treasurySubcoms]);
 
-  // Handle View and Edit
+  // Handle View
   const handleView = (subcom) => {
-    setSelectedSubcom(subcom);
-    setIsDetailsModalOpen(true);
-  };
-
-  const handleEdit = (subcom) => {
-    setSelectedSubcom(subcom);
+    console.log("Selected subcom for view:", subcom); // Debug log
+    // Deep copy to avoid reference issues and ensure unique data
+    setSelectedSubcom({ ...subcom, id: subcom.id });
     setIsDetailsModalOpen(true);
   };
 
@@ -154,8 +153,8 @@ export default function TreasurySubcomList() {
   const exportToExcel = () => {
     const data = paginatedTreasurySubcoms.map((subcom) => ({
       "Treasury Subcom ID": subcom.id,
-      Name: subcom.name,
-      Phone: subcom.phone,
+      "Sender Name": subcom.sender_name,
+      "Receiver Name": subcom.receiver_name,
       Balance: `₹${subcom.balance.toLocaleString()}`,
       Status: subcom.status,
       "Last Active": subcom.lastActive,
@@ -171,8 +170,8 @@ export default function TreasurySubcomList() {
   const exportToCSV = () => {
     const data = paginatedTreasurySubcoms.map((subcom) => ({
       "Treasury Subcom ID": subcom.id,
-      Name: subcom.name,
-      Phone: subcom.phone,
+      "Sender Name": subcom.sender_name,
+      "Receiver Name": subcom.receiver_name,
       Balance: `₹${subcom.balance.toLocaleString()}`,
       Status: subcom.status,
       "Last Active": subcom.lastActive,
@@ -192,8 +191,8 @@ export default function TreasurySubcomList() {
         head: [
           [
             "Treasury Subcom ID",
-            "Name",
-            "Phone",
+            "Sender Name",
+            "Receiver Name",
             "Balance",
             "Status",
             "Last Active",
@@ -201,8 +200,8 @@ export default function TreasurySubcomList() {
         ],
         body: paginatedTreasurySubcoms.map((subcom) => [
           subcom.id || "N/A",
-          subcom.name || "Unknown",
-          subcom.phone || "N/A",
+          subcom.sender_name || "Unknown",
+          subcom.receiver_name || "Unknown",
           `₹${subcom.balance.toLocaleString()}` || "₹0",
           subcom.status || "N/A",
           subcom.lastActive || "N/A",
@@ -252,10 +251,6 @@ export default function TreasurySubcomList() {
               className="pl-9"
             />
           </div>
-          {/* <Button className="bg-[#00004D] text-white flex items-center gap-2 flex-1/5">
-            <QrCode className="size-4" />
-            Scan QR Code
-          </Button> */}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           <div className="flex flex-col gap-1">
@@ -374,7 +369,7 @@ export default function TreasurySubcomList() {
               <Download className="mr-2 h-4 w-4" /> Export List
             </Button>
           </div>
-        <div className="overflow-x-auto">
+          <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -409,7 +404,7 @@ export default function TreasurySubcomList() {
                           </div>
                         </div>
                       </TableCell>
-                      {/* <TableCell>
+                      <TableCell>
                         <div className="flex items-center gap-2">
                           <Avatar name={subcom.receiver_name} />
                           <div className="flex flex-col gap-1">
@@ -419,15 +414,16 @@ export default function TreasurySubcomList() {
                             </span>
                           </div>
                         </div>
-                      </TableCell> */}
+                      </TableCell>
                       <TableCell>
                         <span
-                          className={`font-medium ${subcom.balance > 10000
+                          className={`font-medium ${
+                            subcom.balance > 10000
                               ? "text-green-600"
                               : subcom.balance > 0
-                                ? "text-yellow-600"
-                                : "text-red-600"
-                            }`}
+                              ? "text-yellow-600"
+                              : "text-red-600"
+                          }`}
                         >
                           ₹{subcom.balance.toLocaleString()}
                         </span>
@@ -435,18 +431,16 @@ export default function TreasurySubcomList() {
                       <TableCell>
                         <Badge
                           variant="ghost"
-                          className={`text-white ${subcom.status.toLowerCase() === "online"
+                          className={`text-white ${
+                            subcom.status.toLowerCase() === "online"
                               ? "bg-green-500"
                               : "bg-red-500"
-                            }`}
+                          }`}
                         >
                           {subcom.status}
                         </Badge>
                       </TableCell>
-                      <TableCell>
-                        {subcom.lastActive }
-                        
-                      </TableCell>
+                      <TableCell>{subcom.lastActive}</TableCell>
                       <TableCell className="flex gap-2">
                         <Button
                           variant="link"
@@ -455,13 +449,6 @@ export default function TreasurySubcomList() {
                         >
                           <Eye className="mr-1 h-4 w-4" /> View
                         </Button>
-                        {/* <Button
-                variant="link"
-                className="text-green-600 p-0 h-auto text-sm"
-                onClick={() => handleEdit(subcom)}
-              >
-                <Pencil className="mr-1 h-4 w-4" /> Edit
-              </Button> */}
                       </TableCell>
                     </TableRow>
                   ))
@@ -474,6 +461,7 @@ export default function TreasurySubcomList() {
 
       {/* Treasury Subcom Details Modal */}
       <TreasurySubcomDetailsModal
+        key={selectedSubcom?.id} // Force re-render with new subcom
         subcom={selectedSubcom}
         isOpen={isDetailsModalOpen}
         onClose={() => {
@@ -520,9 +508,10 @@ export default function TreasurySubcomList() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
       {/* Pagination */}
       {!loading && !error && totalPages > 0 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 mt-4">
+        <div className="flex items-center justify-between mt-4">
           <p className="text-sm text-muted-foreground">
             Showing {(page - 1) * pageSize + 1} to{" "}
             {Math.min(page * pageSize, totalTreasurySubcoms)} of{" "}

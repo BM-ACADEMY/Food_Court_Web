@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+
+import { useState, useEffect, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -39,14 +40,14 @@ import axios from "axios";
 import { format, formatDistanceToNow } from "date-fns";
 
 const TreasurySubcomDetailsModal = ({ subcom, isOpen, onClose }) => {
-  const [subcomData, setSubcomData] = useState(subcom || {});
+  const [subcomData, setSubcomData] = useState({});
   const [transactions, setTransactions] = useState([]);
   const [filteredTransactions, setFilteredTransactions] = useState([]);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
-    name: subcom?.name || "",
-    phone: subcom?.phone || "",
-    email: subcom?.email || "",
+    name: "",
+    phone: "",
+    email: "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -63,58 +64,77 @@ const TreasurySubcomDetailsModal = ({ subcom, isOpen, onClose }) => {
     setLocationId("");
     setUpiId("");
     setFilter("all");
-  }
-  const fetchLocationsAndUpi = async () => {
+  };
+
+  const fetchLocationsAndUpi = useCallback(async () => {
     setLoading(true);
     try {
       const locationRes = await axios.get(`${import.meta.env.VITE_BASE_URL}/locations/fetch-all-locations`);
-      setLocations(locationRes.data.data);
-
+      setLocations(locationRes.data.data || []);
       const upiRes = await axios.get(`${import.meta.env.VITE_BASE_URL}/upis/fetch-all-upis`);
-      setUpis(upiRes.data.data);
+      setUpis(upiRes.data.data || []);
     } catch (err) {
       console.error("Error fetching locations or UPIs:", err);
       setError("Failed to load locations or UPIs. Please try again.");
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    if (isOpen && subcom?.id) {
-      fetchSubcomDetails();
-      fetchTransactions();
-    }
-  }, [isOpen, subcom?.id, locationId, upiId]);
-
-  useEffect(() => {
-    fetchLocationsAndUpi();
   }, []);
 
-  const fetchSubcomDetails = async () => {
+  // Reset state when modal opens or subcom changes
+  useEffect(() => {
+    if (isOpen && subcom) {
+      console.log("Modal received subcom:", subcom); // Debug log
+      setSubcomData(subcom);
+      setFormData({
+        name: subcom.name || subcom.sender_name || subcom.receiver_name || "",
+        phone: subcom.phone || "",
+        email: subcom.email || "",
+      });
+      setIsEditingId(subcom.user_id || subcom.sender_id || "");
+      setIsEditing(false);
+      setError(null);
+      setLoading(false);
+      setTransactions([]);
+      setFilteredTransactions([]);
+      setCurrentPage(1);
+    }
+  }, [isOpen, subcom]);
+
+  const fetchSubcomDetails = useCallback(async () => {
+    if (!subcom?.sender_id) {
+      setError("Invalid subcom ID");
+      return;
+    }
+    setLoading(true);
     try {
+      console.log("Fetching details for subcom.id:", subcom.sender_id); // Debug log
       const response = await axios.get(
-        `${import.meta.env.VITE_BASE_URL}/treasurySubcom/fetch-single-treasurysubcom-details/${subcom.id}`
+        `${import.meta.env.VITE_BASE_URL}/treasurySubcom/fetch-single-treasurysubcom-details/${subcom.sender_id}`
       );
+      console.log("API response for subcom details:", response.data); // Debug log
       setSubcomData(response.data);
       setFormData({
-        name: response.data.name || "",
+        name: response.data.name || response.data.sender_name || response.data.receiver_name || "",
         phone: response.data.phone || "",
         email: response.data.email || "",
       });
-      setIsEditingId(response.data.user_id || "");
+      setIsEditingId(response.data.user_id || subcom.sender_id);
       setError(null);
     } catch (err) {
       console.error("Error fetching treasury subcom details:", err);
       setError("Failed to load subcom details. Please try again.");
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [subcom?.sender_id]);
 
-  const fetchTransactions = async () => {
+  const fetchTransactions = useCallback(async () => {
+    if (!subcom?.id) return;
     setLoading(true);
     try {
       const response = await axios.get(
-        `${import.meta.env.VITE_BASE_URL}/treasurySubcom/fetch-single-treasurysubcom-transactions/${subcom.id}/transactions`,
+        `${import.meta.env.VITE_BASE_URL}/treasurySubcom/fetch-single-treasurysubcom-transactions/${subcom.sender_id}/transactions`,
         {
           params: { location_id: locationId, upi_id: upiId },
         }
@@ -127,16 +147,27 @@ const TreasurySubcomDetailsModal = ({ subcom, isOpen, onClose }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [subcom?.sender_id, locationId, upiId]);
+
+  useEffect(() => {
+    fetchLocationsAndUpi();
+  }, [fetchLocationsAndUpi]);
+
+  useEffect(() => {
+    if (isOpen && subcom?.sender_id) {
+      fetchSubcomDetails();
+      fetchTransactions();
+    }
+  }, [isOpen, subcom?.sender_id, fetchSubcomDetails, fetchTransactions]);
 
   const handleEdit = () => {
     setIsEditing(true);
-    setIsEditingId(subcomData.user_id || subcom.id);
     setFormData({
-      name: subcomData.name || "",
+      name: subcomData.name || subcomData.sender_name || subcomData.receiver_name || "",
       phone: subcomData.phone || "",
       email: subcomData.email || "",
     });
+    setIsEditingId(subcomData.user_id || subcom.sender_id);
   };
 
   const handleSave = async () => {
@@ -191,19 +222,9 @@ const TreasurySubcomDetailsModal = ({ subcom, isOpen, onClose }) => {
 
   useEffect(() => {
     let filtered = transactions;
-
     if (filter !== "all") {
       filtered = filtered.filter((tx) => tx.type === filter);
     }
-
-    // if (locationId !== "all") {
-    //   filtered = filtered.filter((tx) => tx.locationId === locationId);
-    // }
-
-    // if (upiId !== "all") {
-    //   filtered = filtered.filter((tx) => tx.upiId === upiId);
-    // }
-
     setFilteredTransactions(filtered);
     setCurrentPage(1);
   }, [filter, transactions]);
@@ -218,201 +239,213 @@ const TreasurySubcomDetailsModal = ({ subcom, isOpen, onClose }) => {
     setCurrentPage(page);
   };
 
-  const initials = subcomData.name
-    ? subcomData.name
-      .split(" ")
-      .map((part) => part[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase()
-    : "XX";
+  const initials = (subcomData.name || subcomData.sender_name || subcomData.receiver_name || "")
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase() || "XX";
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-     <DialogContent className="max-w-[95vw] sm:max-w-[90vw] md:max-w-2xl lg:max-w-4xl xl:max-w-6xl w-full h-[90vh] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-[95vw] sm:max-w-[90vw] md:max-w-2xl lg:max-w-4xl xl:max-w-6xl w-full h-[90vh] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-<DialogTitle className="text-lg sm:text-xl">Treasury Subcom Details - #{subcomData?.id}</DialogTitle>
+          <DialogTitle className="text-lg sm:text-xl">
+            Treasury Subcom Details - #{subcomData?.id}
+          </DialogTitle>
         </DialogHeader>
-        <Tabs defaultValue="info" className="w-full">
-          <TabsList className="flex flex-col sm:flex-row w-full gap-2 mb-4">
-            <TabsTrigger value="info" className="text-xs sm:text-sm">User Information</TabsTrigger>
-            <TabsTrigger value="transactions" className="text-xs sm:text-sm">Transaction History</TabsTrigger>
-          </TabsList>
+        {loading && <p className="text-center text-gray-600 text-sm">Loading details...</p>}
+        {error && <p className="text-center text-red-500 text-sm">{error}</p>}
+        {!loading && !error && (
+          <Tabs defaultValue="info" className="w-full">
+            <TabsList className="flex flex-col sm:flex-row w-full gap-2 mb-4">
+              <TabsTrigger value="info" className="text-xs sm:text-sm">User Information</TabsTrigger>
+              <TabsTrigger value="transactions" className="text-xs sm:text-sm">Transaction History</TabsTrigger>
+            </TabsList>
 
-          {/* User Information Tab */}
-          <TabsContent value="info" className="space-y-4 overflow-y-hidden">
-           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
-              <Avatar className="h-12 w-12 sm:h-16 sm:w-16">
-                <AvatarImage src={subcomData.avatar || undefined} />
-                <AvatarFallback className="bg-blue-700 text-white text-sm sm:text-base">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <h2 className="text-lg sm:text-xl font-semibold">{subcomData.name}</h2>
-                <p className="text-gray-500 text-sm">#{subcomData.id}</p>
+            {/* User Information Tab */}
+            <TabsContent value="info" className="space-y-4 overflow-y-hidden">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
+                <Avatar className="h-12 w-12 sm:h-16 sm:w-16">
+                  <AvatarImage src={subcomData.avatar || undefined} />
+                  <AvatarFallback className="bg-blue-700 text-white text-sm sm:text-base">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <h2 className="text-lg sm:text-xl font-semibold">
+                    {subcomData.name || subcomData.sender_name || subcomData.receiver_name || "N/A"}
+                  </h2>
+                  <p className="text-gray-500 text-sm">#{subcomData.id}</p>
+                </div>
               </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-sm font-medium">Status</Label>
-                <Badge
-                  variant="ghost"
-                  className={`text-white mt-1 ${subcomData.status?.toLowerCase() === "online" ? "bg-green-500" : "bg-red-500"}`}
-                >
-                  {subcomData?.status}
-                </Badge>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium">Status</Label>
+                  <Badge
+                    variant="ghost"
+                    className={`text-white mt-1 ${
+                      subcomData.status?.toLowerCase() === "online" ? "bg-green-500" : "bg-red-500"
+                    }`}
+                  >
+                    {subcomData.status || "N/A"}
+                  </Badge>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Name</Label>
+                  {isEditing ? (
+                    <Input
+                      name="name"
+                      value={formData.name}
+                      onChange={handleInputChange}
+                      className="mt-1 text-sm"
+                    />
+                  ) : (
+                    <p className="mt-1 text-gray-700 text-sm">
+                      {subcomData.name || subcomData.sender_name || subcomData.receiver_name || "N/A"}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Phone</Label>
+                  {isEditing ? (
+                    <Input
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleInputChange}
+                      className="mt-1 text-sm"
+                      type="tel"
+                    />
+                  ) : (
+                    <p className="mt-1 text-gray-700 text-sm">{subcomData.phone || "N/A"}</p>
+                  )}
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Email</Label>
+                  {isEditing ? (
+                    <Input
+                      name="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      className="mt-1 text-sm"
+                      type="email"
+                    />
+                  ) : (
+                    <p className="mt-1 text-gray-700 text-sm">{subcomData.email || "N/A"}</p>
+                  )}
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Registration Date</Label>
+                  <p className="mt-1 text-gray-700 text-sm">
+                    {subcomData.registrationDate &&
+                    !isNaN(new Date(subcomData.registrationDate).getTime())
+                      ? format(new Date(subcomData.registrationDate), "MMM dd, yyyy")
+                      : "N/A"}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Last Active</Label>
+                  <p className="mt-1 text-gray-700 text-sm">
+                    {subcomData.lastActive && !isNaN(new Date(subcomData.lastActive).getTime())
+                      ? formatDistanceToNow(new Date(subcomData.lastActive), { addSuffix: true })
+                      : "N/A"}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Balance</Label>
+                  <p className="mt-1 text-gray-700 text-sm">
+                    ₹{subcomData.balance?.toLocaleString() || "0.00"}
+                  </p>
+                </div>
               </div>
-              <div>
-                <Label className="text-sm font-medium">Name</Label>
+              {error && <p className="text-red-500 text-sm">{error}</p>}
+              <div className="flex justify-end gap-2">
                 {isEditing ? (
-                  <Input
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    className="mt-1 text-sm"
-                  />
+                  <>
+                    <Button variant="outline" onClick={() => setIsEditing(false)} className="text-xs sm:text-sm">
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSave} className="text-xs sm:text-sm">Save</Button>
+                  </>
                 ) : (
-                  <p className="mt-1 text-gray-700 text-sm">{subcomData?.name || "N/A"}</p>
+                  <Button onClick={handleEdit} className="text-xs sm:text-sm">Edit Information</Button>
                 )}
               </div>
-              <div>
-                <Label className="text-sm font-medium">Phone</Label>
-                {isEditing ? (
-                  <Input
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    className="mt-1 text-sm"
-                    type="tel"
-                  />
-                ) : (
-                  <p className="mt-1 text-gray-700 text-sm">{subcomData?.phone || "N/A"}</p>
-                )}
+            </TabsContent>
+
+            {/* Transaction History Tab */}
+            <TabsContent value="transactions" className="space-y-4 overflow-y-hidden">
+              {/* Filters */}
+              <div className="flex flex-col sm:flex-row sm:justify-end gap-3 mb-4">
+                <Select value={filter} onValueChange={setFilter}>
+                  <SelectTrigger className="w-[150px] sm:w-[180px]">
+                    <SelectValue placeholder="Filter transactions" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-xs sm:text-sm">All Transactions</SelectItem>
+                    <SelectItem value="transfer" className="text-xs sm:text-sm">Transfer</SelectItem>
+                    <SelectItem value="topup" className="text-xs sm:text-sm">Topup</SelectItem>
+                    <SelectItem value="credit" className="text-xs sm:text-sm">Credit</SelectItem>
+                    <SelectItem value="refund" className="text-xs sm:text-sm">Refund</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={locationId} onValueChange={setLocationId}>
+                  <SelectTrigger className="w-full sm:w-[160px] text-xs sm:text-sm">
+                    <SelectValue placeholder="Filter by location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-xs sm:text-sm">All Locations</SelectItem>
+                    {locations.map((loc) => (
+                      <SelectItem key={loc._id} value={loc._id} className="text-xs sm:text-sm">
+                        {loc.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={upiId} onValueChange={setUpiId}>
+                  <SelectTrigger className="w-full sm:w-[160px] text-xs sm:text-sm">
+                    <SelectValue placeholder="Filter by UPI" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-xs sm:text-sm">All UPIs</SelectItem>
+                    {upis.map((upi) => (
+                      <SelectItem key={upi._id} value={upi._id} className="text-xs sm:text-sm">
+                        {upi.upiName} - ({upi.upiId})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button className="text-xs sm:text-sm" onClick={handleReset}>Reset</Button>
               </div>
-              <div>
-                <Label className="text-sm font-medium">Email</Label>
-                {isEditing ? (
-                  <Input
-                    name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    className="mt-1 text-sm"
-                    type="email"
-                  />
-                ) : (
-                  <p className="mt-1 text-gray-700 text-sm">{subcomData?.email || "N/A"}</p>
-                )}
-              </div>
-              <div>
-                <Label className="text-sm font-medium">Registration Date</Label>
-                <p className="mt-1 text-gray-700 text-sm">
-                  {subcomData?.registrationDate && !isNaN(new Date(subcomData.registrationDate).getTime())
-                    ? format(new Date(subcomData.registrationDate), "MMM dd, yyyy")
-                    : "N/A"}
-                </p>
-              </div>
-              <div>
-                <Label className="text-sm font-medium">Last Active</Label>
-                <p className="mt-1 text-gray-700 text-sm">
-                  {subcomData?.lastActive && !isNaN(new Date(subcomData.lastActive).getTime())
-                    ? formatDistanceToNow(new Date(subcomData.lastActive), { addSuffix: true })
-                    : "N/A"}
-                </p>
-              </div>
-              <div>
-                <Label className="text-sm font-medium">Balance</Label>
-                <p className="mt-1 text-gray-700 text-sm">
-                  ₹{subcomData?.balance?.toLocaleString() || "0.00"}
-                </p>
-              </div>
-            </div>
-            {error && <p className="text-red-500 text-sm">{error}</p>}
-            <div className="flex justify-end gap-2">
-              {isEditing ? (
+
+              {/* Loading/Error */}
+              {loading && <p className="text-center text-gray-600 text-sm">Loading transactions...</p>}
+              {error && <p className="text-center text-red-500 text-sm">{error}</p>}
+
+              {/* Transactions Table */}
+              {!loading && !error && (
                 <>
-                  <Button variant="outline" onClick={() => setIsEditing(false)} className="text-xs sm:text-sm">
-                    Cancel
-                  </Button>
-                  <Button onClick={handleSave} className="text-xs sm:text-sm">Save</Button>
-                </>
-              ) : (
-                <Button onClick={handleEdit} className="text-xs sm:text-sm">Edit Information</Button>
-              )}
-            </div>
-          </TabsContent>
-
-          {/* Transaction History Tab */}
-          <TabsContent value="transactions" className="space-y-4 overflow-y-hidden">
-            {/* Filters */}
-            <div className="flex flex-col sm:flex-row sm:justify-end gap-3 mb-4">
-              <Select value={filter} onValueChange={setFilter}>
-                <SelectTrigger className="w-[150px] sm:w-[180px]">
-                  <SelectValue placeholder="Filter transactions" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="text-xs sm:text-sm">All Transactions</SelectItem>
-                  <SelectItem value="transfer" className="text-xs sm:text-sm">Transfer</SelectItem>
-                  <SelectItem value="topup" className="text-xs sm:text-sm">Topup</SelectItem>
-                  <SelectItem value="credit" className="text-xs sm:text-sm">Credit</SelectItem>
-                  <SelectItem value="refund" className="text-xs sm:text-sm">Refund</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={locationId} onValueChange={setLocationId}>
-                <SelectTrigger className="w-full sm:w-[160px] text-xs sm:text-sm">
-                  <SelectValue placeholder="Filter by location" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="text-xs sm:text-sm">All Locations</SelectItem>
-                  {locations.map((loc) => (
-                    <SelectItem key={loc._id} value={loc._id} className="text-xs sm:text-sm">
-                      {loc.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={upiId} onValueChange={setUpiId}>
-                <SelectTrigger className="w-full sm:w-[160px] text-xs sm:text-sm">
-                  <SelectValue placeholder="Filter by UPI" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="text-xs sm:text-sm">All UPIs</SelectItem>
-                  {upis.map((upi) => (
-                    <SelectItem key={upi._id} value={upi._id} className="text-xs sm:text-sm">
-                      {upi.upiName} - ({upi.upiId})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button className="text-xs sm:text-sm" onClick={handleReset}>Reset</Button>
-            </div>
-
-            {/* Loading/Error */}
-            {loading && <p className="text-center text-gray-600 text-sm">Loading transactions...</p>}
-            {error && <p className="text-center text-red-500 text-sm">{error}</p>}
-
-            {/* Transactions Table */}
-            {!loading && !error && (
-              <>
-                <div className="overflow-y-auto min-h-[200px]">
-                  {/* Mobile View: Card-like layout */}
-                  {/* <div className="sm:hidden flex flex-col gap-4">
-                    {currentTransactions.map((transaction) => (
-                      <div key={transaction.id} className="border rounded-lg p-4 bg-white shadow-sm">
-                        <div className="flex flex-col gap-2">
-                          <div className="flex justify-between">
-                            <span className="font-medium text-xs">Transaction ID:</span>
-                            <span className="text-xs">#{transaction.id}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="font-medium text-xs">Type:</span>
-                            <span className="text-xs">{transactionTypes[transaction.type] || transaction.type}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="font-medium text-xs">Amount:</span>
-                            <span className="text-xs">
+                  <div className="overflow-y-auto min-h-[200px]">
+                    <Table className="min-w-[600px] sm:min-w-[800px] md:min-w-full table-fixed">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="whitespace-nowrap">Transaction ID</TableHead>
+                          <TableHead className="whitespace-nowrap">Type</TableHead>
+                          <TableHead className="whitespace-nowrap">Amount</TableHead>
+                          <TableHead className="whitespace-nowrap">Date</TableHead>
+                          <TableHead className="whitespace-nowrap">Description</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {currentTransactions.map((transaction) => (
+                          <TableRow key={transaction.id}>
+                            <TableCell className="whitespace-nowrap">#{transaction.id}</TableCell>
+                            <TableCell className="whitespace-nowrap">
+                              {transactionTypes[transaction.type] || transaction.type}
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap">
                               ₹{transaction.amount.toLocaleString()}
                               {transaction.type === "transfer" && (
                                 <span className="text-red-500"> (Debit)</span>
@@ -420,107 +453,63 @@ const TreasurySubcomDetailsModal = ({ subcom, isOpen, onClose }) => {
                               {(transaction.type === "topup" || transaction.type === "credit") && (
                                 <span className="text-green-500"> (Credit)</span>
                               )}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="font-medium text-xs">Date:</span>
-                            <span className="text-xs">
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap">
                               {transaction.date && !isNaN(new Date(transaction.date).getTime())
                                 ? format(new Date(transaction.date), "dd-MM-yyyy HH:mm")
                                 : "N/A"}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="font-medium text-xs">Description:</span>
-                            <span className="text-xs">{transaction.description || "N/A"}</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div> */}
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap">
+                              {transaction.description || "N/A"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    {currentTransactions.length === 0 && (
+                      <p className="text-center text-gray-600 mt-4 text-sm">
+                        No transactions found for the selected filter.
+                      </p>
+                    )}
+                  </div>
 
-                  {/* Desktop View: Table layout */}
-                 <Table className="min-w-[600px] sm:min-w-[800px] md:min-w-full table-fixed">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="whitespace-nowrap">Transaction ID</TableHead>
-                        <TableHead className="whitespace-nowrap">Type</TableHead>
-                        <TableHead className="whitespace-nowrap">Amount</TableHead>
-                        <TableHead className="whitespace-nowrap">Date</TableHead>
-                        <TableHead className="whitespace-nowrap">Description</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {currentTransactions.map((transaction) => (
-                        <TableRow key={transaction.id}>
-                          <TableCell className="whitespace-nowrap">#{transaction.id}</TableCell>
-                          <TableCell className="whitespace-nowrap">
-                            {transactionTypes[transaction.type] || transaction.type}
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap">
-                            ₹{transaction.amount.toLocaleString()}
-                            {transaction.type === "transfer" && (
-                              <span className="text-red-500"> (Debit)</span>
-                            )}
-                            {(transaction.type === "topup" || transaction.type === "credit") && (
-                              <span className="text-green-500"> (Credit)</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap">
-                            {transaction.date && !isNaN(new Date(transaction.date).getTime())
-                              ? format(new Date(transaction.date), "dd-MM-yyyy HH:mm")
-                              : "N/A"}
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap">
-                            {transaction.description || "N/A"}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                  {currentTransactions.length === 0 && (
-                    <p className="text-center text-gray-600 mt-4 text-sm">
-                      No transactions found for the selected filter.
-                    </p>
-                  )}
-                </div>
-
-                {/* Pagination */}
-                {totalPages > 1 && (
-                  <Pagination className="mt-4 flex justify-center sm:justify-start">
-                    <PaginationContent>
-                      <PaginationItem>
-                        <PaginationPrevious
-                          onClick={() => handlePageChange(currentPage - 1)}
-                          disabled={currentPage === 1}
-                          className="text-xs sm:text-sm"
-                        />
-                      </PaginationItem>
-                      {[...Array(totalPages)].map((_, index) => (
-                        <PaginationItem key={index + 1}>
-                          <PaginationLink
-                            onClick={() => handlePageChange(index + 1)}
-                            isActive={currentPage === index + 1}
+                  {/* Pagination */}
+                  {totalPages > 1 && (
+                    <Pagination className="mt-4 flex justify-center sm:justify-start">
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious
+                            onClick={() => handlePageChange(currentPage - 1)}
+                            disabled={currentPage === 1}
                             className="text-xs sm:text-sm"
-                          >
-                            {index + 1}
-                          </PaginationLink>
+                          />
                         </PaginationItem>
-                      ))}
-                      <PaginationItem>
-                        <PaginationNext
-                          onClick={() => handlePageChange(currentPage + 1)}
-                          disabled={currentPage === totalPages}
-                          className="text-xs sm:text-sm"
-                        />
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
-                )}
-              </>
-            )}
-          </TabsContent>
-        </Tabs>
+                        {[...Array(totalPages)].map((_, index) => (
+                          <PaginationItem key={index + 1}>
+                            <PaginationLink
+                              onClick={() => handlePageChange(index + 1)}
+                              isActive={currentPage === index + 1}
+                              className="text-xs sm:text-sm"
+                            >
+                              {index + 1}
+                            </PaginationLink>
+                          </PaginationItem>
+                        ))}
+                        <PaginationItem>
+                          <PaginationNext
+                            onClick={() => handlePageChange(currentPage + 1)}
+                            disabled={currentPage === totalPages}
+                            className="text-xs sm:text-sm"
+                          />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
+                  )}
+                </>
+              )}
+            </TabsContent>
+          </Tabs>
+        )}
         <DialogFooter className="mt-4">
           <Button variant="default" onClick={onClose} className="text-xs sm:text-sm">
             Close
