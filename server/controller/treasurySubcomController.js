@@ -113,7 +113,6 @@ exports.getAllTreasurySubcomDetails = async (req, res) => {
         { phone_number: { $regex: search, $options: "i" } },
         { _id: { $in: treasurySubcomUserIds } },
       ];
-      console.log("Search treasurySubcomUserIds:", treasurySubcomUserIds);
     }
 
     if (regDate) {
@@ -121,7 +120,6 @@ exports.getAllTreasurySubcomDetails = async (req, res) => {
       const endDate = new Date(startDate);
       endDate.setDate(startDate.getDate() + 1);
       userQuery.created_at = { $gte: startDate, $lt: endDate };
-      console.log("Registration date filter:", { startDate, endDate });
     }
 
     if (["today", "week", "month"].includes(lastActive)) {
@@ -140,7 +138,6 @@ exports.getAllTreasurySubcomDetails = async (req, res) => {
       if (recentLogUserIds.length > 0) {
         userQuery._id = { $in: recentLogUserIds };
       }
-      console.log("Last active user IDs:", recentLogUserIds);
     }
 
     let pipeline = [
@@ -171,33 +168,12 @@ exports.getAllTreasurySubcomDetails = async (req, res) => {
             {
               $match: {
                 $expr: {
-                  $or: [
-                    { $eq: ["$sender_id", "$$user_id"] },
-                    { $eq: ["$receiver_id", "$$user_id"] },
-                  ],
+                  $eq: ["$sender_id", "$$user_id"]
                 },
               },
             },
             { $sort: { created_at: -1 } },
             { $limit: 1 },
-            {
-              $lookup: {
-                from: "users",
-                localField: "sender_id",
-                foreignField: "_id",
-                as: "sender",
-              },
-            },
-            { $unwind: { path: "$sender", preserveNullAndEmptyArrays: true } },
-            {
-              $lookup: {
-                from: "roles",
-                localField: "sender.role_id",
-                foreignField: "_id",
-                as: "sender_role",
-              },
-            },
-            { $unwind: { path: "$sender_role", preserveNullAndEmptyArrays: true } },
             {
               $lookup: {
                 from: "users",
@@ -218,9 +194,6 @@ exports.getAllTreasurySubcomDetails = async (req, res) => {
             { $unwind: { path: "$receiver_role", preserveNullAndEmptyArrays: true } },
             {
               $project: {
-                sender_id: "$sender._id",
-                sender_name: "$sender.name",
-                sender_role_name: "$sender_role.name",
                 receiver_id: "$receiver._id",
                 receiver_name: "$receiver.name",
                 receiver_role_name: "$receiver_role.name",
@@ -239,9 +212,8 @@ exports.getAllTreasurySubcomDetails = async (req, res) => {
           treasury_subcom_id: "$treasurySubcom.treasury_subcom_id",
           balance: { $ifNull: ["$balance.balance", 0] },
           created_at: 1,
-          sender_id: "$transaction.sender_id",
-          sender_name: "$transaction.sender_name",
-          sender_role_name: "$transaction.sender_role_name",
+          treasury_name: "$name",
+          treasury_role: "$role_id",
           receiver_id: "$transaction.receiver_id",
           receiver_name: "$transaction.receiver_name",
           receiver_role_name: "$transaction.receiver_role_name",
@@ -260,9 +232,7 @@ exports.getAllTreasurySubcomDetails = async (req, res) => {
     pipeline.push({ $sort: sortOption });
 
     const treasurySubcomsRaw = await User.aggregate(pipeline);
-    console.log("Aggregated treasurySubcoms:", treasurySubcomsRaw.length);
 
-    // Get Login Statuses
     const treasurySubcomIds = treasurySubcomsRaw.map((u) => u._id);
     const loginLogs = await LoginLog.find({ user_id: { $in: treasurySubcomIds } }).sort({ login_time: -1 });
 
@@ -281,37 +251,32 @@ exports.getAllTreasurySubcomDetails = async (req, res) => {
       if (log.status === true && !log.logout_time) activeUserSet.add(id);
     });
 
-    // Format data
     let formatted = treasurySubcomsRaw.map((u) => {
       const idStr = u._id.toString();
       return {
         id: u.treasury_subcom_id,
         name: u.name,
         phone: u.phone_number,
+        treasury_name: u.treasury_name,
+        role_id: u.treasury_role,
         balance: parseFloat(u.balance.toString()),
         status: activeUserSet.has(idStr) ? "Online" : "Offline",
         lastActive: lastActiveMap[idStr] || "Unknown",
-        sender_id: u.sender_id?.toString() || "Unknown",
-        sender_name: u.sender_name || "Unknown",
-        sender_role_name: u.sender_role_name || "Unknown",
         receiver_id: u.receiver_id?.toString() || "Unknown",
         receiver_name: u.receiver_name || "Unknown",
         receiver_role_name: u.receiver_role_name || "Unknown",
       };
     });
 
-    // Apply status filter AFTER formatting
     if (status !== "all") {
       formatted = formatted.filter((u) => u.status.toLowerCase() === status.toLowerCase());
     }
 
-    // Pagination after filtering
     const totalItems = formatted.length;
     const totalPages = Math.ceil(totalItems / pageSize);
     const start = (page - 1) * pageSize;
     const paginated = formatted.slice(start, start + parseInt(pageSize));
 
-    // Compute statistics
     const totalBalance = formatted.reduce((sum, u) => sum + u.balance, 0);
     const onlineCount = formatted.filter((u) => u.status === "Online").length;
 
@@ -327,6 +292,8 @@ exports.getAllTreasurySubcomDetails = async (req, res) => {
     res.status(500).json({ error: "Server error", details: error.message });
   }
 };
+
+
 exports.getTreasuryDetails = async (req, res) => {
   try {
     const { treasuryId } = req.params;

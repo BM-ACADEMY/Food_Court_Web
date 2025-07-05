@@ -6,6 +6,7 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { debounce } from "lodash";
 import {
   Card,
   CardContent,
@@ -53,41 +54,34 @@ import { useAuth } from "@/context/AuthContext";
 import getSocket from "@/socketConfig/Socket";
 const PER_PAGE = 10;
 const socket = getSocket();
+
+
 export default function History() {
   const { user } = useAuth();
   const [transactions, setTransactions] = useState([]);
   const [todayBalance, setTodayBalance] = useState("0.00");
-  const [transactionCount, setTransactionCount] = useState(0);
+  const [transactionCount, setTransactionCount] = useState(0); // Today's transactions
+  const [totalTransactionCount, setTotalTransactionCount] = useState(0); // Total transactions
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [openDialog, setOpenDialog] = useState(false);
   const [exportFormat, setExportFormat] = useState("csv");
   const [dateFilter, setDateFilter] = useState("All Time");
   const [typeFilter, setTypeFilter] = useState("All");
-  useEffect(() => {
-    if (user?._id) {
-      socket.emit("joinRestaurantRoom", user._id.toString());
 
-      socket.on("newTransaction", (data) => {
-        console.log("🔔 New transaction received via socket:", data);
-        loadData(); // 🔁 Re-fetch transactions and balance
-      });
-
-      return () => {
-        socket.off("newTransaction");
-      };
-    }
-  }, [user?._id]);
-  // Fetch today's balance and transactions
   const loadData = async () => {
-    if (!user) return;
+    if (!user) {
+      setError("Please log in to view transaction history.");
+      return;
+    }
 
     setIsLoading(true);
     setError(null);
     try {
-      // Fetch today's balance for restaurant
+      // Fetch today's balance and transaction count
       const balanceRes = await axios.get(
         `${import.meta.env.VITE_BASE_URL}/transactions/today-balance/${user._id}`,
         { withCredentials: true }
@@ -95,72 +89,65 @@ export default function History() {
       setTodayBalance(balanceRes.data.data.todayBalance || "0.00");
       setTransactionCount(balanceRes.data.data.transactionCount || 0);
 
-      // Fetch transactions
+      // Fetch transactions and total transaction count
       const txRes = await axios.get(
         `${import.meta.env.VITE_BASE_URL}/transactions/fetch-all-transaction`,
-        { withCredentials: true }
+        {
+          params: {
+            userId: user._id,
+            dateFilter,
+            typeFilter,
+            page: currentPage,
+            limit: PER_PAGE,
+          },
+          withCredentials: true,
+        }
       );
-      const allTransactions = txRes.data.data;
-
-      // Log transactions to debug customer_id
-      console.log("Fetched transactions:", allTransactions);
-
-      // Filter transactions where user is sender or receiver
-      const userTransactions = allTransactions.filter(
-        (tx) =>
-          (tx.sender_id?._id.toString() === user._id.toString() ||
-            tx.receiver_id?._id.toString() === user._id.toString()) &&
-          tx.customer_id !== undefined // Ensure customer_id is present
-      );
-
-      console.log("Filtered user transactions:", userTransactions);
-      userTransactions.forEach((tx) =>
-        console.log(`Transaction ${tx.transaction_id}: customer_id=${tx.customer_id}`)
-      );
-
-      setTransactions(userTransactions);
+      setTransactions(txRes.data.data);
+      setTotalPages(txRes.data.pagination.totalPages);
+      // Set totalTransactionCount only when dateFilter is "All Time" and typeFilter is "All"
+      if (dateFilter === "All Time" && typeFilter === "All") {
+        setTotalTransactionCount(txRes.data.pagination.totalTransactions || 0);
+      }
     } catch (error) {
       console.error("Failed to load data:", error);
-      setError(
-        error.response?.data?.message ||
-        "Failed to load transactions or today's balance."
-      );
+      let errorMessage = "Failed to load transactions or today's balance.";
+      if (error.code === "ERR_NETWORK") {
+        errorMessage = "Network error. Please check your connection and try again.";
+      } else if (error.response?.status === 401) {
+        errorMessage = "Unauthorized. Please log in again.";
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const loadDataDebounced = debounce(loadData, 1000);
+
+  useEffect(() => {
+    if (user?._id) {
+      socket.emit("joinRestaurantRoom", user._id.toString());
+
+      socket.on("newTransaction", (data) => {
+        console.log("🔔 New transaction received via socket:", data);
+        loadDataDebounced();
+      });
+
+      return () => {
+        socket.off("newTransaction");
+        loadDataDebounced.cancel();
+      };
+    }
+  }, [user?._id]);
+
   useEffect(() => {
     loadData();
-  }, [user]);
+  }, [user, dateFilter, typeFilter, currentPage]);
 
-  // Date filtering logic
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-
-  const dateFiltered = transactions.filter((txn) => {
-    const txnDate = new Date(txn.created_at);
-    const txnDateOnly = new Date(
-      txnDate.getFullYear(),
-      txnDate.getMonth(),
-      txnDate.getDate()
-    );
-    if (dateFilter === "Today") return txnDateOnly.getTime() === today.getTime();
-    if (dateFilter === "Yesterday")
-      return txnDateOnly.getTime() === yesterday.getTime();
-    return true; // All Time
-  });
-
-  // Type filtering logic
-  const typeFiltered = dateFiltered.filter((txn) => {
-    if (typeFilter === "All") return true;
-    return txn.transaction_type === typeFilter;
-  });
-
-  // Search filtering logic
-  const filtered = typeFiltered.filter((txn) => {
+  const filtered = transactions.filter((txn) => {
     const customerName =
       txn.sender_id?._id.toString() === user._id.toString()
         ? txn.receiver_id?.name
@@ -169,20 +156,14 @@ export default function History() {
     return (
       (customerName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       customerId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (txn.transaction_id || txn._id || "")
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase()) ||
+      (txn.transaction_id || txn._id || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (txn.amount || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (txn.status || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (txn.transaction_type || "").toLowerCase().includes(searchQuery.toLowerCase())
     );
   });
 
-  const totalPages = Math.ceil(filtered.length / PER_PAGE);
-  const paginated = filtered.slice(
-    (currentPage - 1) * PER_PAGE,
-    currentPage * PER_PAGE
-  );
+  const paginated = filtered;
 
   const exportData = () => {
     const data = filtered.map((txn, index) => {
@@ -215,7 +196,6 @@ export default function History() {
       };
     });
 
-    // Calculate total amount
     const totalAmount = data.reduce((sum, txn) => {
       const amount = txn.Amount;
       const isOutgoing = txn["Formatted Amount"].startsWith("-");
@@ -223,7 +203,6 @@ export default function History() {
     }, 0);
 
     if (exportFormat === "csv" || exportFormat === "excel") {
-      // Add total row to the data
       const dataWithTotal = [
         ...data,
         {
@@ -243,11 +222,9 @@ export default function History() {
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Transactions");
 
-      // Style the total row
       if (exportFormat === "excel") {
         const ws = workbook.Sheets["Transactions"];
-        // Bold the total row
-        const totalRow = data.length + 2; // +2 because header is row 1 and data starts at row 2
+        const totalRow = data.length + 2;
         ws[`A${totalRow}`].s = { font: { bold: true } };
         ws[`E${totalRow}`].s = { font: { bold: true } };
         ws[`F${totalRow}`].s = { font: { bold: true } };
@@ -265,15 +242,12 @@ export default function History() {
     } else if (exportFormat === "pdf") {
       const doc = new jsPDF();
 
-      // Title
       doc.setFontSize(16);
       doc.text("Transaction History Report", 14, 10);
 
-      // Date range info
       doc.setFontSize(10);
       doc.text(`Date Range: ${dateFilter}`, 14, 18);
 
-      // Prepare data with serial numbers
       const tableData = data.map((txn) => [
         txn["S.No"],
         txn["Transaction ID"],
@@ -284,7 +258,6 @@ export default function History() {
         txn.Type,
       ]);
 
-      // Table
       autoTable(doc, {
         startY: 25,
         head: [
@@ -301,7 +274,6 @@ export default function History() {
         body: tableData,
         foot: [["", "", "TOTAL", totalAmount.toFixed(2), "", "", ""]],
         didDrawPage: function (data) {
-          // Footer with page numbers
           const pageCount = doc.internal.getNumberOfPages();
           doc.setFontSize(10);
           for (let i = 1; i <= pageCount; i++) {
@@ -314,23 +286,23 @@ export default function History() {
           }
         },
         headStyles: {
-          fillColor: [0, 0, 82], // Dark blue header
-          textColor: 255, // White text
+          fillColor: [0, 0, 82],
+          textColor: 255,
           fontStyle: "bold",
         },
         footStyles: {
-          fillColor: [220, 220, 220], // Gray footer
-          textColor: 0, // Black text
+          fillColor: [220, 220, 220],
+          textColor: 0,
           fontStyle: "bold",
         },
         columnStyles: {
-          0: { cellWidth: "auto" }, // Serial number column
-          1: { cellWidth: "auto" }, // Transaction ID column
-          2: { cellWidth: "auto" }, // Customer column
-          3: { cellWidth: "auto" }, // Amount column
-          4: { cellWidth: "auto" }, // Date column
-          5: { cellWidth: "auto" }, // Status column
-          6: { cellWidth: "auto" }, // Type column
+          0: { cellWidth: "auto" },
+          1: { cellWidth: "auto" },
+          2: { cellWidth: "auto" },
+          3: { cellWidth: "auto" },
+          4: { cellWidth: "auto" },
+          5: { cellWidth: "auto" },
+          6: { cellWidth: "auto" },
         },
       });
 
@@ -339,17 +311,6 @@ export default function History() {
 
     setOpenDialog(false);
   };
-
-  // Calculate today's transactions
-  const todaysTransactions = transactions.filter((txn) => {
-    const txnDate = new Date(txn.created_at);
-    const txnDateOnly = new Date(
-      txnDate.getFullYear(),
-      txnDate.getMonth(),
-      txnDate.getDate()
-    );
-    return txnDateOnly.getTime() === today.getTime();
-  }).length;
 
   if (!user) {
     return (
@@ -372,7 +333,6 @@ export default function History() {
 
   return (
     <div className="min-h-screen p-4 md:p-8 max-w-7xl mx-auto">
-      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <Card className="bg-white border-l-4 border-blue-700 shadow-sm">
           <CardContent className="py-4 flex items-center justify-between">
@@ -393,7 +353,7 @@ export default function History() {
             <div>
               <p className="text-gray-500 text-sm">Total Transactions</p>
               <p className="text-2xl font-semibold text-green-900">
-                {transactions.length}
+                {totalTransactionCount}
               </p>
             </div>
             <div className="p-2 bg-green-100 rounded-full">
@@ -406,9 +366,7 @@ export default function History() {
           <CardContent className="py-4 flex items-center justify-between">
             <div>
               <p className="text-gray-500 text-sm">Today's Transactions</p>
-              <p className="text-2xl font-semibold text-purple-900">
-                {transactionCount}
-              </p>
+              <p className="text-2xl font-semibold text-purple-900">{transactionCount}</p>
             </div>
             <div className="p-2 bg-purple-100 rounded-full">
               <Clock className="text-purple-700" size={24} />
@@ -417,7 +375,6 @@ export default function History() {
         </Card>
       </div>
 
-      {/* Controls */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4">
         <div className="flex items-center gap-2 w-full md:w-auto">
           <DropdownMenu>
@@ -480,15 +437,11 @@ export default function History() {
         </Button>
       </div>
 
-      {/* Table */}
-      {/* Table */}
       <div className="bg-white shadow rounded-lg overflow-x-auto">
         <table className="w-full text-sm text-left border-t">
           <thead className="bg-gray-100 text-gray-700 uppercase text-xs">
             <tr>
-              <th className="p-4 font-medium w-12">
-                {/* Empty header for checkbox column */}
-              </th>
+              <th className="p-4 font-medium w-12"></th>
               <th className="p-4 font-medium">Transaction ID</th>
               <th className="p-4 font-medium">Customer</th>
               <th className="p-4 font-medium">Customer ID</th>
@@ -528,8 +481,9 @@ export default function History() {
                     <td className="p-4">{customerName}</td>
                     <td className="p-4 text-gray-500">{customerId}</td>
                     <td
-                      className={`p-4 font-semibold ${amountPrefix === "+" ? "text-green-600" : "text-red-600"
-                        }`}
+                      className={`p-4 font-semibold ${
+                        amountPrefix === "+" ? "text-green-600" : "text-red-600"
+                      }`}
                     >
                       {amountPrefix}₹{parseFloat(txn.amount || "0.00").toFixed(2)}
                     </td>
@@ -561,7 +515,6 @@ export default function History() {
         </table>
       </div>
 
-      {/* Pagination */}
       <Pagination className="mt-6 justify-end">
         <PaginationContent>
           <PaginationItem>
@@ -610,7 +563,6 @@ export default function History() {
         </PaginationContent>
       </Pagination>
 
-      {/* Export Dialog */}
       <Dialog open={openDialog} onOpenChange={setOpenDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -623,28 +575,19 @@ export default function History() {
             <RadioGroup value={exportFormat} onValueChange={setExportFormat}>
               <div className="flex items-center gap-3 p-2 rounded-md hover:bg-muted cursor-pointer">
                 <RadioGroupItem value="csv" id="export-csv" />
-                <Label
-                  htmlFor="export-csv"
-                  className="flex items-center gap-2"
-                >
+                <Label htmlFor="export-csv" className="flex items-center gap-2">
                   <FileText size={18} /> CSV
                 </Label>
               </div>
               <div className="flex items-center gap-3 p-2 rounded-md hover:bg-muted cursor-pointer">
                 <RadioGroupItem value="excel" id="export-excel" />
-                <Label
-                  htmlFor="export-excel"
-                  className="flex items-center gap-2"
-                >
+                <Label htmlFor="export-excel" className="flex items-center gap-2">
                   <FileSpreadsheet size={18} /> Excel (.xlsx)
                 </Label>
               </div>
               <div className="flex items-center gap-3 p-2 rounded-md hover:bg-muted cursor-pointer">
                 <RadioGroupItem value="pdf" id="export-pdf" />
-                <Label
-                  htmlFor="export-pdf"
-                  className="flex items-center gap-2"
-                >
+                <Label htmlFor="export-pdf" className="flex items-center gap-2">
                   <FileSignature size={18} /> PDF
                 </Label>
               </div>

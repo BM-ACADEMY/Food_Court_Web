@@ -401,56 +401,153 @@ exports.processPayment = async (req, res) => {
 
 exports.getAllTransactions = async (req, res) => {
   try {
-    const transactions = await Transaction.find()
+    const { userId, dateFilter, typeFilter, page = 1, limit = 10 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
 
-      .sort({ created_at: -1 })
-      .populate({
-        path: "sender_id",
-        select: "name email phone_number role_id",
-        populate: { path: "role_id", select: "_id role_id name" },
-      })
-      .populate({
-        path: "receiver_id",
-        select: "name email phone_number role_id",
-        populate: { path: "role_id", select: "_id role_id name" },
-      })
+    let matchStage = {};
+    if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+      matchStage.$or = [
+        { sender_id: new mongoose.Types.ObjectId(userId) },
+        { receiver_id: new mongoose.Types.ObjectId(userId) },
+      ];
+    }
 
-      // .populate("location_id", "location_name")
+    if (typeFilter && typeFilter !== "All") {
+      matchStage.transaction_type = typeFilter;
+    }
 
-      .lean();
+    if (dateFilter && dateFilter !== "All Time") {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      let startDate, endDate;
 
-    // Enrich transactions with customer_id
-    const enrichedTransactions = await Promise.all(
-      transactions.map(async (transaction) => {
-        let customer_id = null;
-        let customerUserId = null;
+      if (dateFilter === "Today") {
+        startDate = today;
+        endDate = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+      } else if (dateFilter === "Yesterday") {
+        startDate = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+        endDate = today;
+      }
 
-        const senderRole = transaction.sender_id?.role_id?.role_id;
-        const receiverRole = transaction.receiver_id?.role_id?.role_id;
+      matchStage.created_at = { $gte: startDate, $lt: endDate };
+    }
 
-        if (senderRole === "role-5") {
-          customerUserId = transaction.sender_id._id;
-        } else if (receiverRole === "role-5") {
-          customerUserId = transaction.receiver_id._id;
-        }
+    const [transactions, total] = await Promise.all([
+      Transaction.aggregate([
+        { $match: matchStage },
+        { $sort: { created_at: -1 } },
+        { $skip: skip },
+        { $limit: parseInt(limit) },
+        {
+          $lookup: {
+            from: "users",
+            localField: "sender_id",
+            foreignField: "_id",
+            as: "sender_id",
+          },
+        },
+        { $unwind: "$sender_id" },
+        {
+          $lookup: {
+            from: "roles",
+            localField: "sender_id.role_id",
+            foreignField: "_id",
+            as: "sender_id.role_id",
+          },
+        },
+        { $unwind: "$sender_id.role_id" },
+        {
+          $lookup: {
+            from: "users",
+            localField: "receiver_id",
+            foreignField: "_id",
+            as: "receiver_id",
+          },
+        },
+        { $unwind: "$receiver_id" },
+        {
+          $lookup: {
+            from: "roles",
+            localField: "receiver_id.role_id",
+            foreignField: "_id",
+            as: "receiver_id.role_id",
+          },
+        },
+        { $unwind: "$receiver_id.role_id" },
+        {
+          $lookup: {
+            from: "customers",
+            let: {
+              senderId: "$sender_id._id",
+              receiverId: "$receiver_id._id",
+              senderRole: "$sender_id.role_id.role_id",
+              receiverRole: "$receiver_id.role_id.role_id",
+            },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $or: [
+                      { $and: [{ $eq: ["$user_id", "$$senderId"] }, { $eq: ["$$senderRole", "role-5"] }] },
+                      { $and: [{ $eq: ["$user_id", "$$receiverId"] }, { $eq: ["$$receiverRole", "role-5"] }] },
+                    ],
+                  },
+                },
+              },
+              { $project: { customer_id: 1 } },
+            ],
+            as: "customer",
+          },
+        },
+        {
+          $project: {
+            _id: 1,
+            transaction_id: 1,
+            sender_id: {
+              _id: "$sender_id._id",
+              name: "$sender_id.name",
+              email: "$sender_id.email",
+              phone_number: "$sender_id.phone_number",
+              role_id: {
+                _id: "$sender_id.role_id._id",
+                role_id: "$sender_id.role_id.role_id",
+                name: "$sender_id.role_id.name",
+              },
+            },
+            receiver_id: {
+              _id: "$receiver_id._id",
+              name: "$receiver_id.name",
+              email: "$receiver_id.email",
+              phone_number: "$receiver_id.phone_number",
+              role_id: {
+                _id: "$receiver_id.role_id._id",
+                role_id: "$receiver_id.role_id.role_id",
+                name: "$receiver_id.role_id.name",
+              },
+            },
+            amount: 1,
+            transaction_type: 1,
+            payment_method: 1,
+            status: 1,
+            remarks: 1,
+            created_at: 1,
+            customer_id: { $ifNull: [{ $arrayElemAt: ["$customer.customer_id", 0] }, "N/A"] },
+          },
+        },
+      ]),
+      Transaction.countDocuments(matchStage),
+    ]);
 
-        if (customerUserId) {
-          const customer = await Customer.findOne({ user_id: customerUserId })
-            .select("customer_id")
-            .lean();
-          customer_id = customer?.customer_id || "N/A";
-        } else {
-          customer_id = "N/A";
-        }
-
-        return {
-          ...transaction,
-          customer_id,
-        };
-      })
-    );
-
-    res.status(200).json({ success: true, data: enrichedTransactions });
+    res.status(200).json({
+      success: true,
+      data: transactions,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(total / parseInt(limit)),
+        totalTransactions: total,
+      },
+    });
   } catch (err) {
     console.error("Fetch all transactions error:", err.message, err.stack);
     res.status(400).json({
@@ -459,7 +556,6 @@ exports.getAllTransactions = async (req, res) => {
     });
   }
 };
-
 exports.getAllRecentTransaction = async (req, res) => {
   try {
     const debug =

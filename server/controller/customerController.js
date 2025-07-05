@@ -5,7 +5,7 @@ const Transaction = require("../model/transactionModel");
 const UserBalance = require("../model/userBalanceModel");
 const LoginLog = require("../model/loginLogModel");
 const mongoose = require("mongoose");
-const { format } =require('date-fns');
+const { startOfDay, subDays, subMonths, format } = require("date-fns");
 
 // Create Customer
 exports.createCustomer = async (req, res) => {
@@ -96,6 +96,8 @@ exports.deleteCustomer = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+
 exports.getAllCustomerDetails = async (req, res) => {
   try {
     const {
@@ -116,7 +118,6 @@ exports.getAllCustomerDetails = async (req, res) => {
     // Find customer role
     const customerRole = await Role.findOne({ name: "Customer" }).select("_id");
     if (!customerRole) {
-      debug("Customer role not found");
       return res.json({
         customers: [],
         totalCustomers: 0,
@@ -134,47 +135,55 @@ exports.getAllCustomerDetails = async (req, res) => {
       const customerMatches = await Customer.find({
         customer_id: { $regex: search, $options: "i" },
       }).select("user_id");
+
       const customerUserIds = customerMatches.map((c) => c.user_id);
       userQuery.$or = [
         { name: { $regex: search, $options: "i" } },
         { phone_number: { $regex: search, $options: "i" } },
         { _id: { $in: customerUserIds } },
       ];
-      debug("Search customerUserIds:", customerUserIds);
     }
 
-    // Handle registration date
+    // Filter by registration date
     if (regDate) {
       const startDate = new Date(regDate);
       const endDate = new Date(startDate);
       endDate.setDate(startDate.getDate() + 1);
       userQuery.created_at = { $gte: startDate, $lt: endDate };
-      debug("Registration date filter:", { startDate, endDate });
     }
 
     // Handle lastActive filter
     if (["today", "week", "month"].includes(lastActive)) {
       const now = new Date();
       let dateFilter;
-      if (lastActive === "today") {
-        dateFilter = startOfDay(now);
-      } else if (lastActive === "week") {
-        dateFilter = subDays(now, 7);
-      } else {
-        dateFilter = subMonths(now, 1);
-      }
+      if (lastActive === "today") dateFilter = startOfDay(now);
+      else if (lastActive === "week") dateFilter = subDays(now, 7);
+      else dateFilter = subMonths(now, 1);
 
       const recentLogUserIds = await LoginLog.find({
         login_time: { $gte: dateFilter },
       }).distinct("user_id");
+
       userQuery._id = recentLogUserIds.length
         ? { $in: recentLogUserIds }
         : { $in: [] };
-      debug("Last active user IDs:", recentLogUserIds);
     }
 
-    // Build pipeline
-    let pipeline = [
+    // Sort Options
+    const sortOptionMap = {
+      asc: { name: 1 },
+      desc: { name: -1 },
+      recent: { created_at: -1 },
+      "high-balance": { balance: -1 },
+      "low-balance": { balance: 1 },
+    };
+    const sortOption = sortOptionMap[sortBy] || sortOptionMap["asc"];
+
+    const pageNum = parseInt(page, 10) || 1;
+    const pageSizeNum = parseInt(pageSize, 10) || 10;
+
+    // Customer pipeline
+    const customerPipeline = [
       { $match: userQuery },
       {
         $lookup: {
@@ -184,7 +193,7 @@ exports.getAllCustomerDetails = async (req, res) => {
           as: "customer",
         },
       },
-      { $unwind: { path: "$customer", preserveNullAndEmptyArrays: false } },
+      { $unwind: "$customer" },
       {
         $lookup: {
           from: "userbalances",
@@ -197,190 +206,34 @@ exports.getAllCustomerDetails = async (req, res) => {
       {
         $lookup: {
           from: "loginlogs",
-          localField: "_id",
-          foreignField: "user_id",
-          as: "loginLogs",
-        },
-      },
-      {
-        $lookup: {
-          from: "roles",
-          localField: "role_id",
-          foreignField: "_id",
-          as: "role",
-        },
-      },
-      { $unwind: { path: "$role", preserveNullAndEmptyArrays: true } },
-      {
-        $lookup: {
-          from: "transactions",
           let: { userId: "$_id" },
           pipeline: [
-            {
-              $match: {
-                $expr: {
-                  $or: [
-                    { $eq: ["$sender_id", "$$userId"] },
-                    { $eq: ["$receiver_id", "$$userId"] },
-                  ],
-                },
-              },
-            },
-            { $sort: { created_at: -1 } },
+            { $match: { $expr: { $eq: ["$user_id", "$$userId"] } } },
+            { $sort: { login_time: -1 } },
             { $limit: 1 },
-            {
-              $lookup: {
-                from: "users",
-                localField: "sender_id",
-                foreignField: "_id",
-                as: "sender",
-              },
-            },
-            { $unwind: { path: "$sender", preserveNullAndEmptyArrays: true } },
-            {
-              $lookup: {
-                from: "roles",
-                localField: "sender.role_id",
-                foreignField: "_id",
-                as: "sender_role",
-              },
-            },
-            { $unwind: { path: "$sender_role", preserveNullAndEmptyArrays: true } },
-            {
-              $lookup: {
-                from: "users",
-                localField: "receiver_id",
-                foreignField: "_id",
-                as: "receiver",
-              },
-            },
-            { $unwind: { path: "$receiver", preserveNullAndEmptyArrays: true } },
-            {
-              $lookup: {
-                from: "roles",
-                localField: "receiver.role_id",
-                foreignField: "_id",
-                as: "receiver_role",
-              },
-            },
-            { $unwind: { path: "$receiver_role", preserveNullAndEmptyArrays: true } },
-            {
-              $project: {
-                sender_id: "$sender._id",
-                sender_name: "$sender.name",
-                sender_role_name: "$sender_role.name",
-                sender_role_id: "$sender_role._id",
-                receiver_id: "$receiver._id",
-                receiver_name: "$receiver.name",
-                receiver_role_name: "$receiver_role.name",
-                receiver_role_id: "$receiver_role._id",
-              },
-            },
           ],
-          as: "transaction",
+          as: "loginLog",
         },
       },
-      { $unwind: { path: "$transaction", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: "$loginLog", preserveNullAndEmptyArrays: true } },
       {
         $project: {
           user_id: "$_id",
           name: 1,
           phone_number: 1,
           is_flagged: 1,
+          created_at: 1,
           customer_id: "$customer.customer_id",
           registration_type: "$customer.registration_type",
           balance: { $ifNull: ["$balance.balance", 0] },
-          created_at: 1,
-          loginLogs: 1,
-          status: {
-            $cond: [
-              { $eq: [{ $max: "$loginLogs.status" }, true] },
-              "Online",
-              "Offline",
-            ],
-          },
-          lastLogin: { $max: "$loginLogs.login_time" },
-          sender_id: "$transaction.sender_id",
-          sender_name: "$transaction.sender_name",
-          sender_role: "$transaction.sender_role_name",
-          sender_role_id: "$transaction.sender_role_id",
-          receiver_id: "$transaction.receiver_id",
-          receiver_name: "$transaction.receiver_name",
-          receiver_role: "$transaction.receiver_role_name",
-          receiver_role_id: "$transaction.receiver_role_id",
-          role: "$role.name", // Include role name
+          lastLogin: "$loginLog.login_time",
+          loginStatus: "$loginLog.status",
         },
       },
-    ];
-
-    // Sort
-    const validSortOptions = ["asc", "desc", "recent", "high-balance", "low-balance"];
-    if (!validSortOptions.includes(sortBy)) {
-      return res.status(400).json({
-        error: `Invalid sortBy: ${sortBy}. Must be one of: ${validSortOptions.join(", ")}`,
-      });
-    }
-    const sortOption = {
-      asc: { name: 1 },
-      desc: { name: -1 },
-      recent: { created_at: -1 },
-      "high-balance": { balance: -1 },
-      "low-balance": { balance: 1 },
-    }[sortBy];
-
-    pipeline.push({ $sort: sortOption });
-
-    const pageNum = parseInt(page, 10) || 1;
-    const pageSizeNum = parseInt(pageSize, 10) || 10;
-    pipeline.push(
+      { $sort: sortOption },
       { $skip: (pageNum - 1) * pageSizeNum },
-      { $limit: pageSizeNum }
-    );
-
-    const customers = await User.aggregate(pipeline);
-    debug("Aggregated customers:", customers.length);
-
-    const formattedCustomers = customers.map((customer) => {
-      let lastActive = "Unknown";
-      if (customer.lastLogin) {
-        const now = new Date();
-        const lastLogin = new Date(customer.lastLogin);
-        const diffMinutes = (now - lastLogin) / 60000;
-
-        if (diffMinutes < 5) lastActive = "Just now";
-        else if (diffMinutes < 60)
-          lastActive = `${Math.floor(diffMinutes)} mins ago`;
-        else if (diffMinutes < 1440)
-          lastActive = `${Math.floor(diffMinutes / 60)} hours ago`;
-        else lastActive = format(lastLogin, "yyyy-MM-dd");
-      }
-
-      return {
-        user_id: customer.user_id?.toString(),
-        id: customer.customer_id,
-        name: customer.name,
-        phone: customer.phone_number,
-        registration_type: customer.registration_type || "Unknown",
-        balance: parseFloat(customer.balance.toString()),
-        status: customer.status,
-        lastActive,
-        is_flagged: customer.is_flagged || false,
-        role: customer.role || "Unknown", // Include role in response
-        sender_id: customer.sender_id?.toString() || "Unknown",
-        sender_name: customer.sender_name || "Unknown",
-        sender_role: customer.sender_role || "Unknown",
-        sender_role_id: customer.sender_role_id?.toString() || "Unknown",
-        receiver_id: customer.receiver_id?.toString() || "Unknown",
-        receiver_name: customer.receiver_name || "Unknown",
-        receiver_role: customer.receiver_role || "Unknown",
-        receiver_role_id: customer.receiver_role_id?.toString() || "Unknown",
-      };
-    });
-
-    // Apply status filter after formatting
-    const filteredCustomers = status !== "all"
-      ? formattedCustomers.filter((c) => c.status.toLowerCase() === status.toLowerCase())
-      : formattedCustomers;
+      { $limit: pageSizeNum },
+    ];
 
     // Stats pipeline
     const statsPipeline = [
@@ -412,24 +265,50 @@ exports.getAllCustomerDetails = async (req, res) => {
       },
     ];
 
-    const stats = await User.aggregate(statsPipeline);
-    const {
-      totalCustomers = 0,
-      totalBalance = 0,
-    } = stats[0] || {};
+    // Execute both in parallel
+    const [rawCustomers, stats] = await Promise.all([
+      User.aggregate(customerPipeline),
+      User.aggregate(statsPipeline),
+    ]);
 
-    // Online count
-    const onlineCount = filteredCustomers.filter(
-      (c) => c.status === "Online"
-    ).length;
+    // Format customers
+    const now = new Date();
+    const formattedCustomers = rawCustomers
+      .filter((c) => status === "all" || (c.loginStatus ? "Online" : "Offline").toLowerCase() === status.toLowerCase())
+      .map((customer) => {
+        let lastActive = "Unknown";
+        if (customer.lastLogin) {
+          const diffMins = (now - new Date(customer.lastLogin)) / 60000;
+          if (diffMins < 5) lastActive = "Just now";
+          else if (diffMins < 60) lastActive = `${Math.floor(diffMins)} mins ago`;
+          else if (diffMins < 1440) lastActive = `${Math.floor(diffMins / 60)} hours ago`;
+          else lastActive = format(new Date(customer.lastLogin), "yyyy-MM-dd");
+        }
+
+        return {
+          user_id: customer.user_id.toString(),
+          id: customer.customer_id,
+          name: customer.name,
+          phone: customer.phone_number,
+          registration_type: customer.registration_type || "Unknown",
+          balance: parseFloat(customer.balance.toString()),
+          status: customer.loginStatus ? "Online" : "Offline",
+          lastActive,
+          is_flagged: customer.is_flagged || false,
+        };
+      });
+
+    const { totalCustomers = 0, totalBalance = 0 } = stats[0] || {};
+    const onlineCount = formattedCustomers.filter((c) => c.status === "Online").length;
 
     res.json({
-      customers: filteredCustomers,
+      customers: formattedCustomers,
       totalCustomers,
       totalBalance: parseFloat(totalBalance.toString()),
       onlineCount,
       totalPages: Math.ceil(totalCustomers / pageSizeNum),
     });
+
   } catch (error) {
     console.error("Error in getAllCustomerDetails:", error);
     res.status(500).json({ error: "Server error", details: error.message });

@@ -375,7 +375,6 @@ export default function TreasurySubcomList() {
                 <TableRow>
                   <TableHead>Treasury Subcom ID</TableHead>
                   <TableHead>Sender Name</TableHead>
-                  <TableHead>Receiver Name</TableHead>
                   <TableHead>Balance</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Last Active</TableHead>
@@ -395,26 +394,16 @@ export default function TreasurySubcomList() {
                       <TableCell className="font-medium">#{subcom.id}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <Avatar name={subcom.sender_name} />
+                          <Avatar name={subcom.name} />
                           <div className="flex flex-col gap-1">
-                            <span>{subcom.sender_name}</span>
-                            <span className="text-[12px] text-gray-500">
+                            <span>{subcom.name}</span>
+                            {/* <span className="text-[12px] text-gray-500">
                               ({subcom.sender_role_name})
-                            </span>
+                            </span> */}
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Avatar name={subcom.receiver_name} />
-                          <div className="flex flex-col gap-1">
-                            <span>{subcom.receiver_name}</span>
-                            <span className="text-[12px] text-gray-500">
-                              ({subcom.receiver_role_name})
-                            </span>
-                          </div>
-                        </div>
-                      </TableCell>
+                
                       <TableCell>
                         <span
                           className={`font-medium ${
