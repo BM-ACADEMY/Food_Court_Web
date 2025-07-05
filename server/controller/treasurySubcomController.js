@@ -327,7 +327,6 @@ exports.getAllTreasurySubcomDetails = async (req, res) => {
     res.status(500).json({ error: "Server error", details: error.message });
   }
 };
-
 exports.getTreasuryDetails = async (req, res) => {
   try {
     const { treasuryId } = req.params;
@@ -483,6 +482,7 @@ exports.getTreasuryTransactions = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch transactions" });
   }
 };
+
 
 exports.getSessionReport = async (req, res) => {
   try {

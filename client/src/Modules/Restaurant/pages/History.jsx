@@ -51,7 +51,7 @@ import {
 } from "@/components/ui/pagination";
 import { useAuth } from "@/context/AuthContext";
 import getSocket from "@/socketConfig/Socket";
-const PER_PAGE = 15;
+const PER_PAGE = 10;
 const socket = getSocket();
 export default function History() {
   const { user } = useAuth();
