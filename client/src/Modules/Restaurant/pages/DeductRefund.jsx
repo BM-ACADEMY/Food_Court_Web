@@ -1,13 +1,21 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import Deduct from '@/Modules/Restaurant/pages/Deduct';
 import Refund from '@/Modules/Restaurant/pages/Refund';
 
 const DeductRefund = () => {
   const [activeTab, setActiveTab] = useState("deduct");
+  const navigate = useNavigate();
 
   return (
     <div className="container mx-auto p-4">
+      <div className="mb-4">
+        <Button variant="ghost" onClick={() => navigate(-1)} className="cursor-pointer gap-2 -ml-4">
+          <ArrowLeft className="w-4 h-4" /> Back
+        </Button>
+      </div>
       {/* Centered Tabs */}
       <div className="flex justify-center gap-4 mb-2">
         <Button

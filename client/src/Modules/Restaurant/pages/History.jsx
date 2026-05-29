@@ -7,6 +7,7 @@ import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { debounce } from "lodash";
+import { useNavigate } from "react-router-dom";
 import {
   Card,
   CardContent,
@@ -30,6 +31,7 @@ import {
   FileSpreadsheet,
   FileSignature,
   Filter,
+  ArrowLeft,
 } from "lucide-react";
 import {
   Dialog,
@@ -58,6 +60,7 @@ const socket = getSocket();
 
 export default function History() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [transactions, setTransactions] = useState([]);
   const [todayBalance, setTodayBalance] = useState("0.00");
   const [transactionCount, setTransactionCount] = useState(0); // Today's transactions
@@ -333,6 +336,11 @@ export default function History() {
 
   return (
     <div className="min-h-screen p-4 md:p-8 max-w-7xl mx-auto">
+      <div className="mb-4">
+        <Button variant="ghost" onClick={() => navigate(-1)} className="cursor-pointer gap-2 -ml-4">
+          <ArrowLeft className="w-4 h-4" /> Back
+        </Button>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <Card className="bg-white border-l-4 border-blue-700 shadow-sm">
           <CardContent className="py-4 flex items-center justify-between">

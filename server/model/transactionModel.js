@@ -106,7 +106,7 @@ const transactionSchema = new mongoose.Schema(
     transaction_type: {
       type: String,
       required: true,
-      enum: ["Transfer", "TopUp", "Refund", "Credit", "Registration Fee"],
+      enum: ["Transfer", "TopUp", "Refund", "Credit", "Registration Fee", "Merge"],
     },
     payment_method: {
       type: String,
@@ -120,6 +120,11 @@ const transactionSchema = new mongoose.Schema(
     },
     remarks: {
       type: String,
+    },
+    order_status: {
+      type: String,
+      enum: ["Pending", "Preparing", "Ready", "Delivered", "Cancelled"],
+      default: "Pending",
     },
  
     edited_at: {

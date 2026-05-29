@@ -12,7 +12,7 @@ const Header = () => {
           alt="Pegasus Logo"
           className="w-8 h-8"
         />
-        <span className="text-lg font-bold tracking-wide">PEGASUS 2K25</span>
+        <span className="text-lg font-bold tracking-wide">PEGASUS 2K26</span>
       </div>
 
       <div className="flex items-center gap-4">

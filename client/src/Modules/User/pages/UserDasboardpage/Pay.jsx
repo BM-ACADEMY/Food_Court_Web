@@ -319,7 +319,7 @@ const QrScanner = () => {
             </Button>
             <Button
               onClick={handlePaymentSubmit}
-              className="bg-[#000066] hover:bg-[#000080] text-white text-sm sm:text-base"
+              className="bg-[#000066] hover:bg-[#000080] text-white text-sm sm:text-base cursor-pointer"
               disabled={!isCustomer || !amount || isSubmitting}
             >
               Pay Now

@@ -1,9 +1,9 @@
 const nodemailer = require("nodemailer");
 
-const sendEmail = async ({ to, subject, html }) => {
+const sendEmail = async ({ to, subject, html, attachments }) => {
   const transporter = nodemailer.createTransport({
     host: process.env.EMAIL_HOST,
-    secure:true,
+    secure: true,
     port: 465,
     auth: {
       user: process.env.EMAIL_USER,
@@ -12,10 +12,11 @@ const sendEmail = async ({ to, subject, html }) => {
   });
 
   await transporter.sendMail({
-    from: `"Pegasus2025" <${process.env.EMAIL_USER}>`,
+    from: `"Pegasus2026" <${process.env.EMAIL_USER}>`,
     to,
     subject,
     html,
+    attachments,
   });
 };
 

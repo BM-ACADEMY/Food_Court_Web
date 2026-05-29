@@ -12,5 +12,6 @@ router.get('/fetch-all-balance', userBalanceController.getAllUserBalances); // l
 router.get('/dashboard-summary', userBalanceController.getDashboardSummary); // list all
 router.get('/fetch-balance-by-id/:user_id', userBalanceController.getBalanceByUserId); // get by user_id
 router.delete('/delete-balance/:id', userBalanceController.deleteBalance); // delete by balance _id
+router.post('/merge-balance', userBalanceController.mergeBalance);
 
 module.exports = router;

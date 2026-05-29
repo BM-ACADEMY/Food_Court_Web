@@ -42,7 +42,10 @@ export function UserForm({ open, onOpenChange, onSubmit, defaultValues }) {
     admin_to_admin_transfer_limit: "",
     admin_to_subcom_transfer_limit: "",
     top_up_limit: "",
+    menuItems: [], // Dynamic menu items for restaurant
   });
+
+  const [loadingMenu, setLoadingMenu] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -77,9 +80,26 @@ export function UserForm({ open, onOpenChange, onSubmit, defaultValues }) {
             admin_to_admin_transfer_limit: "",
             admin_to_subcom_transfer_limit: "",
             top_up_limit: "",
+            menuItems: [],
             ...defaultValues,
             role_id: defaultValues?.role_id || defaultRoleId,
           }));
+
+          // Fetch menu items if editing a restaurant
+          if (defaultValues && defaultValues.r_id) {
+            setLoadingMenu(true);
+            axios.get(`${import.meta.env.VITE_BASE_URL}/products/customer/fetch-by-restaurant/${defaultValues.r_id}`, { withCredentials: true })
+              .then(res => {
+                if (res.data.data && res.data.data.length > 0) {
+                  setFormData(prev => ({
+                    ...prev,
+                    menuItems: res.data.data.map(p => ({ _id: p._id, name: p.name, amount: p.amount }))
+                  }));
+                }
+              })
+              .catch(err => console.error("Failed to load menu items", err))
+              .finally(() => setLoadingMenu(false));
+          }
         })
         .catch(() => {
           setRoleError("Failed to load roles or locations");
@@ -226,6 +246,75 @@ export function UserForm({ open, onOpenChange, onSubmit, defaultValues }) {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* Dynamic Menu Items Section */}
+              <div className="mt-4 border-t pt-4">
+                <div className="flex justify-between items-center mb-3">
+                  <Label className="text-lg font-bold text-[#00004D]">Menu Items</Label>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    className="border-[#00004D] text-[#00004D]"
+                    onClick={() => {
+                      setFormData(prev => ({
+                        ...prev,
+                        menuItems: [...prev.menuItems, { _id: null, name: "", amount: "" }]
+                      }));
+                    }}
+                  >
+                    + Add Item
+                  </Button>
+                </div>
+                {loadingMenu ? (
+                  <p className="text-sm text-gray-500">Loading menu items...</p>
+                ) : formData.menuItems.length === 0 ? (
+                  <p className="text-sm text-gray-500 italic">No menu items added. Click above to add one.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {formData.menuItems.map((item, index) => (
+                      <div key={index} className="flex gap-2 items-end bg-gray-50 p-2 rounded border">
+                        <div className="flex-1">
+                          <Label className="text-xs mb-1 block">Item Name</Label>
+                          <Input 
+                            placeholder="e.g. Burger" 
+                            value={item.name} 
+                            onChange={(e) => {
+                              const newItems = [...formData.menuItems];
+                              newItems[index].name = e.target.value;
+                              setFormData(prev => ({ ...prev, menuItems: newItems }));
+                            }} 
+                          />
+                        </div>
+                        <div className="w-24">
+                          <Label className="text-xs mb-1 block">Price (₹)</Label>
+                          <Input 
+                            type="number"
+                            placeholder="0.00" 
+                            value={item.amount} 
+                            onChange={(e) => {
+                              const newItems = [...formData.menuItems];
+                              newItems[index].amount = e.target.value;
+                              setFormData(prev => ({ ...prev, menuItems: newItems }));
+                            }} 
+                          />
+                        </div>
+                        <Button 
+                          type="button" 
+                          variant="destructive" 
+                          size="icon"
+                          onClick={() => {
+                            const newItems = formData.menuItems.filter((_, i) => i !== index);
+                            setFormData(prev => ({ ...prev, menuItems: newItems }));
+                          }}
+                        >
+                          <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5.5 1C5.22386 1 5 1.22386 5 1.5C5 1.77614 5.22386 2 5.5 2H9.5C9.77614 2 10 1.77614 10 1.5C10 1.22386 9.77614 1 9.5 1H5.5ZM3 3.5C3 3.22386 3.22386 3 3.5 3H11.5C11.7761 3 12 3.22386 12 3.5C12 3.77614 11.7761 4 11.5 4H11V12C11 12.5523 10.5523 13 10 13H5C4.44772 13 4 12.5523 4 12V4H3.5C3.22386 4 3 3.77614 3 3.5ZM5 4H10V12H5V4Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path></svg>
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </>
           )}

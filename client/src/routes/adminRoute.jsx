@@ -12,6 +12,7 @@ import { UpiManager } from "@/Modules/Admin/pages/upi/UpiPage";
 import GenerateQr from "@/Modules/Admin/pages/offlineQrcode/OfflineQrcode";
 import PointExchange from "@/Modules/Admin/pages/points/PointExchange";
 import AddDeleteAccess from "@/Modules/Admin/pages/users/AddDeleteAccess";
+import MergeBalance from "@/Modules/Master-admin/pages/account/MergeBalance";
 import FeesTable from "@/Modules/Admin/pages/fees/FeesTable";
 
 export default function AdminRoutes() {
@@ -26,6 +27,7 @@ export default function AdminRoutes() {
         <Route path="admin/admin-list" element={<AdminList />} />  
          <Route path="points/point-exchange" element={<PointExchange />} />
           <Route path="adddelete/add-new-user" element={<AddDeleteAccess />} />
+        <Route path="merge-balance" element={<MergeBalance />} />
         <Route path="history" element={<SessionHistory />} />  
         <Route path="locations" element={<LocationManager />} />
          <Route path="fees" element={<FeesTable />} />  

@@ -398,3 +398,58 @@ exports.deleteBalance = async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
+
+// Merge balances between two accounts
+exports.mergeBalance = async (req, res) => {
+  const { source_user_id, target_user_id } = req.body;
+
+  if (!source_user_id || !target_user_id) {
+    return res.status(400).json({ success: false, message: "Source and target user IDs are required." });
+  }
+
+  if (source_user_id === target_user_id) {
+    return res.status(400).json({ success: false, message: "Cannot merge an account into itself." });
+  }
+
+  try {
+    const sourceBalanceDoc = await UserBalance.findOne({ user_id: source_user_id });
+    const targetBalanceDoc = await UserBalance.findOne({ user_id: target_user_id });
+
+    if (!sourceBalanceDoc) {
+      return res.status(404).json({ success: false, message: "Source account balance not found." });
+    }
+
+    if (!targetBalanceDoc) {
+      return res.status(404).json({ success: false, message: "Target account balance not found." });
+    }
+
+    const amountToTransfer = parseFloat(sourceBalanceDoc.balance);
+    if (amountToTransfer <= 0) {
+      return res.status(400).json({ success: false, message: "Source account has no balance to merge." });
+    }
+
+    // Perform updates without Mongoose sessions since Replica Set is not configured
+    sourceBalanceDoc.balance = "0.00";
+    await sourceBalanceDoc.save();
+
+    targetBalanceDoc.balance = (parseFloat(targetBalanceDoc.balance) + amountToTransfer).toFixed(2);
+    await targetBalanceDoc.save();
+
+    // Log the transaction
+    await Transaction.create({
+      transaction_id: "MRG" + Date.now().toString().slice(-6),
+      sender_id: source_user_id,
+      receiver_id: target_user_id,
+      amount: amountToTransfer.toFixed(2),
+      transaction_type: "Merge",
+      payment_method: "Balance Deduction",
+      status: "Success",
+      remarks: "Account balance merge",
+    });
+
+    res.status(200).json({ success: true, message: "Balance successfully merged." });
+  } catch (error) {
+    console.error("Error merging balance:", error);
+    res.status(500).json({ success: false, message: "Server error during merge." });
+  }
+};

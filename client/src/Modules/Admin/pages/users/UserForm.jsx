@@ -17,6 +17,7 @@ import {
 import { useEffect, useState } from "react";
 import axios from "axios";
 import zxcvbn from "zxcvbn";
+import { Trash2 } from "lucide-react";
 
 export function UserForm({ open, onOpenChange, onSubmit, defaultValues }) {
   const [roles, setRoles] = useState([]);
@@ -40,7 +41,10 @@ export function UserForm({ open, onOpenChange, onSubmit, defaultValues }) {
     admin_to_admin_transfer_limit: "",
     admin_to_subcom_transfer_limit: "",
     top_up_limit: "",
+    menuItems: [],
   });
+
+  const [loadingMenu, setLoadingMenu] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -82,7 +86,24 @@ export function UserForm({ open, onOpenChange, onSubmit, defaultValues }) {
             top_up_limit: "",
             ...defaultValues,
             role_id: defaultValues?.role_id || defaultRoleId,
+            menuItems: [],
           }));
+
+          // Fetch menu items if editing a restaurant
+          if (defaultValues && defaultValues.r_id) {
+            setLoadingMenu(true);
+            axios.get(`${import.meta.env.VITE_BASE_URL}/products/customer/fetch-by-restaurant/${defaultValues.r_id}`, { withCredentials: true })
+              .then(res => {
+                if (res.data.data && res.data.data.length > 0) {
+                  setFormData(prev => ({
+                    ...prev,
+                    menuItems: res.data.data.map(p => ({ _id: p._id, name: p.name, amount: p.amount }))
+                  }));
+                }
+              })
+              .catch(err => console.error("Failed to load menu items", err))
+              .finally(() => setLoadingMenu(false));
+          }
         })
         .catch(() => {
           setRoleError("Failed to load roles or locations");
@@ -241,6 +262,70 @@ export function UserForm({ open, onOpenChange, onSubmit, defaultValues }) {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* Dynamic Menu Items */}
+              <div className="mt-4 p-4 border rounded bg-gray-50">
+                <div className="flex justify-between items-center mb-2">
+                  <Label className="font-bold">Menu Items</Label>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setFormData(prev => ({ 
+                      ...prev, 
+                      menuItems: [...prev.menuItems, { name: "", amount: "" }] 
+                    }))}
+                  >
+                    + Add Item
+                  </Button>
+                </div>
+                {loadingMenu ? (
+                  <p className="text-sm text-gray-500">Loading menu...</p>
+                ) : formData.menuItems.length === 0 ? (
+                  <p className="text-sm text-gray-400 mb-2">No menu items added.</p>
+                ) : (
+                  formData.menuItems.map((item, index) => (
+                    <div key={index} className="flex gap-2 items-end mb-2">
+                      <div className="flex-1">
+                        <Label className="text-xs">Item Name</Label>
+                        <Input
+                          value={item.name}
+                          onChange={(e) => {
+                            const newItems = [...formData.menuItems];
+                            newItems[index].name = e.target.value;
+                            setFormData({ ...formData, menuItems: newItems });
+                          }}
+                          placeholder="e.g. Burger"
+                        />
+                      </div>
+                      <div className="w-24">
+                        <Label className="text-xs">Price</Label>
+                        <Input
+                          type="number"
+                          value={item.amount}
+                          onChange={(e) => {
+                            const newItems = [...formData.menuItems];
+                            newItems[index].amount = e.target.value;
+                            setFormData({ ...formData, menuItems: newItems });
+                          }}
+                          placeholder="0.00"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="text-red-500"
+                        onClick={() => {
+                          const newItems = formData.menuItems.filter((_, i) => i !== index);
+                          setFormData({ ...formData, menuItems: newItems });
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))
+                )}
               </div>
             </>
           )}

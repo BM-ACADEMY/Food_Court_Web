@@ -9,8 +9,9 @@ import { Loader2 } from "lucide-react"; // lucide spinner
 const AdminLoginForm = ({ onBack, onForgotPassword, onLoginWithOtp }) => {
   const navigate = useNavigate();
   const { login } = useAuth();
-  const [emailOrPhone, setEmailOrPhone] = useState("");
+  const [emailOrPhone, setEmailOrPhone] = useState(() => localStorage.getItem("adminRememberEmail") || "");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(() => localStorage.getItem("adminRememberMe") === "true");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -22,6 +23,15 @@ const AdminLoginForm = ({ onBack, onForgotPassword, onLoginWithOtp }) => {
 
     try {
       await login(emailOrPhone, password); 
+      
+      if (rememberMe) {
+        localStorage.setItem("adminRememberEmail", emailOrPhone);
+        localStorage.setItem("adminRememberMe", "true");
+      } else {
+        localStorage.removeItem("adminRememberEmail");
+        localStorage.removeItem("adminRememberMe");
+      }
+
       navigate("/");
     } catch (err) {
       setError("Invalid credentials. Please try again.");
@@ -76,7 +86,12 @@ const AdminLoginForm = ({ onBack, onForgotPassword, onLoginWithOtp }) => {
 
           <div className="flex items-center justify-between text-sm sm:text-base">
             <label className="flex items-center space-x-2">
-              <input type="checkbox" className="w-4 h-4" />
+              <input 
+                type="checkbox" 
+                className="w-4 h-4" 
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+              />
               <span>Remember me</span>
             </label>
             <button

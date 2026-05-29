@@ -2,6 +2,7 @@
 const Role = require("../model/roleModel");
 const User = require("../model/userModel");
 const Restaurant = require("../model/restaurantModel");
+const Product = require("../model/productModel");
 const UserBalance = require("../model/userBalanceModel");
 const LoginLog = require("../model/loginLogModel");
 const Transaction = require("../model/transactionModel");
@@ -16,6 +17,7 @@ exports.createRestaurant = async (req, res) => {
       restaurant_name,
       location,
       qr_code,
+      menuItems,
     } = req.body;
 
     const restaurant = new Restaurant({
@@ -26,6 +28,22 @@ exports.createRestaurant = async (req, res) => {
     });
 
     await restaurant.save();
+
+    // Create initial menu items if provided
+    if (menuItems && Array.isArray(menuItems) && menuItems.length > 0) {
+      const products = menuItems
+        .filter(item => item.name && item.amount)
+        .map(item => ({
+          restaurant_id: restaurant._id,
+          name: item.name,
+          amount: Number(item.amount)
+        }));
+      
+      if (products.length > 0) {
+        await Product.insertMany(products);
+      }
+    }
+
     res.status(201).json({ success: true, data: restaurant });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -85,16 +103,52 @@ exports.getRestaurantByQrCode = async (req, res) => {
 exports.updateRestaurant = async (req, res) => {
   try {
     const { id } = req.params;
+    const { menuItems, ...updateData } = req.body;
+
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ success: false, message: "Invalid restaurant ID format" });
     }
-    const updated = await Restaurant.findByIdAndUpdate(id, req.body, {
+    const updated = await Restaurant.findByIdAndUpdate(id, updateData, {
       new: true,
       runValidators: true,
     });
     if (!updated) {
       return res.status(404).json({ success: false, message: "Restaurant not found" });
     }
+
+    // Sync menu items
+    if (menuItems && Array.isArray(menuItems)) {
+      const existingProducts = await Product.find({ restaurant_id: id });
+      const existingProductIds = existingProducts.map(p => p._id.toString());
+      const receivedIds = menuItems.map(item => item._id).filter(Boolean);
+
+      // 1. Delete removed products
+      const productsToDelete = existingProductIds.filter(pid => !receivedIds.includes(pid));
+      if (productsToDelete.length > 0) {
+        await Product.deleteMany({ _id: { $in: productsToDelete } });
+      }
+
+      // 2. Add or Update products
+      for (const item of menuItems) {
+        if (!item.name || !item.amount) continue;
+
+        if (item._id) {
+          // Update existing
+          await Product.findByIdAndUpdate(item._id, {
+            name: item.name,
+            amount: Number(item.amount)
+          });
+        } else {
+          // Create new
+          await Product.create({
+            restaurant_id: id,
+            name: item.name,
+            amount: Number(item.amount)
+          });
+        }
+      }
+    }
+
     res.status(200).json({ success: true, data: updated });
   } catch (err) {
     console.error("Update restaurant error:", err.message);

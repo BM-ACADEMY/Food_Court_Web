@@ -18,7 +18,7 @@ const Role = require("../model/roleModel");
 const Transaction = require("../model/transactionModel");
 const sendEmail=require("../utils/sendEmail");
 const crypto = require("crypto");
-
+const QRCode = require("qrcode");
 // Login function
 exports.loginUser = async (req, res) => {
   const { emailOrPhone, password, role } = req.body;
@@ -42,19 +42,8 @@ exports.loginUser = async (req, res) => {
 
     const userRoleId = user.role_id?.role_id;
 
-    // Role-based access restriction
-    if (role === "admin") {
-      const allowedAdminRoles = ["role-1", "role-2", "role-3", "role-4"];
-      if (!allowedAdminRoles.includes(userRoleId)) {
-        return res.status(403).json({ message: "Unauthorized: Not an admin" });
-      }
-    } else if (role === "customer") {
-      if (userRoleId !== "role-5") {
-        return res.status(403).json({ message: "Unauthorized: Not a customer" });
-      }
-    } else {
-      return res.status(400).json({ message: "Invalid role context provided" });
-    }
+    // Role-based routing is handled by the frontend appRoutes and backend roleMiddleware.
+    // We allow any valid user to log in from the main login form.
 
     // Verify password
     const isMatch = await bcrypt.compare(password, user.password_hash);
@@ -302,20 +291,54 @@ exports.createUser = async (req, res) => {
 
     await newUser.save();
 
-    // Create customer record for role-5 users
-    if (role_id.toString() === "role-5") {
+    // Populate role to check its role_id string
+    const populatedUser = await User.findById(newUser._id).populate("role_id");
+    const roleKey = populatedUser.role_id?.role_id;
+
+    let qrCodeData = null;
+
+    if (roleKey === "role-5") {
       const customer = new Customer({
         user_id: newUser._id,
-        customer_id: `CUST-${newUser._id.toString().slice(-6)}`,
-        registration_type: "Standard",
+        registration_type: "online",
         registration_fee_paid: false,
         status: "Active",
       });
       await customer.save();
+      qrCodeData = customer.qr_code;
+    } else if (roleKey === "role-4") {
+      const restaurant = new Restaurant({
+        user_id: newUser._id,
+        restaurant_name: name,
+      });
+      await restaurant.save();
+      qrCodeData = restaurant.qr_code;
+    } else if (roleKey === "role-3") {
+      const treasury = new TreasurySubcom({
+        user_id: newUser._id,
+      });
+      await treasury.save();
+      qrCodeData = treasury.qr_code;
     }
 
-    // Populate role
-    const populatedUser = await User.findById(newUser._id).populate("role_id");
+    if (qrCodeData && email) {
+      try {
+        const qrImageBuffer = await QRCode.toBuffer(qrCodeData);
+        await sendEmail({
+          to: email,
+          subject: "Welcome! Here is your personal QR Code",
+          html: `<p>Hello ${name},</p><p>Welcome to Food Court! Please find your unique QR code attached.</p><p>You can use this QR code to identify yourself on the platform.</p>`,
+          attachments: [
+            {
+              filename: 'qrcode.png',
+              content: qrImageBuffer,
+            }
+          ]
+        });
+      } catch (err) {
+        console.error("Failed to generate/send QR code email:", err);
+      }
+    }
 
     res.status(201).json({
       success: true,

@@ -346,7 +346,7 @@ const TransactionHistory = () => {
         <div className="flex items-center gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="text-gray-500">
+              <Button variant="ghost" size="sm" className="text-gray-500 cursor-pointer">
                 <Filter className="w-4 h-4 mr-2" />
                 Filter
               </Button>
@@ -473,9 +473,9 @@ const TransactionHistory = () => {
 
           <DialogFooter className="pt-4">
             <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
+              <Button variant="outline" className="cursor-pointer">Cancel</Button>
             </DialogClose>
-            <Button onClick={exportData}>Export</Button>
+            <Button onClick={exportData} className="cursor-pointer">Export</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

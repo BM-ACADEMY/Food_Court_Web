@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 const Counter = require("./counterModel"); // Import Counter
-
+const { v4: uuidv4 } = require("uuid");
 const treasurySubcomSchema = new mongoose.Schema(
   {
     user_id: {
@@ -18,6 +18,12 @@ const treasurySubcomSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Decimal128,
       default: 5000.0,
     },
+    qr_code: {
+      type: String,
+      unique: true,
+      trim: true,
+      index: true,
+    },
   },
   {
     timestamps: {
@@ -29,6 +35,10 @@ const treasurySubcomSchema = new mongoose.Schema(
 
 // 🧠 Pre-save hook to generate `TRES1001`, etc.
 treasurySubcomSchema.pre("save", async function (next) {
+  if (!this.qr_code) {
+    this.qr_code = uuidv4();
+  }
+  
   if (!this.treasury_subcom_id) {
     try {
       const counter = await Counter.findByIdAndUpdate(

@@ -6,7 +6,8 @@ import QRCode from "qrcode";
 import { useAuth } from "@/context/AuthContext";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
+import { Download, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const QrCodePage = () => {
   const { user, loading } = useAuth();
@@ -14,6 +15,7 @@ const QrCodePage = () => {
   const [error, setError] = useState(null);
   const [restaurantName, setRestaurantName] = useState("");
   const qrImageRef = useRef(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!loading && user) {
@@ -72,7 +74,12 @@ const QrCodePage = () => {
   }
 
   return (
-    <div className="min-h-[60vh] px-4 py-10 flex justify-center items-center bg-[#f9fafb]">
+    <div className="min-h-[60vh] px-4 py-10 flex flex-col justify-center items-center bg-[#f9fafb]">
+      <div className="max-w-md w-full mb-4">
+        <Button variant="ghost" onClick={() => navigate(-1)} className="cursor-pointer gap-2 -ml-4">
+          <ArrowLeft className="w-4 h-4" /> Back
+        </Button>
+      </div>
       <Card className="max-w-md w-full text-center shadow-lg p-6">
         <CardTitle className="text-xl font-bold mb-4">Restaurant QR Code</CardTitle>
         <CardContent>

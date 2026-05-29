@@ -61,6 +61,11 @@ const masterAdminNavLinks = [
     icon: KeyRound,
   },
   {
+    title: "Merge Balance",
+    url: "/master-admin/merge-balance",
+    icon: Coins,
+  },
+  {
     title: "Point Exchange",
     url: "/master-admin/points/point-exchange",
     icon: Coins,
@@ -117,6 +122,11 @@ const adminNavLinks = [
     title: "Add / Delete Access",
     url: "/admin/adddelete/add-new-user",
     icon: KeyRound,
+  },
+  {
+    title: "Merge Balance",
+    url: "/admin/merge-balance",
+    icon: Coins,
   },
   {
     title: "Point Exchange",

@@ -16,7 +16,7 @@ const PrivacyModal = ({ open, onOpenChange }) => {
                 <strong className="[color:#000052]">Valid only during the Pegasus 2025 event</strong>
               </p>
               <p>
-                Christian Medical College, Vellore ("CMC Vellore", "we", "our", or "us") operates the QR-based valet platform available at <a href="https://www.pegasus2025.com" className="underline hover:text-white">www.pegasus2025.com</a> ("the Site"). This Privacy Policy explains how we collect, use, store, and protect your personal information during the Pegasus 2025 event.
+                Christian Medical College, Vellore ("CMC Vellore", "we", "our", or "us") operates the QR-based valet platform available at <a href="https://www.pegasus2026.com" className="underline hover:text-white">www.pegasus2026.com</a> ("the Site"). This Privacy Policy explains how we collect, use, store, and protect your personal information during the Pegasus 2025 event.
               </p>
               <h3 className="font-semibold text-base sm:text-lg [color:#000052]">
                 1. Information We Collect

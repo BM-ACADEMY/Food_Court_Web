@@ -33,15 +33,16 @@ function TopUpOnline({ customer }) {
   };
 
   const fetchBalance = async (userId) => {
-    console.log(userId,"fetch");
+    console.log(userId, "fetch");
     
+    const id = userId._id || userId; // handle both object and string
     const response = await axios.get(
-      `${import.meta.env.VITE_BASE_URL}/user-balance/fetch-balance-by-id/${userId._id}`,
+      `${import.meta.env.VITE_BASE_URL}/user-balance/fetch-balance-by-id/${id}`,
       { withCredentials: true }
     );
 
     const balance = response.data.data?.balance;
-    if (!balance) throw new Error("Failed to fetch balance");
+    if (balance === undefined || balance === null) throw new Error("Failed to fetch balance");
 
     return typeof balance === "string"
       ? balance

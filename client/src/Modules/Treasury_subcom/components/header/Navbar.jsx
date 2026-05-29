@@ -182,7 +182,7 @@ const TreasuryDashboardHeader = () => {
           <img src={Pegasus} alt="Pegasus Logo" className="w-10 h-10 cursor-pointer" onClick={handleHome} />
           <div>
             <h1 className="text-base md:text-base font-bold tracking-wide cursor-pointer" onClick={handleHome}>
-              PEGASUS 2K25
+              PEGASUS 2K26
             </h1>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

@@ -31,6 +31,7 @@ router.get("/fetch-transaction-by-id/:id", controller.getTransactionById);
 // router.put("/update-transaction/:id", controller.updateTransaction);
 
 router.put("/update-transaction/:transactionId", controller.updateTransaction);
+router.put("/update-order-status/:transactionId", controller.updateOrderStatus);
 
 router.delete("/delete-transaction/:id", controller.deleteTransaction);
 router.get("/history/user/:userId", controller.getTransactionHistoryByUserId);

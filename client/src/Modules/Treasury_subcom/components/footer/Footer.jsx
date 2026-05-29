@@ -14,7 +14,7 @@ const Footer = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-10 text-sm sm:text-base">
           {/* Left Section */}
           <div className="text-center md:text-left">
-            <h2 className="font-bold text-lg sm:text-xl mb-1">PEGASUS 2K25</h2>
+            <h2 className="font-bold text-lg sm:text-xl mb-1">PEGASUS 2K26</h2>
             <p className="italic text-[#cfcfd8] text-sm sm:text-base">
               "One Destination. Endless Taste, Treasures and Thrills"
             </p>
