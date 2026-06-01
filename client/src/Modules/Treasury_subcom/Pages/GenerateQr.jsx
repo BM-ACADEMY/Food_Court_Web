@@ -1,3 +1,4 @@
+import BackButton from "@/components/BackButton";
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -142,6 +143,7 @@ export default function GenerateQr() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+      <BackButton />
       <Card className="w-full max-w-xl shadow-md">
         <CardHeader className="bg-[#070149] rounded-t-md px-6 py-4">
           <CardTitle className="text-xl font-semibold text-white text-center">

@@ -13,5 +13,7 @@ router.get("/roles/fetch-all-roles", dashboardController.getRoles);
 
 // Route to export transaction data
 router.get("/export", dashboardController.getExportData);
+// Route to fetch restaurant settlements
+router.get("/restaurant-settlements", dashboardController.getRestaurantSettlements);
 
 module.exports = router;

@@ -95,6 +95,8 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState("xlsx");
+  const [exportTarget, setExportTarget] = useState("all");
+  const [exportUserType, setExportUserType] = useState("all");
   const itemsPerPage = 10; // Last 20 transactions
   const [paymentMethod, setPaymentMethod] = useState("all");
 
@@ -188,16 +190,19 @@ export default function Dashboard() {
 
   const fetchExportData = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/dashboards/transactions`, {
-        params: {
-          transactionType: transactionType === "all" ? undefined : transactionType,
-          userType: userType === "all" ? undefined : userType,
-          fromDate: fromDate ? format(fromDate, "yyyy-MM-dd") : undefined,
-          toDate: toDate ? format(toDate, "yyyy-MM-dd") : undefined,
-          limit: 10000, // Large limit for exports
-          page: 1
-        }
-      });
+      let params = {
+        limit: 10000, // Large limit for exports
+        page: 1
+      };
+
+      if (exportTarget === "userType") {
+        params.userType = exportUserType === "all" ? undefined : exportUserType;
+      } else if (exportTarget === "dateRange") {
+        params.fromDate = startDate ? format(startDate, "yyyy-MM-dd") : undefined;
+        params.toDate = endDate ? format(endDate, "yyyy-MM-dd") : undefined;
+      }
+
+      const response = await axios.get(`${API_BASE_URL}/dashboards/transactions`, { params });
       return response.data.transactions || [];
     } catch (error) {
       console.error("Error fetching export data:", error);
@@ -331,7 +336,7 @@ export default function Dashboard() {
 
     const ws = XLSX.utils.json_to_sheet(formattedData);
     const csv = XLSX.utils.sheet_to_csv(ws);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
     saveAs(blob, `transactions_${format(new Date(), "yyyy-MM-dd")}.csv`);
   };
 
@@ -352,7 +357,7 @@ export default function Dashboard() {
       item.type || "N/A",
       item.from || "Unknown",
       item.to || "Unknown",
-      item.amount || "₹0",
+      item.amount || "Rs. 0",
       item.status || "N/A",
     ]);
 
@@ -366,7 +371,7 @@ export default function Dashboard() {
       startY: 30,
       head: [["S.No", "ID", "Time", "Type", "From", "To", "Amount", "Status"]],
       body: tableData,
-      foot: [["", "", "", "", "", "TOTAL", `₹${totalAmount.toFixed(2)}`, ""]],
+      foot: [["", "", "", "", "", "TOTAL", `Rs. ${totalAmount.toFixed(2)}`, ""]],
       theme: "grid",
       styles: { fontSize: 8 },
       headStyles: {
@@ -591,11 +596,7 @@ export default function Dashboard() {
                 {transactions.map((tx) => (
                   <TableRow key={tx.id}>
                     <TableCell className="whitespace-nowrap truncate">
-                      {new Date(tx.time).toLocaleString("en-IN", {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                        timeZone: "Asia/Kolkata",
-                      })}
+                      {tx.time}
                     </TableCell>
                     <TableCell>#{tx.id || "N/A"}</TableCell>
                     <TableCell>
@@ -754,6 +755,7 @@ export default function Dashboard() {
           <Button
             className="w-full bg-[#00004D] cursor-pointer"
             onClick={() => {
+              setExportTarget("all");
               setIsExportModalOpen(true);
               setExportFormat("xlsx");
             }}
@@ -763,7 +765,7 @@ export default function Dashboard() {
         </div>
         <div className="rounded-md border p-4">
           <h2 className="font-semibold mb-2">Export by User Type</h2>
-          <Select onValueChange={setUserType} value={userType}>
+          <Select onValueChange={setExportUserType} value={exportUserType}>
             <SelectTrigger className="w-full mb-4">
               <SelectValue placeholder="Select User Type" />
             </SelectTrigger>
@@ -779,6 +781,7 @@ export default function Dashboard() {
           <Button
             className="w-full bg-[#00004D] cursor-pointer"
             onClick={() => {
+              setExportTarget("userType");
               setIsExportModalOpen(true);
               setExportFormat("xlsx");
             }}
@@ -837,6 +840,7 @@ export default function Dashboard() {
           <Button
             className="w-full bg-[#00004D] cursor-pointer"
             onClick={() => {
+              setExportTarget("dateRange");
               setIsExportModalOpen(true);
               setExportFormat("xlsx");
             }}

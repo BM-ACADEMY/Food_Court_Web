@@ -322,8 +322,9 @@ export default function RestaurantDetailsModal({ isOpen, onClose, restaurant }) 
                           <TableHead className="whitespace-nowrap">Transaction ID</TableHead>
                           <TableHead className="whitespace-nowrap">Type</TableHead>
                           <TableHead className="whitespace-nowrap">Amount</TableHead>
+                          <TableHead className="whitespace-nowrap">Sender</TableHead>
+                          <TableHead className="whitespace-nowrap">Receiver</TableHead>
                           <TableHead className="whitespace-nowrap">Date</TableHead>
-                          <TableHead className="whitespace-nowrap">Description</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -352,9 +353,20 @@ export default function RestaurantDetailsModal({ isOpen, onClose, restaurant }) 
                                 )}
                               </TableCell>
                               <TableCell className="whitespace-nowrap">
+                                <div className="flex flex-col">
+                                  <span className="font-medium text-gray-900">{tx.sender?.name || "N/A"}</span>
+                                  <span className="text-xs text-gray-500">{tx.sender?.role || "N/A"} &middot; {tx.sender?.user_id || "N/A"}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="whitespace-nowrap">
+                                <div className="flex flex-col">
+                                  <span className="font-medium text-gray-900">{tx.receiver?.name || "N/A"}</span>
+                                  <span className="text-xs text-gray-500">{tx.receiver?.role || "N/A"} &middot; {tx.receiver?.user_id || "N/A"}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="whitespace-nowrap">
                                 {format(new Date(tx.date), "dd-MM-yyyy HH:mm")}
                               </TableCell>
-                              <TableCell className="whitespace-nowrap">{tx.description || "N/A"}</TableCell>
                             </TableRow>
                           ))
                         )}

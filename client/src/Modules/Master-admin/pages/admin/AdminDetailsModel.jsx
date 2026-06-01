@@ -338,8 +338,9 @@ const AdminDetailsModal = ({ admin, isOpen, onClose }) => {
                         <TableHead className="whitespace-nowrap">Transaction ID</TableHead>
                         <TableHead className="whitespace-nowrap">Type</TableHead>
                         <TableHead className="whitespace-nowrap">Amount</TableHead>
+                        <TableHead className="whitespace-nowrap">Sender</TableHead>
+                        <TableHead className="whitespace-nowrap">Receiver</TableHead>
                         <TableHead className="whitespace-nowrap">Date</TableHead>
-                        <TableHead className="whitespace-nowrap">Description</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -362,12 +363,21 @@ const AdminDetailsModal = ({ admin, isOpen, onClose }) => {
                             )}
                           </TableCell>
                           <TableCell className="whitespace-nowrap">
+                            <div className="flex flex-col">
+                              <span className="font-medium text-gray-900">{transaction.sender?.name || "N/A"}</span>
+                              <span className="text-xs text-gray-500">{transaction.sender?.role || "N/A"} &middot; {transaction.sender?.user_id || "N/A"}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            <div className="flex flex-col">
+                              <span className="font-medium text-gray-900">{transaction.receiver?.name || "N/A"}</span>
+                              <span className="text-xs text-gray-500">{transaction.receiver?.role || "N/A"} &middot; {transaction.receiver?.user_id || "N/A"}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap">
                             {transaction.date && !isNaN(new Date(transaction.date).getTime())
                               ? format(new Date(transaction.date), "dd-MM-yyyy HH:mm")
                               : "N/A"}
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap">
-                            {transaction.description || "N/A"}
                           </TableCell>
                         </TableRow>
                       ))}

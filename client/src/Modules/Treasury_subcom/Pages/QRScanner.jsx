@@ -3,18 +3,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input"; // Add Input component from shadcn
-import {
-  Dialog,
-  DialogTrigger,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { QrCode, ScanLine } from "lucide-react";
 import { Html5Qrcode } from "html5-qrcode";
 import axios from "axios";
 import TopUpOnline from "./TopUpOnline";
+import BackButton from "@/components/BackButton";
 
 function QRScanner() {
   const [scannedData, setScannedData] = useState(null);
@@ -36,10 +31,8 @@ function QRScanner() {
       if (html5QrCodeRef.current) {
         await stopScanner();
       }
-
       const html5QrCode = new Html5Qrcode("qr-reader");
       html5QrCodeRef.current = html5QrCode;
-
       await html5QrCode.start(
         { facingMode: "environment" },
         { fps: 30, qrbox: { width: 400, height: 500 } },
@@ -69,35 +62,26 @@ function QRScanner() {
     if (typeof decodedText === "string" && decodedText.trim() !== "") {
       setLoading(true);
       setError("");
-
       try {
         const qrCode = encodeURIComponent(decodedText.trim());
-
         const customerResponse = await axios.get(
           `${BASE_URL}/customers/fetch-by-qr?qr_code=${qrCode}`,
           { withCredentials: true }
         );
-
         if (!customerResponse.data.success) {
           throw new Error(customerResponse.data.message || "Customer not found.");
         }
-
         const { customer_id, user_id } = customerResponse.data.data;
-
         const detailsResponse = await axios.get(
           `${BASE_URL}/customers/fetch-customer-details-by-qr?qr_code=${qrCode}`,
           { withCredentials: true }
         );
-
         if (!detailsResponse.data.success) {
           throw new Error(detailsResponse.data.message || "Customer details not found.");
         }
-
         const { name, phone_number, email, balance } = detailsResponse.data.data;
-
         const balanceValue =
           balance !== "Payment not done yet" ? parseFloat(balance.toString()) : 0;
-
         const newScannedData = {
           customerId: customer_id || "N/A",
           userId: user_id,
@@ -106,7 +90,6 @@ function QRScanner() {
           email: email || "N/A",
           currentBalance: balanceValue,
         };
-
         console.log("Scanned customer data:", newScannedData);
         setScannedData(newScannedData);
         setScannerOpen(false);
@@ -122,31 +105,24 @@ function QRScanner() {
     }
   };
 
-  // New function to handle phone number search
   const handlePhoneSearch = async () => {
     if (!phoneNumber) {
       setError("Please enter a phone number.");
       return;
     }
-
     setLoading(true);
     setError("");
-
     try {
       const response = await axios.get(
         `${BASE_URL}/customers/fetch-customer-details-by-phone?phone_number=${encodeURIComponent(phoneNumber)}`,
         { withCredentials: true }
       );
-
       if (!response.data.success) {
         throw new Error(response.data.message || "Customer not found.");
       }
-
       const { customer_id, user_id, name, email, phone_number, balance } = response.data.data;
-
       const balanceValue =
         balance !== "Payment not done yet" ? parseFloat(balance.toString()) : 0;
-
       const newScannedData = {
         customerId: customer_id || "N/A",
         userId: user_id,
@@ -155,7 +131,6 @@ function QRScanner() {
         email: email || "N/A",
         currentBalance: balanceValue,
       };
-
       console.log("Phone search customer data:", newScannedData);
       setScannedData(newScannedData);
     } catch (err) {
@@ -206,7 +181,8 @@ function QRScanner() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 py-10 px-4 flex justify-center">
+    <div className="min-h-screen bg-gray-100 py-10 px-4 flex justify-center relative">
+      <BackButton />
       <div className="w-full max-w-xl">
         <div className="bg-white p-6 rounded-lg shadow-lg">
           <h2 className="text-xl font-semibold mb-4 text-center">QR Code Scanner</h2>
@@ -218,11 +194,11 @@ function QRScanner() {
                 Scan QR Code
               </Button>
             </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
+            <DialogContent className="sm:max-w-[600px] max-w-[90vw] max-h-[80vh] overflow-y-auto p-6">
+              <DialogHeader className="bg-[#000052] text-white p-4 rounded-t-lg">
                 <DialogTitle>Scan QR Code</DialogTitle>
               </DialogHeader>
-              <div className="relative w-full h-64 bg-gray-100 border border-dashed border-[#070149] rounded-lg overflow-hidden">
+              <div className="relative w-full h-64 bg-gray-100 border border-dashed border-[#070149] rounded-lg overflow-hidden mt-4">
                 {!html5QrCodeRef.current && (
                   <div className="absolute inset-0 flex items-center justify-center">
                     <ScanLine className="w-20 h-20 text-[#070149]" />
@@ -230,16 +206,9 @@ function QRScanner() {
                 )}
                 <div id="qr-reader" ref={qrRef} className="w-full h-full" />
               </div>
-              {cameraError && (
-                <p className="text-red-500 text-sm mt-2">{cameraError}</p>
-              )}
-              {loading && (
-                <p className="text-blue-500 text-sm mt-2">Fetching customer details...</p>
-              )}
-              <Button
-                onClick={() => setScannerOpen(false)}
-                className="mt-4 bg-[#070149] hover:bg-[#3f3b6d] text-white"
-              >
+              {cameraError && <p className="text-red-500 text-sm mt-2">{cameraError}</p>}
+              {loading && <p className="text-blue-500 text-sm mt-2">Fetching customer details...</p>}
+              <Button onClick={() => setScannerOpen(false)} className="mt-4 bg-[#000052] hover:bg-[#070090] text-white">
                 Close
               </Button>
             </DialogContent>
@@ -257,7 +226,7 @@ function QRScanner() {
               />
               <Button
                 onClick={handlePhoneSearch}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                className="bg-[#000052] hover:bg-[#070090] text-white"
                 disabled={loading}
               >
                 {loading ? "Searching..." : "Search"}
@@ -271,9 +240,15 @@ function QRScanner() {
 
           {scannedData && !error && (
             <div className="space-y-2 p-4 rounded-md text-sm border-t mt-4">
-              <p><strong>Customer ID:</strong> {scannedData.customerId}</p>
-              <p><strong>Name:</strong> {scannedData.name}</p>
-              <p><strong>Phone:</strong> {scannedData.phone}</p>
+              <p>
+                <strong>Customer ID:</strong> {scannedData.customerId}
+              </p>
+              <p>
+                <strong>Name:</strong> {scannedData.name}
+              </p>
+              <p>
+                <strong>Phone:</strong> {scannedData.phone}
+              </p>
               <p>
                 <strong>Current Balance:</strong>{" "}
                 {scannedData.currentBalance === 0
@@ -282,7 +257,7 @@ function QRScanner() {
               </p>
               <Button
                 onClick={handleProceedToTopup}
-                className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white"
+                className="w-full mt-4 bg-[#000052] hover:bg-[#070090] text-white"
               >
                 Proceed to Topup
               </Button>

@@ -27,21 +27,21 @@ const Footer = () => {
             <div className="flex items-start gap-2 mb-2 justify-center md:justify-start text-[#8ef5b7]">
               <Phone className="w-4 h-4 mt-1" />
               <a href="tel:+916369777051" className="text-white hover:underline">
-                Samuel Vincent D G: +91 6369777051
+                Samuel Thomas C: +91 93923 28189
               </a>
             </div>
 
             <div className="flex items-start gap-2 mb-2 justify-center md:justify-start text-[#8ef5b7]">
               <Phone className="w-4 h-4 mt-1" />
               <a href="tel:+917010124947" className="text-white hover:underline">
-                Mohith Varshan G: +91 7010124947
+                Darshan S: +91 98846 20481
               </a>
             </div>
 
             <div className="flex items-start gap-2 justify-center md:justify-start text-[#8ef5b7]">
               <Mail className="w-4 h-4 mt-1" />
-              <a href="mailto:pegasus25coupons@gmail.com" className="text-white hover:underline break-words">
-                pegasus25coupons@gmail.com
+              <a href="mailto:pegasus26esupport@gmail.com" className="text-white hover:underline break-words">
+                pegasus26esupport@gmail.com
               </a>
             </div>
           </div>

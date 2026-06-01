@@ -180,7 +180,7 @@ export default function RestaurantList() {
     const data = allRestaurants.map((restaurant) => ({
       "Restaurant ID": restaurant.id || "N/A",
       Name: restaurant.name || "Unknown",
-      Role: restaurant.receiver_role_name || "Restaurant", // Changed to receiver_role_name
+      Category: restaurant.category || "N/A",
       Sales: `₹${restaurant.sales.toLocaleString()}` || "₹0", // Fixed INR formatting
       Status: restaurant.status || "N/A",
       "Last Active": restaurant.lastActive || "N/A",
@@ -202,14 +202,14 @@ export default function RestaurantList() {
     const data = allRestaurants.map((restaurant) => ({
       "Restaurant ID": restaurant.id || "N/A",
       Name: restaurant.name || "Unknown",
-      Role: restaurant.receiver_role_name || "Restaurant", // Changed to receiver_role_name
+      Category: restaurant.category || "N/A",
       Sales: `₹${restaurant.sales.toLocaleString()}` || "₹0", // Fixed INR formatting
       Status: restaurant.status || "N/A",
       "Last Active": restaurant.lastActive || "N/A",
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const csv = XLSX.utils.sheet_to_csv(ws);
-    const file = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const file = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
     saveAs(file, `restaurants_${format(new Date(), "yyyy-MM-dd")}.csv`);
   };
 
@@ -225,13 +225,13 @@ export default function RestaurantList() {
       autoTable(doc, {
         startY: 30,
         head: [
-          ["Restaurant ID", "Name", "Role", "Sales", "Status", "Last Active"], // Removed Category
+          ["Restaurant ID", "Name", "Category", "Sales", "Status", "Last Active"],
         ],
         body: allRestaurants.map((restaurant) => [
           restaurant.id || "N/A",
           restaurant.name || "Unknown",
-          restaurant.receiver_role_name || "Restaurant", // Changed to receiver_role_name
-          `₹${restaurant.sales.toLocaleString()}` || "₹0", // Fixed INR formatting
+          restaurant.category || "N/A",
+          `Rs. ${restaurant.sales.toLocaleString()}` || "Rs. 0", // Fixed INR formatting
           restaurant.status || "N/A",
           restaurant.lastActive || "N/A",
         ]),
@@ -461,8 +461,8 @@ export default function RestaurantList() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Restaurant ID</TableHead>
-                  <TableHead>Sender Name</TableHead>
-                  <TableHead>Role</TableHead>
+                  <TableHead>Restaurant Name</TableHead>
+                  <TableHead>Category</TableHead>
                   <TableHead>Sales</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Last Active</TableHead>
@@ -482,13 +482,13 @@ export default function RestaurantList() {
                       <TableCell className="font-medium">#{restaurant.id}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <Avatar name={restaurant.receiver_name} />
-                          <p>{restaurant.receiver_name}</p>
+                          <Avatar name={restaurant.name} />
+                          <p>{restaurant.name || "Unknown"}</p>
                         </div>
                       </TableCell>
                       <TableCell>
                         <span className="text-sm text-orange-500">
-                          {restaurant.receiver_role_name || "Restaurant"}
+                          {restaurant.category || "N/A"}
                         </span>
                       </TableCell>
                       <TableCell>

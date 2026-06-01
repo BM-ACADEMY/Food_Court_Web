@@ -204,7 +204,7 @@ export default function CustomerList() {
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const csv = XLSX.utils.sheet_to_csv(ws);
-    const file = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const file = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
     saveAs(file, `customers_${format(new Date(), "yyyy-MM-dd")}.csv`);
   };
 
@@ -219,7 +219,7 @@ export default function CustomerList() {
           customer.id || "N/A",
           `${customer.name || "Unknown"} (${customer.role || "Unknown"})`,
           customer.phone || "N/A",
-          `₹${customer.balance.toLocaleString()}` || "₹0",
+          `Rs. ${customer.balance.toLocaleString()}` || "Rs. 0",
           customer.status || "N/A",
           customer.registration_type || "N/A",
           customer.lastActive || "N/A",

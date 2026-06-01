@@ -331,7 +331,7 @@ export default function Dashboard() {
 
     const ws = XLSX.utils.json_to_sheet(formattedData);
     const csv = XLSX.utils.sheet_to_csv(ws);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
     saveAs(blob, `transactions_${format(new Date(), "yyyy-MM-dd")}.csv`);
   };
 
@@ -352,7 +352,7 @@ export default function Dashboard() {
       item.type || "N/A",
       item.from || "Unknown",
       item.to || "Unknown",
-      item.amount || "₹0",
+      item.amount || "Rs. 0",
       item.status || "N/A",
     ]);
 
@@ -366,7 +366,7 @@ export default function Dashboard() {
       startY: 30,
       head: [["S.No", "ID", "Time", "Type", "From", "To", "Amount", "Status"]],
       body: tableData,
-      foot: [["", "", "", "", "", "TOTAL", `₹${totalAmount.toFixed(2)}`, ""]],
+      foot: [["", "", "", "", "", "TOTAL", `Rs. ${totalAmount.toFixed(2)}`, ""]],
       theme: "grid",
       styles: { fontSize: 8 },
       headStyles: {

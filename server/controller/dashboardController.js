@@ -6,7 +6,7 @@ const Role = require("../model/roleModel");
 const UserBalance = require("../model/userBalanceModel");
 const Transaction = require("../model/transactionModel");
 const { format } = require("date-fns");
-const { startOfDay, endOfDay, subDays } = require("date-fns");
+const { startOfDay, endOfDay, subDays, addDays } = require("date-fns");
 
 // Helper to calculate percentage difference
 const calculatePercentageDiff = (today, yesterday) => {
@@ -183,7 +183,7 @@ exports.getTransactions = async (req, res) => {
 
     const formattedTransactions = transactions.map((tx) => ({
       id: tx.transaction_id,
-      time: format(new Date(tx.created_at), "dd-MM-yyyy HH:mm"),
+      time: format(new Date(tx.created_at), "dd MMM yyyy, h:mm aaa"),
       type: tx.transaction_type,
       from: tx.sender_id ? tx.sender_id.name : "Unknown",
       fromRoleId: tx.sender_id?.role_id?.role_id || "Unknown",
@@ -269,7 +269,7 @@ exports.getExportData = async (req, res) => {
             : restaurant
             ? restaurant.status
             : "N/A",
-          lastActive: format(new Date(tx.created_at), "dd-MM-yyyy HH:mm"),
+          lastActive: format(new Date(tx.created_at), "dd MMM yyyy, h:mm aaa"),
         };
       })
     );
@@ -279,5 +279,69 @@ exports.getExportData = async (req, res) => {
     res
       .status(500)
       .json({ error: "Failed to export data", details: error.message });
+  }
+};
+
+exports.getRestaurantSettlements = async (req, res) => {
+  try {
+    const restaurantRole = await Role.findOne({ name: "Restaurant" });
+    if (!restaurantRole) {
+      return res.status(404).json({ error: "Restaurant role not found" });
+    }
+
+    const restaurants = await Restaurant.find({ status: "Active" }).populate("user_id", "name");
+    
+    const { startDate } = req.query;
+    // Determine the starting day. If not provided, default to 5 days ago (so the 6 days end today)
+    const baseDate = startDate ? startOfDay(new Date(startDate)) : startOfDay(subDays(new Date(), 5));
+
+    const days = [];
+    for (let i = 0; i < 6; i++) {
+      const d = addDays(baseDate, i);
+      days.push({
+        label: format(d, "dd MMM"),
+        start: startOfDay(d),
+        end: endOfDay(d),
+      });
+    }
+
+    const settlements = await Promise.all(
+      restaurants.map(async (rest) => {
+        const userId = rest.user_id?._id;
+        if (!userId) return null;
+
+        const balanceDoc = await UserBalance.findOne({ user_id: userId });
+        const balance = balanceDoc ? parseFloat(balanceDoc.balance) : 0;
+
+        const dailyEarnings = [];
+        let totalSixDays = 0;
+
+        for (const day of days) {
+          const txs = await Transaction.find({
+            receiver_id: userId,
+            status: "Success",
+            created_at: { $gte: day.start, $lte: day.end }
+          });
+          
+          const dayTotal = txs.reduce((sum, tx) => sum + (parseFloat(tx.amount?.toString().replace(/[^0-9.-]+/g,"")) || 0), 0);
+          dailyEarnings.push({ date: day.label, amount: dayTotal });
+          totalSixDays += dayTotal;
+        }
+
+        return {
+          id: rest._id,
+          restaurantName: rest.restaurant_name,
+          ownerName: rest.user_id?.name || "Unknown",
+          totalBalance: balance,
+          totalSixDays,
+          dailyEarnings,
+        };
+      })
+    );
+
+    res.status(200).json({ success: true, data: settlements.filter(Boolean), days: days.map(d => d.label) });
+  } catch (error) {
+    console.error("Settlement fetch error:", error);
+    res.status(500).json({ error: "Failed to fetch settlements", details: error.message });
   }
 };

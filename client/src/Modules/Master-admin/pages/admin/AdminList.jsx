@@ -174,7 +174,7 @@ export default function AdminList() {
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const csv = XLSX.utils.sheet_to_csv(ws);
-    const file = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const file = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
     saveAs(file, `admins_${format(new Date(), "yyyy-MM-dd")}.csv`);
   };
 
@@ -189,7 +189,7 @@ export default function AdminList() {
           admin.id || "N/A",
           admin.name || "Unknown",
           admin.phone || "N/A",
-          `₹${admin.balance.toLocaleString()}` || "₹0",
+          `Rs. ${admin.balance.toLocaleString()}` || "Rs. 0",
           admin.status || "N/A",
           admin.lastActive || "N/A",
         ]),

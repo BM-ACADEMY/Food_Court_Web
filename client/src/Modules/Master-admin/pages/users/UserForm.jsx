@@ -71,7 +71,6 @@ export function UserForm({ open, onOpenChange, onSubmit, defaultValues }) {
             phone_number: "",
             password: "",
             confirm_password: "",
-            role_id: defaultRoleId,
             registration_type: "online",
             restaurant_name: "",
             location: "",

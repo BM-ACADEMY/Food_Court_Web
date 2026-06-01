@@ -1,4 +1,5 @@
 const Upi = require("../model/upiModel");
+const trackActivity = require("../utils/activityLogger");
 
 exports.createUpi = async (req, res) => {
   try {
@@ -8,6 +9,9 @@ exports.createUpi = async (req, res) => {
     }
     const upi = new Upi({ upiId, upiName });
     await upi.save();
+
+    await trackActivity(req, "Create UPI", `Created UPI account: "${upiId}" (${upiName})`);
+
     res.status(201).json({ message: "UPI created successfully", upi });
   } catch (error) {
     console.error("Error creating UPI:", error);
@@ -54,6 +58,9 @@ exports.updateUpi = async (req, res) => {
     if (!upi) {
       return res.status(404).json({ error: "UPI not found" });
     }
+
+    await trackActivity(req, "Update UPI", `Updated UPI account to: "${upiId}" (${upiName})`);
+
     res.status(200).json({ message: "UPI updated successfully", upi });
   } catch (error) {
     console.error("Error updating UPI:", error);
@@ -68,6 +75,9 @@ exports.deleteUpi = async (req, res) => {
     if (!upi) {
       return res.status(404).json({ error: "UPI not found" });
     }
+
+    await trackActivity(req, "Delete UPI", `Deleted UPI account: "${upi.upiId}"`);
+
     res.status(200).json({ message: "UPI deleted successfully" });
   } catch (error) {
     console.error("Error deleting UPI:", error);

@@ -388,7 +388,7 @@ export default function TransactionHistory() {
 
       const ws = XLSX.utils.json_to_sheet(dataWithTotal);
       const csv = XLSX.utils.sheet_to_csv(ws);
-      const file = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const file = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
       saveAs(file, `transactions_${format(new Date(), "yyyy-MM-dd")}.csv`);
     } catch (error) {
       console.error("Error exporting to CSV:", error);
@@ -403,7 +403,7 @@ export default function TransactionHistory() {
       const data = prepareExportData(allTransactions);
 
       // Calculate total amount
-      const totalAmount = data.reduce((sum, item) => sum + item["Amount (₹)"], 0);
+      const totalAmount = data.reduce((sum, item) => sum + item["Amount (Rs. )"], 0);
 
       const doc = new jsPDF();
 
@@ -413,7 +413,7 @@ export default function TransactionHistory() {
       doc.setFontSize(10);
       doc.text(`Generated on: ${format(new Date(), "yyyy-MM-dd HH:mm")}`, 15, 22);
       doc.text(`Total Transactions: ${data.length}`, 15, 28);
-      doc.text(`Total Amount: ₹${totalAmount.toFixed(2)}`, 15, 34);
+      doc.text(`Total Amount: Rs. ${totalAmount.toFixed(2)}`, 15, 34);
 
       // Prepare table data
       const tableData = data.map((item) => [
@@ -433,7 +433,7 @@ export default function TransactionHistory() {
 
       // Add total row
       const footerData = [
-        ["", "", "", "", "", "", "", "", "", "TOTAL", `₹${totalAmount.toFixed(2)}`, ""],
+        ["", "", "", "", "", "", "", "", "", "TOTAL", `Rs. ${totalAmount.toFixed(2)}`, ""],
       ];
 
       // Calculate total table width for debugging

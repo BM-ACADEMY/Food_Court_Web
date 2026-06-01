@@ -37,6 +37,8 @@ router.delete("/delete-transaction/:id", controller.deleteTransaction);
 router.get("/history/user/:userId", controller.getTransactionHistoryByUserId);
 router.get("/history/user/:userId/export", controller.exportTransactionHistoryByUserId);
 router.get("/history/user/:userId/detailed", controller.getUserTransactionHistory);
+router.get("/history/customer/:customerId", controller.getTransactionHistoryByCustomerId);
+router.get("/history/customer/:customerId/export", controller.exportTransactionHistoryByCustomerId);
 router.get("/types", controller.getTransactionTypes);
 router.get("/fetch-treasury-subcom-restaurant-history", controller.getTransactionTreasuryRestaurantHistory);
 router.get("/today-balance/:userId", controller.getTodayBalance);

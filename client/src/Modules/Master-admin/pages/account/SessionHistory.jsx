@@ -87,7 +87,7 @@
 //                   <SelectValue placeholder="All Users" />
 //                 </SelectTrigger>
 //                 <SelectContent>
-//                   <SelectItem value="">All Users</SelectItem>
+//                  <SelectItem value="all-users">All Users</SelectItem>
 //                   {users.map((u) => (
 //                     <SelectItem key={u._id} value={u._id}>
 //                       {u.name} ({u.role_id?.name || "Unknown"})
@@ -203,18 +203,22 @@ const SessionHistory = () => {
   const [sessions, setSessions] = useState([]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [selectedUserId, setSelectedUserId] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState("all-users");
   const [loading, setLoading] = useState(false);
   const [qrCodes, setQrCodes] = useState({});
   const [qrLoading, setQrLoading] = useState(false);
 
-  const isAdmin = user?.role_id?.name === "Master-Admin" || user?.role_id?.name === "Admin";
+  const isAdmin =
+    user?.role?.name === "Master-Admin" ||
+    user?.role?.name === "Admin" ||
+    user?.role_id?.name === "Master-Admin" ||
+    user?.role_id?.name === "Admin";
 
   // Fetch all users for admin dropdown
   const fetchUsers = async () => {
     if (!isAdmin) return;
     try {
-      const res = await axios.get(`${import.meta.env.VITE_BASE_URL}/users/fetch-all-users`, {
+      const res = await axios.get(`${import.meta.env.VITE_BASE_URL}/users/fetch-all-users?limit=10000`, {
         withCredentials: true,
       });
       setUsers(res.data.data || []);
@@ -245,7 +249,7 @@ const SessionHistory = () => {
     setQrLoading(true);
     try {
       const params = { startDate, endDate };
-      if (isAdmin && selectedUserId) params.userId = selectedUserId;
+      if (isAdmin && selectedUserId && selectedUserId !== "all-users") params.userId = selectedUserId;
       const res = await axios.get(`${import.meta.env.VITE_BASE_URL}/users/fetch-users-for-history`, {
         params,
         withCredentials: true,
@@ -304,10 +308,10 @@ const SessionHistory = () => {
                   <SelectValue placeholder="All Users" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Users</SelectItem>
+                  <SelectItem value="all-users">All Users</SelectItem>
                   {users.map((u) => (
                     <SelectItem key={u._id} value={u._id}>
-                      {u.name} ({u.role || "Unknown"})
+                      {u.name} ({u.role || u.role_name || u.role_id?.name || "Unknown"})
                     </SelectItem>
                   ))}
                 </SelectContent>

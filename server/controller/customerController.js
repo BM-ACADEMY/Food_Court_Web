@@ -1,11 +1,16 @@
 const Customer = require("../model/customerModel");
 const Role = require("../model/roleModel");
 const User = require("../model/userModel");
+const Restaurant = require("../model/restaurantModel");
+const Admin = require("../model/adminModel");
+const TreasurySubcom = require("../model/treasurySubcomModel");
+const MasterAdmin = require("../model/masterAdminModel");
 const Transaction = require("../model/transactionModel");
 const UserBalance = require("../model/userBalanceModel");
 const LoginLog = require("../model/loginLogModel");
 const mongoose = require("mongoose");
 const { startOfDay, subDays, subMonths, format } = require("date-fns");
+const trackActivity = require("../utils/activityLogger");
 
 // Create Customer
 exports.createCustomer = async (req, res) => {
@@ -17,14 +22,26 @@ exports.createCustomer = async (req, res) => {
       qr_code,
     } = req.body;
 
-    const customer = new Customer({
-      user_id,
-      registration_type,
-      registration_fee_paid,
-      qr_code,
-    });
+    let customer = await Customer.findOne({ user_id });
+    if (customer) {
+      if (registration_type) customer.registration_type = registration_type;
+      if (registration_fee_paid !== undefined) customer.registration_fee_paid = registration_fee_paid;
+      if (qr_code) customer.qr_code = qr_code;
+      await customer.save();
+    } else {
+      customer = new Customer({
+        user_id,
+        registration_type,
+        registration_fee_paid,
+        qr_code,
+      });
+      await customer.save();
+    }
 
-    await customer.save();
+    const userObj = await User.findById(user_id);
+    const customerName = userObj ? userObj.name : "Unknown Customer";
+    await trackActivity(req, "Create Customer", `Configured customer profile for "${customerName}" (Fee paid: ${registration_fee_paid})`);
+
     res.status(201).json({
       success: true,
       message: "User added Successfully",
@@ -88,6 +105,10 @@ exports.deleteCustomer = async (req, res) => {
       return res
         .status(404)
         .json({ success: false, message: "Customer not found" });
+
+    const userObj = await User.findById(customer.user_id);
+    const customerName = userObj ? userObj.name : "Unknown Customer";
+    await trackActivity(req, "Delete Customer", `Deleted customer profile for "${customerName}"`);
 
     res
       .status(200)
@@ -274,29 +295,35 @@ exports.getAllCustomerDetails = async (req, res) => {
     // Format customers
     const now = new Date();
     const formattedCustomers = rawCustomers
-      .filter((c) => status === "all" || (c.loginStatus ? "Online" : "Offline").toLowerCase() === status.toLowerCase())
       .map((customer) => {
         let lastActive = "Unknown";
+        let diffMins = 0;
         if (customer.lastLogin) {
-          const diffMins = (now - new Date(customer.lastLogin)) / 60000;
+          diffMins = (now - new Date(customer.lastLogin)) / 60000;
           if (diffMins < 5) lastActive = "Just now";
           else if (diffMins < 60) lastActive = `${Math.floor(diffMins)} mins ago`;
           else if (diffMins < 1440) lastActive = `${Math.floor(diffMins / 60)} hours ago`;
           else lastActive = format(new Date(customer.lastLogin), "yyyy-MM-dd");
         }
 
+        // Token expires in 24 hours, but we treat them as offline if their last login was > 12 hours ago
+        // to prevent users who simply closed the tab from appearing online forever.
+        const isOnline = customer.loginStatus && diffMins < 720;
+
         return {
           user_id: customer.user_id.toString(),
           id: customer.customer_id,
           name: customer.name,
           phone: customer.phone_number,
+          role: "Customer",
           registration_type: customer.registration_type || "Unknown",
           balance: parseFloat(customer.balance.toString()),
-          status: customer.loginStatus ? "Online" : "Offline",
+          status: isOnline ? "Online" : "Offline",
           lastActive,
           is_flagged: customer.is_flagged || false,
         };
-      });
+      })
+      .filter((c) => status === "all" || c.status.toLowerCase() === status.toLowerCase());
 
     const { totalCustomers = 0, totalBalance = 0 } = stats[0] || {};
     const onlineCount = formattedCustomers.filter((c) => c.status === "Online").length;
@@ -507,7 +534,17 @@ exports.getCustomerDetails = async (req, res) => {
       return res.status(404).json({ error: "Customer not found" });
     }
 
-    res.status(200).json(customer[0]);
+    const customerData = customer[0];
+    let isOnline = false;
+    if (customerData.status === "Online" && customerData.lastActive) {
+      const diffMins = (new Date() - new Date(customerData.lastActive)) / 60000;
+      if (diffMins < 720) {
+        isOnline = true;
+      }
+    }
+    customerData.status = isOnline ? "Online" : "Offline";
+
+    res.status(200).json(customerData);
   } catch (error) {
     console.error("Error fetching customer details:", error);
     res.status(500).json({ error: "Failed to fetch customer details" });
@@ -558,30 +595,95 @@ exports.getCustomerDetails = async (req, res) => {
 exports.getCustomerTransactions = async (req, res) => {
   try {
     const { customerId } = req.params;
+    const { filter = "all", page = 1, pageSize = 5 } = req.query;
+
     const customer = await Customer.findOne({ customer_id: customerId });
     if (!customer) {
       return res.status(404).json({ error: "Customer not found" });
     }
-    const transactions = await Transaction.find({
+
+    const query = {
       $or: [{ sender_id: customer.user_id }, { receiver_id: customer.user_id }],
-      transaction_type: { $in: ["Transfer", "TopUp", "Refund", "Credit"] },
-    })
-      .populate("sender_id", "name")
-      .populate("receiver_id", "name")
+    };
+
+    if (filter !== "all") {
+      query.transaction_type = filter.charAt(0).toUpperCase() + filter.slice(1);
+    } else {
+      query.transaction_type = { $in: ["Transfer", "TopUp", "Refund", "Credit"] };
+    }
+
+    const pageNum = parseInt(page, 10);
+    const pageSizeNum = parseInt(pageSize, 10);
+    const totalCount = await Transaction.countDocuments(query);
+
+    const transactions = await Transaction.find(query)
+      .populate({
+        path: "sender_id",
+        select: "name user_id",
+        populate: { path: "role_id", select: "name" },
+      })
+      .populate({
+        path: "receiver_id",
+        select: "name user_id",
+        populate: { path: "role_id", select: "name" },
+      })
+      .sort({ created_at: -1 })
+      .skip((pageNum - 1) * pageSizeNum)
+      .limit(pageSizeNum)
       .lean();
+
+    const userIds = new Set();
+    transactions.forEach((tx) => {
+      if (tx.sender_id) userIds.add(tx.sender_id._id);
+      if (tx.receiver_id) userIds.add(tx.receiver_id._id);
+    });
+
+    const userIdsArray = Array.from(userIds);
+
+    const [customers, restaurantsList, admins, subcoms, masterAdmins] = await Promise.all([
+      Customer.find({ user_id: { $in: userIdsArray } }).select('user_id customer_id').lean(),
+      Restaurant.find({ user_id: { $in: userIdsArray } }).select('user_id restaurant_id').lean(),
+      Admin.find({ user_id: { $in: userIdsArray } }).select('user_id admin_id').lean(),
+      TreasurySubcom.find({ user_id: { $in: userIdsArray } }).select('user_id treasury_subcom_id').lean(),
+      MasterAdmin.find({ user_id: { $in: userIdsArray } }).select('user_id master_admin_id').lean()
+    ]);
+
+    const customIdMap = new Map();
+    customers.forEach(c => customIdMap.set(c.user_id.toString(), c.customer_id));
+    restaurantsList.forEach(r => customIdMap.set(r.user_id.toString(), r.restaurant_id));
+    admins.forEach(a => customIdMap.set(a.user_id.toString(), a.admin_id));
+    subcoms.forEach(s => customIdMap.set(s.user_id.toString(), s.treasury_subcom_id));
+    masterAdmins.forEach(m => customIdMap.set(m.user_id.toString(), m.master_admin_id));
+
     const formattedTransactions = transactions.map((tx) => ({
       id: tx.transaction_id,
       type: tx.transaction_type.toLowerCase(),
       amount: parseFloat(tx.amount),
       date: tx.created_at,
+      sender: {
+        name: tx.sender_id?.name || "Unknown",
+        user_id: tx.sender_id ? (customIdMap.get(tx.sender_id._id.toString()) || tx.sender_id.user_id || "Unknown") : "Unknown",
+        role: tx.sender_id?.role_id?.name || "Unknown",
+      },
+      receiver: {
+        name: tx.receiver_id?.name || "Unknown",
+        user_id: tx.receiver_id ? (customIdMap.get(tx.receiver_id._id.toString()) || tx.receiver_id.user_id || "Unknown") : "Unknown",
+        role: tx.receiver_id?.role_id?.name || "Unknown",
+      },
       description:
         tx.transaction_type === "Transfer"
-          ? `To ${tx.receiver_id.name}`
+          ? `To ${tx.receiver_id?.name || "Unknown"}`
           : tx.transaction_type === "Refund"
-          ? `From ${tx.sender_id.name}`
+          ? `From ${tx.sender_id?.name || "Unknown"}`
           : tx.remarks || `${tx.transaction_type} transaction`,
     }));
-    res.status(200).json({ data: formattedTransactions });
+
+    res.status(200).json({ 
+      data: formattedTransactions,
+      total: totalCount,
+      totalPages: Math.ceil(totalCount / pageSizeNum),
+      currentPage: pageNum,
+    });
   } catch (error) {
     console.error("Error fetching transactions:", error);
     res.status(500).json({ error: "Failed to fetch transactions" });
@@ -646,6 +748,8 @@ exports.updateCustomer = async (req, res) => {
         { upsert: true }
       );
     }
+
+    await trackActivity(req, "Update Customer", `Updated customer profile of "${user.name}"`);
 
     // Fetch updated customer data
     const updatedCustomer = await Customer.aggregate([

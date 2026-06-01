@@ -68,7 +68,7 @@ export default function MergeBalance() {
         name: foundUser.name,
         phone_number: foundUser.phone_number,
         email: foundUser.email,
-        role: foundUser.role_id?.name,
+        role: foundUser.role_name || foundUser.role_id?.name || foundUser.role || "Unknown",
         balance,
       });
     } catch (err) {

@@ -94,6 +94,11 @@ const adminNavLinks = [
     icon: SquareTerminal,
   },
   {
+    title: "Settlements",
+    url: "/admin/settlements",
+    icon: FileText,
+  },
+  {
     title: "Customer Users",
     url: "/admin/customers/customer-list",
     icon: Users,

@@ -178,7 +178,7 @@ export default function TreasurySubcomList() {
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const csv = XLSX.utils.sheet_to_csv(ws);
-    const file = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const file = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
     saveAs(file, `treasury_subcoms_${format(new Date(), "yyyy-MM-dd")}.csv`);
   };
 
@@ -202,7 +202,7 @@ export default function TreasurySubcomList() {
           subcom.id || "N/A",
           subcom.sender_name || "Unknown",
           subcom.receiver_name || "Unknown",
-          `₹${subcom.balance.toLocaleString()}` || "₹0",
+          `Rs. ${subcom.balance.toLocaleString()}` || "Rs. 0",
           subcom.status || "N/A",
           subcom.lastActive || "N/A",
         ]),

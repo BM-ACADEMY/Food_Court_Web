@@ -1,3 +1,4 @@
+import BackButton from "@/components/BackButton";
 
 import React, { useState, useEffect } from "react";
 import axios from "axios";
@@ -65,6 +66,7 @@ const SessionReport = ({ userId, onLogout }) => {
 
   return (
     <div>
+      <BackButton />
       <Button onClick={handleLogoutClick} variant="destructive">
         Logout
       </Button>

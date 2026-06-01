@@ -209,7 +209,7 @@ export default function RestaurantList() {
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const csv = XLSX.utils.sheet_to_csv(ws);
-    const file = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const file = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
     saveAs(file, `restaurants_${format(new Date(), "yyyy-MM-dd")}.csv`);
   };
 
@@ -231,7 +231,7 @@ export default function RestaurantList() {
           restaurant.id || "N/A",
           restaurant.name || "Unknown",
           restaurant.receiver_role_name || "Restaurant", // Changed to receiver_role_name
-          `₹${restaurant.sales.toLocaleString()}` || "₹0", // Fixed INR formatting
+          `Rs. ${restaurant.sales.toLocaleString()}` || "Rs. 0", // Fixed INR formatting
           restaurant.status || "N/A",
           restaurant.lastActive || "N/A",
         ]),

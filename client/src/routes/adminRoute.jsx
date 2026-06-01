@@ -1,6 +1,7 @@
 import { Routes, Route } from "react-router-dom";
 import ModuleLayout from "./moduleRoute";
 import Dashboard from "@/Modules/Admin/pages/dashboard/Dashboard";
+import Settlements from "@/Modules/Admin/pages/settlements/Settlements";
 import TransactionHistory from "@/Modules/Admin/pages/transaction/TransactionPage";
 import CustomerList from "@/Modules/Admin/pages/customer/customerList";
 import TreasurySubcomList from "@/Modules/Admin/pages/treasurySubcom/TreasurySubcom";
@@ -20,6 +21,7 @@ export default function AdminRoutes() {
     <Routes>
       <Route path="/" element={<ModuleLayout />}>
         <Route index element={<Dashboard />} />
+        <Route path="settlements" element={<Settlements />} />
         <Route path="transaction-history" element={<TransactionHistory />} />  
         <Route path="customers/customer-list" element={<CustomerList />} />  
         <Route path="treasury-subcom/treasury-subcom-list" element={<TreasurySubcomList />} />  
