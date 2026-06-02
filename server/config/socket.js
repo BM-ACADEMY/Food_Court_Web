@@ -80,6 +80,7 @@ const initSocket = async (server) => {
         process.env.DEV_FRONTEND_URL,
         "https://pegasus2026.com",
         "https://www.pegasus2026.com",
+        "https://pegasus2025sample.vercel.app",
       ],
       credentials: true,
       methods: ["GET", "POST"],
