@@ -19,6 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Pagination,
   PaginationContent,
@@ -192,31 +193,49 @@ const AdminDetailsModal = ({ admin, isOpen, onClose }) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-[95vw] sm:max-w-[90vw] md:max-w-2xl lg:max-w-4xl xl:max-w-6xl w-full h-[90vh] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-lg sm:text-xl">Admin Details - #{adminData?.id}</DialogTitle>
+      <DialogContent className="max-w-[95vw] sm:max-w-[90vw] md:max-w-2xl lg:max-w-4xl xl:max-w-6xl w-full h-[90vh] max-h-[90vh] overflow-y-auto p-0 border-0 rounded-xl shadow-2xl">
+        <DialogHeader className="bg-[#00004D] px-6 py-4 text-white">
+          <DialogTitle className="text-xl sm:text-2xl font-bold tracking-wide">Admin Details &middot; #{adminData?.id}</DialogTitle>
         </DialogHeader>
-        <Tabs defaultValue="info" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="info">User Information</TabsTrigger>
-            <TabsTrigger value="transactions">Transaction History</TabsTrigger>
+        
+        <div className="px-6 pb-6">
+        <Tabs defaultValue="info" className="w-full mt-4">
+          <TabsList className="grid w-full grid-cols-2 bg-gray-100 p-1 rounded-lg">
+            <TabsTrigger value="info" className="data-[state=active]:bg-[#00004D] data-[state=active]:text-white rounded-md transition-all font-medium">User Information</TabsTrigger>
+            <TabsTrigger value="transactions" className="data-[state=active]:bg-[#00004D] data-[state=active]:text-white rounded-md transition-all font-medium">Transaction History</TabsTrigger>
           </TabsList>
 
           {/* User Information Tab */}
-          <TabsContent value="info" className="space-y-4 w-full">
-            <div className="flex items-center space-x-4 mb-4">
-              <Avatar className="h-15 w-15">
+          <TabsContent value="info" className="space-y-6 w-full mt-6 animate-in fade-in duration-300">
+            <div className="flex flex-col sm:flex-row items-center gap-6 p-6 bg-blue-50/50 rounded-xl border border-blue-100 shadow-sm">
+              <Avatar className="h-24 w-24 border-4 border-white shadow-md">
                 <AvatarImage src={adminData.avatar || undefined} />
-                <AvatarFallback className="bg-blue-700 text-white">
+                <AvatarFallback className="bg-gradient-to-br from-[#00004D] to-blue-600 text-white text-3xl font-bold">
                   {initials}
                 </AvatarFallback>
               </Avatar>
-              <div>
-                <h2 className="text-xl font-semibold">{adminData.name}</h2>
-                <p className="text-gray-500">#{adminData.id}</p>
+              <div className="text-center sm:text-left">
+                <h2 className="text-3xl font-bold text-[#00004D]">{adminData.name}</h2>
+                <div className="flex items-center justify-center sm:justify-start gap-3 mt-2">
+                  <Badge variant="outline" className="bg-white px-3 py-1 font-mono text-xs shadow-sm border-blue-200 text-blue-700">
+                    #{adminData.id}
+                  </Badge>
+                  <Badge
+                    variant="ghost"
+                    className={`px-3 py-1 text-white text-xs font-semibold shadow-sm ${
+                      adminData?.status?.toLowerCase() === "online"
+                        ? "bg-emerald-500 hover:bg-emerald-600"
+                        : "bg-rose-500 hover:bg-rose-600"
+                    }`}
+                  >
+                    {adminData?.status?.toUpperCase()}
+                  </Badge>
+                </div>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="shadow-sm border-gray-200">
+              <CardContent className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
               <div>
                 <Label className="text-sm font-medium">Status</Label>
                 <Badge
@@ -230,58 +249,58 @@ const AdminDetailsModal = ({ admin, isOpen, onClose }) => {
                   {adminData?.status}
                 </Badge>
               </div>
-              <div>
-                <Label className="text-sm font-medium">Name</Label>
+              <div className="space-y-1">
+                <Label className="text-xs text-gray-500 uppercase font-semibold tracking-wider">Name</Label>
                 {isEditing ? (
                   <Input
                     name="name"
                     value={formData.name}
                     onChange={handleInputChange}
-                    className="mt-1"
+                    className="mt-1 border-gray-300 focus-visible:ring-[#00004D]"
                   />
                 ) : (
-                  <p className="mt-1 text-gray-600">{adminData?.name || "N/A"}</p>
+                  <p className="text-gray-900 font-medium text-lg">{adminData?.name || "N/A"}</p>
                 )}
               </div>
-              <div>
-                <Label className="text-sm font-medium">Phone</Label>
+              <div className="space-y-1">
+                <Label className="text-xs text-gray-500 uppercase font-semibold tracking-wider">Phone</Label>
                 {isEditing ? (
                   <Input
                     name="phone"
                     value={formData.phone}
                     onChange={handleInputChange}
-                    className="mt-1"
+                    className="mt-1 border-gray-300 focus-visible:ring-[#00004D]"
                     type="tel"
                   />
                 ) : (
-                  <p className="mt-1 text-gray-600">{adminData?.phone || "N/A"}</p>
+                  <p className="text-gray-900 font-medium text-lg">{adminData?.phone || "N/A"}</p>
                 )}
               </div>
-              <div>
-                <Label className="text-sm font-medium">Email</Label>
+              <div className="space-y-1">
+                <Label className="text-xs text-gray-500 uppercase font-semibold tracking-wider">Email</Label>
                 {isEditing ? (
                   <Input
                     name="email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    className="mt-1"
+                    className="mt-1 border-gray-300 focus-visible:ring-[#00004D]"
                     type="email"
                   />
                 ) : (
-                  <p className="mt-1 text-gray-600">{adminData?.email || "N/A"}</p>
+                  <p className="text-gray-900 font-medium text-lg">{adminData?.email || "N/A"}</p>
                 )}
               </div>
-              <div>
-                <Label className="text-sm font-medium">Registration Date</Label>
-                <p className="mt-1 text-gray-600">
+              <div className="space-y-1">
+                <Label className="text-xs text-gray-500 uppercase font-semibold tracking-wider">Registration Date</Label>
+                <p className="text-gray-900 font-medium text-lg">
                   {adminData?.registrationDate && !isNaN(new Date(adminData.registrationDate).getTime())
                     ? format(new Date(adminData.registrationDate), "MMM dd, yyyy")
                     : "N/A"}
                 </p>
               </div>
-              <div>
-                <Label className="text-sm font-medium">Last Active</Label>
-                <p className="mt-1 text-gray-600">
+              <div className="space-y-1">
+                <Label className="text-xs text-gray-500 uppercase font-semibold tracking-wider">Last Active</Label>
+                <p className="text-gray-900 font-medium text-lg">
                   {adminData?.lastActive && !isNaN(new Date(adminData.lastActive).getTime())
                     ? formatDistanceToNow(new Date(adminData.lastActive), {
                         addSuffix: true,
@@ -289,44 +308,49 @@ const AdminDetailsModal = ({ admin, isOpen, onClose }) => {
                     : "N/A"}
                 </p>
               </div>
-              <div>
-                <Label className="text-sm font-medium">Balance</Label>
-                <p className="mt-1 text-gray-600">
+              <div className="space-y-1">
+                <Label className="text-xs text-gray-500 uppercase font-semibold tracking-wider">Wallet Balance</Label>
+                <p className="text-[#00004D] font-bold text-2xl">
                   ₹{adminData?.balance?.toLocaleString() || "0.00"}
                 </p>
               </div>
             </div>
-            {error && <p className="text-red-500">{error}</p>}
-            <div className="flex justify-end gap-2">
+              </CardContent>
+            </Card>
+            {error && <p className="text-red-500 bg-red-50 p-3 rounded-md text-sm">{error}</p>}
+            <div className="flex justify-end gap-3 pt-2">
               {isEditing ? (
                 <>
-                  <Button variant="outline" onClick={() => setIsEditing(false)}>
+                  <Button variant="outline" className="border-gray-300" onClick={() => setIsEditing(false)}>
                     Cancel
                   </Button>
-                  <Button onClick={handleSave}>Save</Button>
+                  <Button className="bg-[#00004D] hover:bg-blue-900 shadow-md" onClick={handleSave}>Save Changes</Button>
                 </>
               ) : (
-                <Button onClick={() => handleEdit(adminData)}>Edit Information</Button>
+                <Button className="bg-[#00004D] hover:bg-blue-900 shadow-md" onClick={() => handleEdit(adminData)}>Edit Information</Button>
               )}
             </div>
           </TabsContent>
 
           {/* Transaction History Tab */}
-          <TabsContent value="transactions" className="space-y-4 w-full">
-           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
-              <Select value={filter} onValueChange={setFilter}>
-                <SelectTrigger className="w-[150px] sm:w-[180px]">
-                  <SelectValue placeholder="Filter transactions" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Transactions</SelectItem>
-                  <SelectItem value="transfer">Transfer</SelectItem>
-                  <SelectItem value="topup">Topup</SelectItem>
-                  <SelectItem value="credit">Credit</SelectItem>
-                  <SelectItem value="refund">Refund</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <TabsContent value="transactions" className="space-y-4 w-full mt-6 animate-in fade-in duration-300">
+            <Card className="shadow-sm border-gray-200">
+              <CardContent className="p-0">
+                <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 rounded-t-xl">
+                  <h3 className="font-semibold text-gray-700">Recent Activity</h3>
+                  <Select value={filter} onValueChange={setFilter}>
+                    <SelectTrigger className="w-[150px] sm:w-[180px] bg-white border-gray-200 focus:ring-[#00004D]">
+                      <SelectValue placeholder="Filter transactions" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Transactions</SelectItem>
+                      <SelectItem value="transfer">Transfer</SelectItem>
+                      <SelectItem value="topup">Topup</SelectItem>
+                      <SelectItem value="credit">Credit</SelectItem>
+                      <SelectItem value="refund">Refund</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
             {loading && <p className="text-center text-gray-600">Loading transactions...</p>}
             {error && <p className="text-center text-red-500">{error}</p>}
             {!loading && !error && (
@@ -419,10 +443,13 @@ const AdminDetailsModal = ({ admin, isOpen, onClose }) => {
                 )}
               </>
             )}
+            </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+        </div>
+        <DialogFooter className="bg-gray-50 px-6 py-4 border-t border-gray-100 rounded-b-xl">
+          <Button variant="outline" onClick={onClose} className="border-gray-300 font-medium">
             Close
           </Button>
         </DialogFooter>

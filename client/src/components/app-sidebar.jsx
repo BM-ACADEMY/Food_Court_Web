@@ -85,6 +85,11 @@ const masterAdminNavLinks = [
     url: "/master-admin/fees",
     icon: ArrowDownFromLine,
   },
+  {
+    title: "Offline Qrcode",
+    url: "/master-admin/qrcode",
+    icon: QrCode,
+  },
 ];
 
 const adminNavLinks = [

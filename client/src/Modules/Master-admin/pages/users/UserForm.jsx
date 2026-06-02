@@ -108,7 +108,16 @@ export function UserForm({ open, onOpenChange, onSubmit, defaultValues }) {
   }, [open, defaultValues]);
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+
+    if (name === "phone_number") {
+      // Remove any non-digits and restrict to max 10 characters
+      value = value.replace(/\D/g, "").slice(0, 10);
+    } else if (name === "email") {
+      // Force email to lowercase
+      value = value.toLowerCase();
+    }
+
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 

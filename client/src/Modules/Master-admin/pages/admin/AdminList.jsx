@@ -241,7 +241,7 @@ export default function AdminList() {
   // };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       <h2 className="text-3xl font-bold text-[#00004D]">Admin User Check</h2>
 
       {/* Filters */}
@@ -382,25 +382,22 @@ export default function AdminList() {
             </Button>
           </div>
           <div className="w-full overflow-x-auto">
-            <Table className="min-w-[1000px]"> {/* enforce min width */}
+            <Table className="min-w-[1000px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Admin ID</TableHead>
-                  <TableHead>Sender Name</TableHead>
-                  <TableHead>Receiver Name</TableHead>
+                  <TableHead>Name</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Balance</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Last Active</TableHead>
-                  <TableHead>Permission</TableHead>
-
-                  {/* <TableHead>Actions</TableHead> */}
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {admins.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center">
+                    <TableCell colSpan={7} className="text-center">
                       No admins found
                     </TableCell>
                   </TableRow>
@@ -409,29 +406,17 @@ export default function AdminList() {
                     <TableRow key={admin.id}>
                       <TableCell className="font-medium">#{admin.id}</TableCell>
 
-                      {/* Sender Name */}
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <Avatar name={admin.sender_name} />
+                          <Avatar name={admin.name} />
                           <div className="flex flex-col">
-                            <span className="font-medium">{admin.sender_name}</span>
-                            <span className="text-xs text-gray-500">{admin.sender_role_name}</span>
+                            <span className="font-medium">{admin.name || "Unknown"}</span>
+                            <span className="text-xs text-gray-500">{admin.role || "Admin"}</span>
                           </div>
                         </div>
                       </TableCell>
 
-                      {/* Receiver Name */}
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Avatar name={admin.receiver_name} />
-                          <div className="flex flex-col">
-                            <span className="font-medium">{admin.receiver_name}</span>
-                            <span className="text-xs text-gray-500">{admin.receiver_role_name}</span>
-                          </div>
-                        </div>
-                      </TableCell>
-
-                      <TableCell>{admin.phone}</TableCell>
+                      <TableCell>{admin.phone || "N/A"}</TableCell>
                       <TableCell>
                         <span
                           className={`font-medium ${admin.balance > 10000
@@ -441,21 +426,21 @@ export default function AdminList() {
                               : "text-red-600"
                             }`}
                         >
-                          ₹{admin.balance.toLocaleString()}
+                          ₹{(admin.balance || 0).toLocaleString()}
                         </span>
                       </TableCell>
                       <TableCell>
                         <Badge
                           variant="ghost"
-                          className={`text-white ${admin.status.toLowerCase() === "online"
+                          className={`text-white ${admin.status?.toLowerCase() === "online"
                             ? "bg-green-500"
                             : "bg-red-500"
                             }`}
                         >
-                          {admin.status}
+                          {admin.status || "Offline"}
                         </Badge>
                       </TableCell>
-                      <TableCell>{admin.lastActive}</TableCell>
+                      <TableCell>{admin.lastActive || "N/A"}</TableCell>
                       
                       <TableCell className="flex gap-2">
                         <Button
@@ -466,6 +451,7 @@ export default function AdminList() {
                           <Eye className="mr-1 h-4 w-4" /> View
                         </Button>
                       </TableCell>
+
                     </TableRow>
                   ))
                 )}

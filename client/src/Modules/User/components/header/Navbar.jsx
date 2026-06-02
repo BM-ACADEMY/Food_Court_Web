@@ -5,7 +5,7 @@ import Cmc from '@/assets/cmc.png';
 
 const Header = () => {
   return (
-    <header className="w-full bg-[#07014A] text-white px-6 py-3 flex items-center justify-between shadow-md">
+    <header className="sticky top-0 z-50 w-full bg-[#07014A] text-white px-6 py-3 flex items-center justify-between shadow-md">
       <div className="flex items-center gap-2">
         <img
           src={Pegasus}

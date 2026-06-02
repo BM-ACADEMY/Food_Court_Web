@@ -13,6 +13,7 @@ import MergeBalance from "@/Modules/Master-admin/pages/account/MergeBalance";
 import { LocationManager } from "@/Modules/Master-admin/pages/locations/LocationPage";
 import { UpiManager } from "@/Modules/Master-admin/pages/upi/UpiPage";
 import FeesTable from "@/Modules/Master-admin/pages/Fees/FeesTable";
+import GenerateQr from "@/Modules/Master-admin/pages/offlineQrcode/OfflineQrcode";
 
 export default function MasterAdminRoutes() {
   return (
@@ -31,6 +32,7 @@ export default function MasterAdminRoutes() {
         <Route path="locations" element={<LocationManager />} />
         <Route path="fees" element={<FeesTable />} />
         <Route path="upi" element={<UpiManager />} />
+        <Route path="qrcode" element={<GenerateQr />} />
       </Route>
     </Routes>
   );

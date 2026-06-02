@@ -630,8 +630,8 @@ const OfflineQrcode = () => {
                       </div>
                       <div className="w-full bg-gray-200 h-2.5 rounded-full overflow-hidden">
                         <div
-                           className="bg-[#00004D] h-full rounded-full transition-all duration-300"
-                           style={{ width: `${(progress.current / progress.total) * 100}%` }}
+                          className="bg-[#00004D] h-full rounded-full transition-all duration-300"
+                          style={{ width: `${(progress.current / progress.total) * 100}%` }}
                         />
                       </div>
                     </div>

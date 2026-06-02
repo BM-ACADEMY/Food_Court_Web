@@ -275,8 +275,9 @@ exports.createUser = async (req, res) => {
 
     // Hash password
     const password_hash = await bcrypt.hash(password, 10);
-    const otpres = sendOtpSms(phone_number, otp);
-  
+    sendOtpSms(phone_number, otp).catch((err) =>
+      console.error("Async SMS sending failed during user registration:", err.message)
+    );
 
     // Create user
     const newUser = new User({
