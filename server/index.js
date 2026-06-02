@@ -121,6 +121,7 @@ app.use(cors({
     const allowedOrigins = [
       "https://pegasus2026.com",
       "https://www.pegasus2026.com",
+      "https://pegasus2025sample.vercel.app",
       "http://localhost:5173"
     ];
     if (!origin || allowedOrigins.includes(origin)) {
