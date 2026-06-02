@@ -60,10 +60,13 @@ exports.loginUser = async (req, res) => {
     );
 
     // Set token in cookie
+    const isProduction = process.env.NODE_ENV === "production" || 
+      (req.get("origin") && !req.get("origin").includes("localhost"));
+
     res.cookie("token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+      secure: isProduction,
+      sameSite: isProduction ? "None" : "Lax",
       maxAge: 86400000,
     });
 
@@ -181,10 +184,13 @@ exports.logoutUser = async (req, res) => {
     }
 
     // Clear token cookie
+    const isProduction = process.env.NODE_ENV === "production" || 
+      (req.get("origin") && !req.get("origin").includes("localhost"));
+
     res.clearCookie("token", {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+      secure: isProduction,
+      sameSite: isProduction ? "None" : "Lax",
     });
 
     res.status(200).json({ success: true, message: "Logged out successfully" });
@@ -470,10 +476,13 @@ exports.verifyMobileLoginOtp = async (req, res) => {
     );
 
     // Set token in cookie
+    const isProduction = process.env.NODE_ENV === "production" || 
+      (req.get("origin") && !req.get("origin").includes("localhost"));
+
     res.cookie("token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+      secure: isProduction,
+      sameSite: isProduction ? "None" : "Lax",
       maxAge: 86400000, // 1 day
     });
 
