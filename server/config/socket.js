@@ -41,8 +41,8 @@
 //     cors: {
 //       origin: [
 //         process.env.DEV_FRONTEND_URL, // e.g., http://localhost:5173
-//         "https://pegasus2025.com",
-//         "https://www.pegasus2025.com"
+//         "https://pegasus2026.com",
+//         "https://www.pegasus2026.com"
 //       ],
 //       credentials: true,
 //     },
@@ -78,8 +78,8 @@ const initSocket = async (server) => {
     cors: {
       origin: [
         process.env.DEV_FRONTEND_URL,
-        "https://pegasus2025.com",
-        "https://www.pegasus2025.com",
+        "https://pegasus2026.com",
+        "https://www.pegasus2026.com",
       ],
       credentials: true,
       methods: ["GET", "POST"],
@@ -89,21 +89,25 @@ const initSocket = async (server) => {
     pingTimeout: 20000,
   });
 
-  // ✅ Redis pub/sub setup with logs
-  const pubClient = createClient({ url: "redis://127.0.0.1:6379" });
-  const subClient = pubClient.duplicate();
+  if (process.env.NODE_ENV === 'production') {
+    // ✅ Redis pub/sub setup with logs
+    const pubClient = createClient({ url: `redis://${process.env.REDIS_HOST || '127.0.0.1'}:${process.env.REDIS_PORT || 6379}` });
+    const subClient = pubClient.duplicate();
 
-  pubClient.on("connect", () => console.log("✅ Redis PUB connected"));
-  subClient.on("connect", () => console.log("✅ Redis SUB connected"));
+    pubClient.on("connect", () => console.log("✅ Redis PUB connected"));
+    subClient.on("connect", () => console.log("✅ Redis SUB connected"));
 
-  pubClient.on("error", (err) => console.error("❌ Redis PUB error:", err));
-  subClient.on("error", (err) => console.error("❌ Redis SUB error:", err));
+    pubClient.on("error", (err) => console.error("❌ Redis PUB error:", err));
+    subClient.on("error", (err) => console.error("❌ Redis SUB error:", err));
 
-  await pubClient.connect();
-  await subClient.connect();
+    await pubClient.connect();
+    await subClient.connect();
 
-  socketIO.adapter(createAdapter(pubClient, subClient));
-  console.log("🔁 Redis adapter initialized");
+    socketIO.adapter(createAdapter(pubClient, subClient));
+    console.log("🔁 Redis adapter initialized");
+  } else {
+    console.log("⚠️ Running in development mode, skipping Redis adapter");
+  }
 
   io = socketIO;
 

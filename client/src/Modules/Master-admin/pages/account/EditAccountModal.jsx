@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import axios from "axios";
-import { toast,Bounce   } from "react-toastify";
+import { toast, Bounce } from "react-toastify";
 
 export default function EditAccountModal({ open, onClose }) {
   const { user, setUser } = useAuth();
@@ -50,7 +50,7 @@ export default function EditAccountModal({ open, onClose }) {
         }
       );
 
-      
+
       if (response) {
         // Update user context with new data
         setUser((prev) => ({
@@ -89,7 +89,7 @@ export default function EditAccountModal({ open, onClose }) {
 
         <div className="grid gap-4 py-2">
           <div className="grid gap-1">
-            <Label htmlFor="name">Full Name</Label>
+            <Label htmlFor="name" className="text-[#00004D]">Full Name</Label>
             <Input
               id="name"
               value={name}
@@ -99,7 +99,7 @@ export default function EditAccountModal({ open, onClose }) {
             />
           </div>
           <div className="grid gap-1">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email" className="text-[#00004D] font-bold">Email</Label>
             <Input
               id="email"
               type="email"
@@ -110,7 +110,7 @@ export default function EditAccountModal({ open, onClose }) {
             />
           </div>
           <div className="grid gap-1">
-            <Label htmlFor="phone_number">Phone Number</Label>
+            <Label htmlFor="phone_number" className="text-[#00004D] font-bold">Phone Number</Label>
             <Input
               id="phone_number"
               type="tel"
@@ -120,7 +120,7 @@ export default function EditAccountModal({ open, onClose }) {
             />
           </div>
           <div className="grid gap-1">
-            <Label htmlFor="password">New Password</Label>
+            <Label htmlFor="password" className="text-[#00004D] font-bold">New Password</Label>
             <Input
               id="password"
               type="password"
@@ -131,7 +131,7 @@ export default function EditAccountModal({ open, onClose }) {
             />
           </div>
           <div className="grid gap-1">
-            <Label htmlFor="confirm_password">Confirm Password</Label>
+            <Label htmlFor="confirm_password" className="text-[#00004D] font-bold">Confirm Password</Label>
             <Input
               id="confirm_password"
               type="password"

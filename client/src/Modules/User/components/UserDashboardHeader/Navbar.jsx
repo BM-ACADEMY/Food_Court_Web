@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Pegasus from "@/assets/pegasus.png";
 import { toast } from 'react-toastify';
-import { Link } from "react-router-dom"; 
+import { Link } from "react-router-dom";
 
 import {
   DropdownMenu,
@@ -49,48 +49,48 @@ const UserDashboardHeader = () => {
   }, [user]);
 
   // Handle save for updating user details
-const handleSave = async () => {
-  try {
-    const response = await axios.put(
-      `${import.meta.env.VITE_BASE_URL}/users/update-user/${user._id}`,
-      {
-        name: editData.name,
-        email: editData.email,
-        phone_number: editData.phone,
-      },
-      { withCredentials: true }
-    );
+  const handleSave = async () => {
+    try {
+      const response = await axios.put(
+        `${import.meta.env.VITE_BASE_URL}/users/update-user/${user._id}`,
+        {
+          name: editData.name,
+          email: editData.email,
+          phone_number: editData.phone,
+        },
+        { withCredentials: true }
+      );
 
-    setUser(response.data.data); // Update user in context
-    setOpenAccount(false);
-    toast.success("Profile updated successfully!"); // ✅ Show success toast
-  } catch (err) {
-    console.error("Update failed:", err);
-    toast.error(
-      err.response?.data?.message || "Failed to update profile."
-    ); // ✅ Show error toast
-  }
-};
+      setUser(response.data.data); // Update user in context
+      setOpenAccount(false);
+      toast.success("Profile updated successfully!"); // ✅ Show success toast
+    } catch (err) {
+      console.error("Update failed:", err);
+      toast.error(
+        err.response?.data?.message || "Failed to update profile."
+      ); // ✅ Show error toast
+    }
+  };
 
 
   // Show loading if user is not logged in
   if (!user) {
-    return <div className="text-white bg-[#000052] p-4">Loading...</div>;
+    return <div className="text-white bg-[#01004c] p-4">Loading...</div>;
   }
 
   return (
     <>
-      <header className="w-full bg-[#000052] text-white px-6 py-4 flex items-center justify-between shadow-md">
+      <header className="w-full bg-[#01004c] text-white px-6 py-4 flex items-center justify-between shadow-md">
         {/* Left section */}
         <div className="flex items-center gap-3">
           <img src={Pegasus} alt="Pegasus Logo" className="w-10 h-10" />
           <div>
             <h1 className="text-base md:text-base font-bold tracking-wide">
-              PEGASUS 2K25
+              PEGASUS 2K26
             </h1>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center text-sm md:text-xs font-medium text-white/80 hover:underline">
+                <button className="flex items-center text-sm md:text-xs font-medium text-white/80 hover:underline cursor-pointer">
                   {user.name}
                   <span className="ml-1 text-white/60">
                     ({user.role?.name || "N/A"})
@@ -135,7 +135,7 @@ const handleSave = async () => {
       <Dialog open={openAccount} onOpenChange={setOpenAccount}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit Account Information</DialogTitle>
+            <DialogTitle className="text-[#01004c]">Edit Account Information</DialogTitle>
             <DialogDescription>
               You can update your personal details here.
             </DialogDescription>
@@ -143,7 +143,7 @@ const handleSave = async () => {
 
           <div className="space-y-3">
             <div>
-              <label className="block text-sm font-medium mb-1">Name</label>
+              <label className="block text-sm font-medium mb-1 text-[#01004c]">Name</label>
               <Input
                 value={editData.name}
                 onChange={(e) =>
@@ -152,7 +152,7 @@ const handleSave = async () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Email</label>
+              <label className="block text-sm font-medium mb-1 text-[#01004c]">Email</label>
               <Input
                 type="email"
                 value={editData.email}
@@ -162,7 +162,7 @@ const handleSave = async () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Phone</label>
+              <label className="block text-sm font-medium mb-1 text-[#01004c]">Phone</label>
               <Input
                 value={editData.phone}
                 onChange={(e) =>
@@ -171,7 +171,7 @@ const handleSave = async () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">
+              <label className="block text-sm font-medium mb-1 text-[#01004c]">
                 Customer ID
               </label>
               <Input value={editData.customerId} disabled />
@@ -179,7 +179,7 @@ const handleSave = async () => {
           </div>
 
           <DialogFooter className="pt-4">
-            <Button variant="default" onClick={handleSave}>
+            <Button variant="default" onClick={handleSave} className="cursor-pointer bg-[#01004c] hover:bg-[#020080] text-white">
               <Save className="mr-2 h-4 w-4" />
               Save Changes
             </Button>
@@ -200,6 +200,7 @@ const handleSave = async () => {
             <Button
               variant="outline"
               onClick={() => setShowLogoutDialog(false)}
+              className="cursor-pointer"
             >
               Cancel
             </Button>
@@ -209,6 +210,7 @@ const handleSave = async () => {
                 await logout();
                 setShowLogoutDialog(false);
               }}
+              className="cursor-pointer bg-red-600 hover:bg-red-700"
             >
               <LogOut className="mr-2 h-4 w-4" />
               Logout

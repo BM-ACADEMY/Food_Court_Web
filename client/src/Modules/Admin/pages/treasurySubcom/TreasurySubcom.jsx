@@ -179,7 +179,7 @@ export default function TreasurySubcomList() {
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const csv = XLSX.utils.sheet_to_csv(ws);
-    const file = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const file = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
     saveAs(file, `treasury_subcoms_${format(new Date(), "yyyy-MM-dd")}.csv`);
   };
 
@@ -203,7 +203,7 @@ export default function TreasurySubcomList() {
           subcom.id || "N/A",
           subcom.name || "Unknown",
           subcom.phone || "N/A",
-          `₹${subcom.balance.toLocaleString()}` || "₹0",
+          `Rs. ${subcom.balance.toLocaleString()}` || "Rs. 0",
           subcom.status || "N/A",
           subcom.lastActive || "N/A",
         ]),
@@ -379,8 +379,8 @@ export default function TreasurySubcomList() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Treasury Subcom ID</TableHead>
-                  <TableHead>Sender Name</TableHead>
-                  <TableHead>Receiver Name</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Phone</TableHead>
                   <TableHead>Balance</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Last Active</TableHead>
@@ -390,7 +390,7 @@ export default function TreasurySubcomList() {
               <TableBody>
                 {paginatedTreasurySubcoms.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center">
+                    <TableCell colSpan={7} className="text-center">
                       No treasury subcoms found
                     </TableCell>
                   </TableRow>
@@ -400,26 +400,18 @@ export default function TreasurySubcomList() {
                       <TableCell className="font-medium">#{subcom.id}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <Avatar name={subcom.sender_name} />
+                          <Avatar name={subcom.name || "Unknown"} />
                           <div className="flex flex-col gap-1">
-                            <span>{subcom.sender_name}</span>
+                            <span>{subcom.name || "Unknown"}</span>
                             <span className="text-[12px] text-gray-500">
-                              ({subcom.sender_role_name})
+                              ({subcom.role || "Treasury Subcom"})
                             </span>
                           </div>
                         </div>
                       </TableCell>
-                      {/* <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Avatar name={subcom.receiver_name} />
-                          <div className="flex flex-col gap-1">
-                            <span>{subcom.receiver_name}</span>
-                            <span className="text-[12px] text-gray-500">
-                              ({subcom.receiver_role_name})
-                            </span>
-                          </div>
-                        </div>
-                      </TableCell> */}
+                      <TableCell>
+                        {subcom.phone || "N/A"}
+                      </TableCell>
                       <TableCell>
                         <span
                           className={`font-medium ${subcom.balance > 10000

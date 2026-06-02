@@ -114,7 +114,7 @@ const RestaurantNavbar = () => {
           </button>
           <div>
             <h1 className="text-base md:text-base font-bold tracking-wide">
-              PEGASUS 2K25
+              PEGASUS 2K26
             </h1>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

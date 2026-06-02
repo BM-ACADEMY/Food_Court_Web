@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ChevronsUpDown, LogOut, User, Save } from "lucide-react";
+import { ChevronsUpDown, LogOut, User, Save, Clock } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import axios from "axios";
 import { toast } from "react-toastify";
@@ -177,12 +177,12 @@ const TreasuryDashboardHeader = () => {
 
   return (
     <>
-      <header className="w-full bg-[#000052] text-white px-6 py-4 flex items-center justify-between shadow-md">
+      <header className="sticky top-0 z-50 w-full bg-[#000052] text-white px-6 py-4 flex items-center justify-between shadow-md">
         <div className="flex items-center gap-3">
           <img src={Pegasus} alt="Pegasus Logo" className="w-10 h-10 cursor-pointer" onClick={handleHome} />
           <div>
             <h1 className="text-base md:text-base font-bold tracking-wide cursor-pointer" onClick={handleHome}>
-              PEGASUS 2K25
+              PEGASUS 2K26
             </h1>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -203,6 +203,12 @@ const TreasuryDashboardHeader = () => {
                   onClick={() => setOpenAccount(true)}
                 >
                   <User className="h-4 w-4" /> Account
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="gap-2"
+                  onClick={() => navigate("/treasury/session-history")}
+                >
+                  <Clock className="h-4 w-4" /> Session History
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="gap-2 text-red-600"
@@ -233,7 +239,7 @@ const TreasuryDashboardHeader = () => {
       <Dialog open={openAccount} onOpenChange={setOpenAccount}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit Account Information</DialogTitle>
+            <DialogTitle className="text-[#000052]">Edit Account Information</DialogTitle>
             <DialogDescription>
               You can update your personal details here.
             </DialogDescription>
@@ -243,7 +249,7 @@ const TreasuryDashboardHeader = () => {
           )}
           <div className="space-y-3">
             <div>
-              <label className="block text-sm font-medium mb-1">Name</label>
+              <label className="block text-sm font-medium mb-1 text-[#000052]">Name</label>
               <Input
                 value={editData.name || ""}
                 onChange={(e) =>
@@ -252,7 +258,7 @@ const TreasuryDashboardHeader = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Email</label>
+              <label className="block text-sm font-medium mb-1 text-[#000052]">Email</label>
               <Input
                 type="email"
                 value={editData.email || ""}
@@ -262,7 +268,7 @@ const TreasuryDashboardHeader = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Phone</label>
+              <label className="block text-sm font-medium mb-1 text-[#000052]">Phone</label>
               <Input
                 value={editData.phone_number || ""}
                 onChange={(e) =>
@@ -272,7 +278,7 @@ const TreasuryDashboardHeader = () => {
             </div>
             {user.role?.role_id === "role-3" && (
               <div>
-                <label className="block text-sm font-medium mb-1">Treasury Subcom ID</label>
+                <label className="block text-sm font-medium mb-1 text-[#000052]">Treasury Subcom ID</label>
                 <Input
                   value={editData.treasury_subcom_id || "N/A"}
                   disabled
@@ -281,7 +287,7 @@ const TreasuryDashboardHeader = () => {
             )}
           </div>
           <DialogFooter className="pt-4">
-            <Button variant="default" onClick={handleSave}>
+            <Button variant="default" className="bg-[#000052] hover:bg-[#000052]" onClick={handleSave}>
               <Save className="mr-2 h-4 w-4" />
               Save Changes
             </Button>

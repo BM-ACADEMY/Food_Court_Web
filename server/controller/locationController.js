@@ -1,4 +1,5 @@
 const Location = require("../model/locationModel");
+const trackActivity = require("../utils/activityLogger");
 
 // Create Location
 exports.createLocation = async (req, res) => {
@@ -8,7 +9,9 @@ exports.createLocation = async (req, res) => {
     const location = new Location({ name });
     await location.save();
 
-    res.status(201).json({ success: true,message:"Location Added Successfully", data: location });
+    await trackActivity(req, "Create Location", `Created location: "${location.name}"`);
+
+    res.status(201).json({ success: true, message: "Location Added Successfully", data: location });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }
@@ -44,7 +47,9 @@ exports.updateLocation = async (req, res) => {
     if (!updated)
       return res.status(404).json({ success: false, message: "Location not found" });
 
-    res.status(200).json({ success: true, message:"Location updated Successfully", data: updated });
+    await trackActivity(req, "Update Location", `Updated location name to: "${updated.name}"`);
+
+    res.status(200).json({ success: true, message: "Location updated Successfully", data: updated });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }
@@ -56,6 +61,8 @@ exports.deleteLocation = async (req, res) => {
     const deleted = await Location.findByIdAndDelete(req.params.id);
     if (!deleted)
       return res.status(404).json({ success: false, message: "Location not found" });
+
+    await trackActivity(req, "Delete Location", `Deleted location: "${deleted.name}"`);
 
     res.status(200).json({ success: true, message: "Location deleted successfully" });
   } catch (err) {

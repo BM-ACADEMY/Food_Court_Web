@@ -138,6 +138,7 @@ import { useAuth } from "@/context/AuthContext";
 const OtpForm = ({ onBack, phone, mode = "register", onSuccess }) => {
   const [otp, setOtp] = useState(new Array(6).fill(""));
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const inputRefs = useRef([]);
   const navigate = useNavigate();
   const { loginWithOtp } = useAuth();
@@ -179,44 +180,34 @@ const OtpForm = ({ onBack, phone, mode = "register", onSuccess }) => {
       return;
     }
 
+    setIsLoading(true);
+
     try {
-      if (mode === "login") {
-        // Use loginWithOtp for login mode
-        const response = await loginWithOtp(phone, fullOtp);
-        if (response.data.success) {
-          toast.success("Login successful", {
-            position: "top-center",
-            autoClose: 4000,
-            theme: "colored",
-            transition: Bounce,
-          });
-          navigate("/"); // AppRoutes will handle role-based redirection
-        } else {
-          setError(response.data.message || "Invalid OTP");
+      // We use loginWithOtp for both login and register modes because
+      // we want to automatically log the user in and set their session cookie
+      // immediately after successful registration!
+      const response = await loginWithOtp(phone, fullOtp);
+      
+      if (response.data.success) {
+        toast.success(mode === "login" ? "Login successful" : "Registration verified & Logged in!", {
+          position: "top-center",
+          autoClose: 4000,
+          theme: "colored",
+          transition: Bounce,
+        });
+        
+        if (mode === "register") {
+          onSuccess?.(); // Optional callback
         }
+        
+        navigate("/"); // AppRoutes will handle role-based redirection to dashboard
       } else {
-        // Handle registration mode
-        const response = await axios.post(
-          `${import.meta.env.VITE_BASE_URL}/users/verify-otp`,
-          {
-            phone_number: phone,
-            otp: fullOtp,
-          }
-        );
-        if (response.data.success) {
-          toast.success("Registration successful", {
-            position: "top-center",
-            autoClose: 4000,
-            theme: "colored",
-            transition: Bounce,
-          });
-          onSuccess?.(); // Call success handler for registration
-        } else {
-          setError(response.data.message || "Invalid OTP");
-        }
+        setError(response.data.message || "Invalid OTP");
       }
     } catch (err) {
       setError(err.response?.data?.message || "Verification failed");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -249,9 +240,20 @@ const OtpForm = ({ onBack, phone, mode = "register", onSuccess }) => {
           </div>
           <Button
             onClick={handleVerify}
-            className="w-full bg-[#05025b] hover:bg-[#1a1a7b] text-base sm:text-lg"
+            className="w-full bg-[#05025b] hover:bg-[#1a1a7b] text-base sm:text-lg flex items-center justify-center cursor-pointer disabled:opacity-70"
+            disabled={isLoading}
           >
-            Verify
+            {isLoading ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Verifying...
+              </>
+            ) : (
+              "Verify"
+            )}
           </Button>
           <div className="mt-6 text-center">
             <button

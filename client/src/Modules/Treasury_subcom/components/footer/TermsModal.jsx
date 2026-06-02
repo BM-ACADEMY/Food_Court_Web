@@ -19,7 +19,7 @@ const TermsModal = ({ open, onOpenChange }) => {
                 <strong className="[color:#000052]">Event Duration:</strong> Valid only during Pegasus 2025
               </p>
               <p>
-                Welcome to <a href="https://www.pegasus2025.com" className="underline hover:text-foreground">www.pegasus2025.com</a>, the official QR-based valet system for Pegasus 2025, hosted by Christian Medical College, Vellore. By accessing or using this platform, you agree to comply with the following Terms and Conditions.
+                Welcome to <a href="https://www.pegasus2026.com" className="underline hover:text-foreground">www.pegasus2026.com</a>, the official QR-based valet system for Pegasus 2025, hosted by Christian Medical College, Vellore. By accessing or using this platform, you agree to comply with the following Terms and Conditions.
               </p>
 
               <h4 className="font-semibold text-sm sm:text-base [color:#000052]">1. Eligibility</h4>
@@ -27,7 +27,7 @@ const TermsModal = ({ open, onOpenChange }) => {
 
               <h4 className="font-semibold text-sm sm:text-base [color:#000052]">2. About the Platform</h4>
               <p>
-                <a href="https://www.pegasus2025.com" className="underline hover:text-foreground">www.pegasus2025.com</a> is an event-specific valet and payment system that allows users to:
+                <a href="https://www.pegasus2026.com" className="underline hover:text-foreground">www.pegasus2026.com</a> is an event-specific valet and payment system that allows users to:
               </p>
               <ul className="list-disc pl-5 space-y-1">
                 <li>Register and create accounts</li>
@@ -120,7 +120,7 @@ const TermsModal = ({ open, onOpenChange }) => {
               <p>
                 Organizing Committee, Pegasus 2025<br />
                 Christian Medical College, Vellore<br />
-                <a href="https://www.pegasus2025.com" className="underline hover:text-foreground">www.pegasus2025.com</a><br />
+                <a href="https://www.pegasus2026.com" className="underline hover:text-foreground">www.pegasus2026.com</a><br />
                 Support available at the help desk during event hours.
               </p>
             </div>

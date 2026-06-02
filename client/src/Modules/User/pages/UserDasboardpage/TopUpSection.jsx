@@ -17,9 +17,8 @@ const TopUpSection = () => {
 
       try {
         const res = await axios.get(
-          `${import.meta.env.VITE_BASE_URL}/customers/fetch-by-qr`,
+          `${import.meta.env.VITE_BASE_URL}/customers/fetch-by-user-id/${user._id}`,
           {
-            params: { qr_code: user?.qr_code || "" },
             withCredentials: true,
           }
         );
@@ -66,7 +65,7 @@ const TopUpSection = () => {
             <div className="mt-4 text-center">
               <Button
                 onClick={handleDownload}
-                className="bg-[#000066] hover:bg-[#000080] text-white text-sm"
+                className="bg-[#000066] hover:bg-[#000080] text-white text-sm cursor-pointer"
               >
                 <Download className="mr-2 h-4 w-4" /> Download QR
               </Button>

@@ -1,3 +1,4 @@
+import BackButton from "@/components/BackButton";
 import { useState } from "react";
 import axios from "axios";
 import { useAuth } from "@/context/AuthContext";
@@ -212,6 +213,7 @@ function TopUp({ customer }) {
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+      <BackButton />
       <div className="w-full max-w-2xl bg-white rounded-lg shadow-md p-6">
         <div className="bg-[#040442] text-white text-lg font-semibold px-4 py-3 rounded-t-md">
           Top Up Card

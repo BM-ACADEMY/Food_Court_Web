@@ -2,11 +2,17 @@
 const Role = require("../model/roleModel");
 const User = require("../model/userModel");
 const Restaurant = require("../model/restaurantModel");
+const Customer = require("../model/customerModel");
+const Admin = require("../model/adminModel");
+const TreasurySubcom = require("../model/treasurySubcomModel");
+const MasterAdmin = require("../model/masterAdminModel");
+const Product = require("../model/productModel");
 const UserBalance = require("../model/userBalanceModel");
 const LoginLog = require("../model/loginLogModel");
 const Transaction = require("../model/transactionModel");
 const mongoose = require("mongoose");
 const { startOfDay, subDays, subMonths, format } = require("date-fns");
+const trackActivity = require("../utils/activityLogger");
 
 // Create Restaurant
 exports.createRestaurant = async (req, res) => {
@@ -16,16 +22,43 @@ exports.createRestaurant = async (req, res) => {
       restaurant_name,
       location,
       qr_code,
+      menuItems,
     } = req.body;
 
-    const restaurant = new Restaurant({
-      user_id,
-      restaurant_name,
-      location,
-      qr_code,
-    });
+    let restaurant = await Restaurant.findOne({ user_id });
+    
+    if (restaurant) {
+      if (restaurant_name) restaurant.restaurant_name = restaurant_name;
+      if (location) restaurant.location = location;
+      if (qr_code) restaurant.qr_code = qr_code;
+      await restaurant.save();
+    } else {
+      restaurant = new Restaurant({
+        user_id,
+        restaurant_name,
+        location,
+        qr_code,
+      });
+      await restaurant.save();
+    }
 
-    await restaurant.save();
+    // Create initial menu items if provided
+    if (menuItems && Array.isArray(menuItems) && menuItems.length > 0) {
+      const products = menuItems
+        .filter(item => item.name && item.amount)
+        .map(item => ({
+          restaurant_id: restaurant._id,
+          name: item.name,
+          amount: Number(item.amount)
+        }));
+      
+      if (products.length > 0) {
+        await Product.insertMany(products);
+      }
+    }
+
+    await trackActivity(req, "Create Restaurant", `Configured restaurant profile for "${restaurant_name || restaurant.restaurant_name}"`);
+
     res.status(201).json({ success: true, data: restaurant });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -85,16 +118,54 @@ exports.getRestaurantByQrCode = async (req, res) => {
 exports.updateRestaurant = async (req, res) => {
   try {
     const { id } = req.params;
+    const { menuItems, ...updateData } = req.body;
+
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ success: false, message: "Invalid restaurant ID format" });
     }
-    const updated = await Restaurant.findByIdAndUpdate(id, req.body, {
+    const updated = await Restaurant.findByIdAndUpdate(id, updateData, {
       new: true,
       runValidators: true,
     });
     if (!updated) {
       return res.status(404).json({ success: false, message: "Restaurant not found" });
     }
+
+    // Sync menu items
+    if (menuItems && Array.isArray(menuItems)) {
+      const existingProducts = await Product.find({ restaurant_id: id });
+      const existingProductIds = existingProducts.map(p => p._id.toString());
+      const receivedIds = menuItems.map(item => item._id).filter(Boolean);
+
+      // 1. Delete removed products
+      const productsToDelete = existingProductIds.filter(pid => !receivedIds.includes(pid));
+      if (productsToDelete.length > 0) {
+        await Product.deleteMany({ _id: { $in: productsToDelete } });
+      }
+
+      // 2. Add or Update products
+      for (const item of menuItems) {
+        if (!item.name || !item.amount) continue;
+
+        if (item._id) {
+          // Update existing
+          await Product.findByIdAndUpdate(item._id, {
+            name: item.name,
+            amount: Number(item.amount)
+          });
+        } else {
+          // Create new
+          await Product.create({
+            restaurant_id: id,
+            name: item.name,
+            amount: Number(item.amount)
+          });
+        }
+      }
+    }
+
+    await trackActivity(req, "Update Restaurant", `Updated restaurant profile for "${updated.restaurant_name}"`);
+
     res.status(200).json({ success: true, data: updated });
   } catch (err) {
     console.error("Update restaurant error:", err.message);
@@ -112,6 +183,9 @@ exports.deleteRestaurant = async (req, res) => {
     if (!deleted) {
       return res.status(404).json({ success: false, message: "Restaurant not found" });
     }
+
+    await trackActivity(req, "Delete Restaurant", `Deleted restaurant profile of "${deleted.restaurant_name}"`);
+
     res.status(200).json({ success: true, message: "Restaurant deleted successfully" });
   } catch (err) {
     console.error("Delete restaurant error:", err.message);
@@ -308,7 +382,7 @@ exports.getAllRestaurantDetails = async (req, res) => {
           is_flagged: 1,
           restaurant_id: "$restaurant.restaurant_id",
           restaurant_name: "$restaurant.restaurant_name",
-          category: "$location.city",
+          category: "$location.name",
           created_at: 1,
           status: {
             $cond: [
@@ -571,11 +645,44 @@ exports.getRestaurantTransactions = async (req, res) => {
 
     // Fetch transactions with pagination
     const transactions = await Transaction.find(query)
-      .populate("sender_id", "name")
-      .populate("receiver_id", "name")
+      .populate({
+        path: "sender_id",
+        select: "name user_id",
+        populate: { path: "role_id", select: "name" },
+      })
+      .populate({
+        path: "receiver_id",
+        select: "name user_id",
+        populate: { path: "role_id", select: "name" },
+      })
+      .sort({ created_at: -1 })
       .skip((pageNum - 1) * pageSizeNum)
       .limit(pageSizeNum)
       .lean();
+
+    // Fetch custom IDs mapping for sender and receiver
+    const userIds = new Set();
+    transactions.forEach((tx) => {
+      if (tx.sender_id) userIds.add(tx.sender_id._id);
+      if (tx.receiver_id) userIds.add(tx.receiver_id._id);
+    });
+
+    const userIdsArray = Array.from(userIds);
+
+    const [customers, restaurantsList, admins, subcoms, masterAdmins] = await Promise.all([
+      Customer.find({ user_id: { $in: userIdsArray } }).select('user_id customer_id').lean(),
+      Restaurant.find({ user_id: { $in: userIdsArray } }).select('user_id restaurant_id').lean(),
+      Admin.find({ user_id: { $in: userIdsArray } }).select('user_id admin_id').lean(),
+      TreasurySubcom.find({ user_id: { $in: userIdsArray } }).select('user_id treasury_subcom_id').lean(),
+      MasterAdmin.find({ user_id: { $in: userIdsArray } }).select('user_id master_admin_id').lean()
+    ]);
+
+    const customIdMap = new Map();
+    customers.forEach(c => customIdMap.set(c.user_id.toString(), c.customer_id));
+    restaurantsList.forEach(r => customIdMap.set(r.user_id.toString(), r.restaurant_id));
+    admins.forEach(a => customIdMap.set(a.user_id.toString(), a.admin_id));
+    subcoms.forEach(s => customIdMap.set(s.user_id.toString(), s.treasury_subcom_id));
+    masterAdmins.forEach(m => customIdMap.set(m.user_id.toString(), m.master_admin_id));
 
     // Format transactions
     const formattedTransactions = transactions.map((tx) => ({
@@ -583,6 +690,16 @@ exports.getRestaurantTransactions = async (req, res) => {
       type: tx.transaction_type.toLowerCase(),
       amount: parseFloat(tx.amount),
       date: tx.created_at,
+      sender: {
+        name: tx.sender_id?.name || "Unknown",
+        user_id: tx.sender_id ? (customIdMap.get(tx.sender_id._id.toString()) || tx.sender_id.user_id || "Unknown") : "Unknown",
+        role: tx.sender_id?.role_id?.name || "Unknown",
+      },
+      receiver: {
+        name: tx.receiver_id?.name || "Unknown",
+        user_id: tx.receiver_id ? (customIdMap.get(tx.receiver_id._id.toString()) || tx.receiver_id.user_id || "Unknown") : "Unknown",
+        role: tx.receiver_id?.role_id?.name || "Unknown",
+      },
       description:
         tx.transaction_type === "Transfer"
           ? `To ${tx.receiver_id?.name || "Unknown"}`

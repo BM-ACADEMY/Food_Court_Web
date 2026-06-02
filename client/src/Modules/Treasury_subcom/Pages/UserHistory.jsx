@@ -44,7 +44,23 @@ import { FileText, FileSpreadsheet, FileSignature, Download } from "lucide-react
 import { toast } from "react-toastify";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
-import "jspdf-autotable"; // Import as a side-effect
+import autoTable from "jspdf-autotable";
+
+/**
+ * Formats a date string into a readable format like: "29 May 2026, 6:18 pm"
+ */
+const formatReadableDate = (dateStr) => {
+  if (!dateStr) return "N/A";
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return "N/A";
+    return format(date, "d MMM yyyy, h:mm a")
+      .replace(" AM", " am")
+      .replace(" PM", " pm");
+  } catch {
+    return "N/A";
+  }
+};
 
 const UserHistory = () => {
   const { user } = useAuth();
@@ -233,7 +249,7 @@ const UserHistory = () => {
           Customer: txn.customer_id || "N/A",
           Amount: txn.amount ? (txn.amount > 0 ? `₹${txn.amount.toFixed(2)}` : `-₹${Math.abs(txn.amount).toFixed(2)}`) : "N/A",
           "Transaction Type": txn.type || "N/A",
-          "Date & Time": txn.datetime ? format(new Date(txn.datetime), "dd/MM/yyyy hh:mm a") : "N/A",
+          "Date & Time": formatReadableDate(txn.datetime),
           Status: txn.status || "N/A",
         }));
 
@@ -259,15 +275,15 @@ const UserHistory = () => {
           index + 1,
           txn.id || "N/A",
           txn.customer_id || "N/A",
-          txn.amount ? (txn.amount > 0 ? `₹${txn.amount.toFixed(2)}` : `-₹${Math.abs(txn.amount).toFixed(2)}`) : "N/A",
+          txn.amount ? (txn.amount > 0 ? `Rs.${txn.amount.toFixed(2)}` : `-Rs.${Math.abs(txn.amount).toFixed(2)}`) : "N/A",
           txn.type || "N/A",
-          txn.datetime ? format(new Date(txn.datetime), "dd/MM/yyyy hh:mm a") : "N/A",
+          formatReadableDate(txn.datetime),
           txn.status || "N/A",
         ]);
 
         tableData.push(["", "", "", "", "", "Total Transactions", totalCount.toString()]);
 
-        doc.autoTable({
+        autoTable(doc, {
           startY: 40,
           head: [["S.No", "Transaction ID", "Customer", "Amount", "Transaction Type", "Date & Time", "Status"]],
           body: tableData,
@@ -414,9 +430,7 @@ const UserHistory = () => {
                       </td>
                       <td className="px-2 sm:px-4 py-2">{transaction.type || "N/A"}</td>
                       <td className="px-2 sm:px-4 py-2">
-                        {transaction.datetime
-                          ? format(new Date(transaction.datetime), "dd/MM/yyyy hh:mm a")
-                          : "N/A"}
+                        {formatReadableDate(transaction.datetime)}
                       </td>
                       <td className="px-2 sm:px-4 py-2">
                         <Badge className="bg-green-100 text-green-800 text-xs">

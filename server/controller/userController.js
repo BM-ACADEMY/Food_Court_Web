@@ -18,7 +18,8 @@ const Role = require("../model/roleModel");
 const Transaction = require("../model/transactionModel");
 const sendEmail=require("../utils/sendEmail");
 const crypto = require("crypto");
-
+const QRCode = require("qrcode");
+const trackActivity = require("../utils/activityLogger");
 // Login function
 exports.loginUser = async (req, res) => {
   const { emailOrPhone, password, role } = req.body;
@@ -42,19 +43,8 @@ exports.loginUser = async (req, res) => {
 
     const userRoleId = user.role_id?.role_id;
 
-    // Role-based access restriction
-    if (role === "admin") {
-      const allowedAdminRoles = ["role-1", "role-2", "role-3", "role-4"];
-      if (!allowedAdminRoles.includes(userRoleId)) {
-        return res.status(403).json({ message: "Unauthorized: Not an admin" });
-      }
-    } else if (role === "customer") {
-      if (userRoleId !== "role-5") {
-        return res.status(403).json({ message: "Unauthorized: Not a customer" });
-      }
-    } else {
-      return res.status(400).json({ message: "Invalid role context provided" });
-    }
+    // Role-based routing is handled by the frontend appRoutes and backend roleMiddleware.
+    // We allow any valid user to log in from the main login form.
 
     // Verify password
     const isMatch = await bcrypt.compare(password, user.password_hash);
@@ -285,8 +275,9 @@ exports.createUser = async (req, res) => {
 
     // Hash password
     const password_hash = await bcrypt.hash(password, 10);
-    const otpres = sendOtpSms(phone_number, otp);
-  
+    sendOtpSms(phone_number, otp).catch((err) =>
+      console.error("Async SMS sending failed during user registration:", err.message)
+    );
 
     // Create user
     const newUser = new User({
@@ -302,20 +293,57 @@ exports.createUser = async (req, res) => {
 
     await newUser.save();
 
-    // Create customer record for role-5 users
-    if (role_id.toString() === "role-5") {
+    // Populate role to check its role_id string
+    const populatedUser = await User.findById(newUser._id).populate("role_id");
+    const roleKey = populatedUser.role_id?.role_id;
+
+    let qrCodeData = null;
+
+    if (roleKey === "role-5") {
       const customer = new Customer({
         user_id: newUser._id,
-        customer_id: `CUST-${newUser._id.toString().slice(-6)}`,
-        registration_type: "Standard",
+        registration_type: "online",
         registration_fee_paid: false,
         status: "Active",
       });
       await customer.save();
+      qrCodeData = customer.qr_code;
+    } else if (roleKey === "role-4") {
+      const restaurant = new Restaurant({
+        user_id: newUser._id,
+        restaurant_name: name,
+      });
+      await restaurant.save();
+      qrCodeData = restaurant.qr_code;
+    } else if (roleKey === "role-3") {
+      const treasury = new TreasurySubcom({
+        user_id: newUser._id,
+      });
+      await treasury.save();
+      qrCodeData = treasury.qr_code;
     }
 
-    // Populate role
-    const populatedUser = await User.findById(newUser._id).populate("role_id");
+    if (qrCodeData && email) {
+      try {
+        const qrImageBuffer = await QRCode.toBuffer(qrCodeData);
+        await sendEmail({
+          to: email,
+          subject: "Welcome! Here is your personal QR Code",
+          html: `<p>Hello ${name},</p><p>Welcome to Food Court! Please find your unique QR code attached.</p><p>You can use this QR code to identify yourself on the platform.</p>`,
+          attachments: [
+            {
+              filename: 'qrcode.png',
+              content: qrImageBuffer,
+            }
+          ]
+        });
+      } catch (err) {
+        console.error("Failed to generate/send QR code email:", err);
+      }
+    }
+
+    const roleName = populatedUser.role_id?.name || "Unknown";
+    await trackActivity(req, "Create User", `Created user "${name}" with role: ${roleName}`);
 
     res.status(201).json({
       success: true,
@@ -697,141 +725,85 @@ exports.getAllUsersforHistory = async (req, res) => {
     const requestingUserId = req.user?.id;
     const { userId, startDate, endDate } = req.query;
 
-    // Validate requesting user
-    const requestingUser = await User.findById(requestingUserId).populate(
-      "role_id"
-    );
+    const requestingUser = await User.findById(requestingUserId).populate("role_id");
     if (!requestingUser) {
       return res.status(404).json({ error: "Requesting user not found" });
     }
 
     const roleName = requestingUser.role_id?.name || "";
-    if (!["Master-Admin", "Admin"].includes(roleName)) {
-      return res
-        .status(403)
-        .json({ error: "Unauthorized to view user history" });
+    if (!["Master-Admin", "Admin", "Treasury-Subcom"].includes(roleName)) {
+      return res.status(403).json({ error: "Unauthorized to view user history" });
     }
 
-    // Build match query for users
-    let matchQuery = {};
-    if (userId) {
-      try {
-        matchQuery._id = mongoose.Types.ObjectId(userId);
-      } catch (err) {
+    let userQuery = {};
+    if (roleName === "Treasury-Subcom") {
+      userQuery._id = requestingUser._id;
+    } else if (userId) {
+      if (!mongoose.isValidObjectId(userId)) {
         return res.status(400).json({ error: "Invalid userId format" });
       }
+      userQuery._id = new mongoose.Types.ObjectId(userId);
     }
 
-    // Build session match query for date filtering
-    let sessionMatch = {};
-    if (startDate) {
-      sessionMatch.login_time = { $gte: new Date(startDate) };
-    }
-    if (endDate) {
-      sessionMatch.login_time = {
-        ...sessionMatch.login_time,
-        $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999)),
-      };
+    const users = await User.find(userQuery).populate("role_id").lean();
+    if (users.length === 0) return res.status(200).json({ success: true, data: [] });
+
+    const userIds = users.map((u) => u._id);
+    const sessionQuery = { user_id: { $in: userIds } };
+    if (startDate || endDate) {
+      sessionQuery.login_time = {};
+      if (startDate) sessionQuery.login_time.$gte = new Date(startDate);
+      if (endDate) sessionQuery.login_time.$lte = new Date(new Date(endDate).setHours(23, 59, 59, 999));
     }
 
-    // Aggregate users, sessions, and transactions
-    const users = await User.aggregate([
-      { $match: matchQuery },
-      {
-        $lookup: {
-          from: "roles",
-          localField: "role_id",
-          foreignField: "_id",
-          as: "role",
-        },
-      },
-      { $unwind: { path: "$role", preserveNullAndEmptyArrays: true } },
-      {
-        $lookup: {
-          from: "loginlogs",
-          let: { user_id: "$_id" },
-          pipeline: [
-            {
-              $match: {
-                $expr: { $eq: ["$user_id", "$$user_id"] },
-                ...sessionMatch,
-              },
-            },
-            { $sort: { login_time: -1 } },
-            { $limit: 1 },
-          ],
-          as: "latestSession",
-        },
-      },
-      { $unwind: { path: "$latestSession", preserveNullAndEmptyArrays: true } },
-      {
-        $lookup: {
-          from: "transactions",
-          let: {
-            user_id: "$_id",
-            session_start: "$latestSession.login_time",
-            session_end: {
-              $ifNull: ["$latestSession.logout_time", new Date()],
-            },
-          },
-          pipeline: [
-            {
-              $match: {
-                $expr: {
-                  $and: [
-                    {
-                      $or: [
-                        { $eq: ["$sender_id", "$$user_id"] },
-                        { $eq: ["$receiver_id", "$$user_id"] },
-                      ],
-                    },
-                    { $gte: ["$created_at", "$$session_start"] },
-                    { $lte: ["$created_at", "$$session_end"] },
-                  ],
-                },
-              },
-            },
-            {
-              $project: {
-                transaction_id: 1,
-                sender_id: 1,
-                receiver_id: 1,
-                amount: 1,
-                transaction_type: 1,
-                payment_method: 1,
-                status: 1,
-                remarks: 1,
-                created_at: 1,
-              },
-            },
-          ],
-          as: "actions",
-        },
-      },
-      {
-        $project: {
-          _id: 1,
-          name: 1,
-          email: 1,
-          phone_number: 1,
-          role: "$role.name",
-          session: {
-            login_time: "$latestSession.login_time",
-            logout_time: "$latestSession.logout_time",
-            status: {
-              $cond: {
-                if: { $eq: ["$latestSession.status", true] },
-                then: "Online",
-                else: "Offline",
-              },
-            },
-          },
-          actions: 1,
-        },
-      },
+    const sessions = await LoginLog.find(sessionQuery).sort({ login_time: -1 }).lean();
+    const sessionIds = sessions.map((s) => s._id);
+
+    const ActivityLog = require("../model/activityLogModel");
+    const [allActivities, allTransactions] = await Promise.all([
+      ActivityLog.find({ login_log_id: { $in: sessionIds } }).lean(),
+      Transaction.find({
+        $or: [{ sender_id: { $in: userIds } }, { receiver_id: { $in: userIds } }],
+        created_at: { $gte: new Date(startDate || 0), $lte: new Date(endDate || new Date()) }
+      }).lean()
     ]);
 
-    res.status(200).json({ success: true, data: users });
+    const result = users.map((userObj) => {
+      const userSessions = sessions
+        .filter((s) => s.user_id.toString() === userObj._id.toString())
+        .map((session) => {
+          const sessionStart = session.login_time;
+          const sessionEnd = session.logout_time || new Date();
+
+          const txnTimeline = allTransactions
+            .filter((t) => (t.sender_id.toString() === userObj._id.toString() || t.receiver_id.toString() === userObj._id.toString()) && t.created_at >= sessionStart && t.created_at <= sessionEnd)
+            .map((t) => ({ ...t, type: "transaction", transaction_id: t.transaction_id || t._id }));
+
+          const actTimeline = allActivities
+            .filter((a) => a.login_log_id.toString() === session._id.toString())
+            .map((a) => ({ ...a, type: "activity" }));
+
+          return {
+            session_id: session._id,
+            login_time: session.login_time,
+            logout_time: session.logout_time,
+            duration_minutes: session.logout_time ? Math.round((new Date(session.logout_time) - new Date(session.login_time)) / 1000 / 60) : null,
+            status: session.status ? "Online" : "Offline",
+            actions: [...txnTimeline, ...actTimeline].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+          };
+        });
+
+      return {
+        _id: userObj._id,
+        name: userObj.name,
+        email: userObj.email,
+        phone_number: userObj.phone_number,
+        role: userObj.role_id?.name,
+        sessions: userSessions
+      };
+    });
+
+    res.status(200).json({ success: true, data: result });
   } catch (error) {
     console.error("Get users history error:", error);
     res.status(500).json({ error: "Server error", details: error.message });
@@ -988,6 +960,7 @@ exports.updateUser = async (req, res) => {
         : "N/A",
     };
 
+    await trackActivity(req, "Update User", `Updated user info for "${updatedUser.name}" (${updatedUser.email})`);
    
     res.json({ data: userObj, message: "User updated successfully" });
   } catch (err) {
@@ -1020,7 +993,7 @@ exports.updateUserFlag = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-
+    await trackActivity(req, "Update Status", `Updated status flag of user "${updatedUser.name}" to ${is_flagged ? "Flagged/Suspended" : "Active"}`);
 
     res.json({success:true, message: "User flag status updated", data: updatedUser });
   } catch (err) {
@@ -1038,6 +1011,9 @@ exports.deleteUser = async (req, res) => {
         .status(404)
         .json({ success: false, message: "User not found" });
     }
+    
+    await trackActivity(req, "Delete User", `Deleted user "${user.name}" (${user.email})`);
+
     res
       .status(200)
       .json({ success: true, message: "User deleted successfully" });

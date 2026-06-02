@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import axios from "axios";
 import { useAuth } from "@/context/AuthContext";
+import QRCode from "qrcode";
 
 // Define gradient pool
 const gradientPool = [
@@ -43,6 +44,13 @@ const FoodStalls = ({ handlePayNow }) => {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false); // Prevent multiple submissions
   const [error, setError] = useState(null);
+  
+  // Cart & Menu state
+  const [restaurantProducts, setRestaurantProducts] = useState([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+  const [cart, setCart] = useState({}); // { [productId]: quantity }
+  const [qrCodeImage, setQrCodeImage] = useState(null);
+
   const { user, loading: authLoading } = useAuth();
 
   // Fetch restaurants on mount
@@ -93,8 +101,9 @@ const FoodStalls = ({ handlePayNow }) => {
   );
 
   // Handle restaurant card click to show details
-  const handleShowDetails = (restaurant) => {
+  const handleShowDetails = async (restaurant) => {
     setSelectedRestaurant({
+      _id: restaurant._id,
       restaurant_name: restaurant.restaurant_name,
       user_id: restaurant.user_id?._id,
       owner_name: restaurant.user_id?.name || "Unknown",
@@ -102,7 +111,60 @@ const FoodStalls = ({ handlePayNow }) => {
       restaurant_id: restaurant.restaurant_id,
       status: restaurant.status,
     });
+    setCart({}); // Reset cart
+    setQrCodeImage(null);
     setShowDetailsDialog(true);
+    
+    // Generate QR code image
+    if (restaurant.qr_code) {
+      try {
+        const qrUrl = await QRCode.toDataURL(restaurant.qr_code, {
+          width: 150,
+          margin: 1,
+        });
+        setQrCodeImage(qrUrl);
+      } catch (err) {
+        console.error("Failed to generate QR code:", err);
+      }
+    }
+    
+    // Fetch products
+    setIsLoadingProducts(true);
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/products/customer/fetch-by-restaurant/${restaurant._id}`,
+        { withCredentials: true }
+      );
+      setRestaurantProducts(res.data.data || []);
+    } catch (err) {
+      console.error("Failed to fetch products:", err);
+      toast.error("Failed to load the menu");
+    } finally {
+      setIsLoadingProducts(false);
+    }
+  };
+
+  const updateCart = (productId, delta) => {
+    setCart((prev) => {
+      const currentQty = prev[productId] || 0;
+      const newQty = Math.max(0, currentQty + delta);
+      if (newQty === 0) {
+        const newCart = { ...prev };
+        delete newCart[productId];
+        return newCart;
+      }
+      return { ...prev, [productId]: newQty };
+    });
+  };
+
+  const calculateTotal = () => {
+    let total = 0;
+    restaurantProducts.forEach((product) => {
+      if (cart[product._id]) {
+        total += product.amount * cart[product._id];
+      }
+    });
+    return total;
   };
 
   // Handle proceed to pay from details dialog
@@ -114,6 +176,13 @@ const FoodStalls = ({ handlePayNow }) => {
       setShowDetailsDialog(false);
       return;
     }
+    
+    const totalAmount = calculateTotal();
+    if (totalAmount <= 0) {
+      toast.error("Please add at least one item to your cart.");
+      return;
+    }
+
     setShowDetailsDialog(false);
     setShowPaymentDialog(true);
   };
@@ -136,13 +205,20 @@ const FoodStalls = ({ handlePayNow }) => {
       return;
     }
 
-    const paymentAmount = parseFloat(amount);
-    if (isNaN(paymentAmount) || paymentAmount <= 0 || !/^\d*\.?\d{0,2}$/.test(amount)) {
-      setResultMessage("Please enter a valid amount greater than 0 (e.g., 10.00).");
+    const paymentAmount = calculateTotal();
+    if (paymentAmount <= 0) {
+      setResultMessage("Invalid total amount.");
       setIsSuccess(false);
       setShowResultDialog(true);
       return;
     }
+
+    // Build remarks string from cart
+    const orderItems = restaurantProducts
+      .filter((p) => cart[p._id])
+      .map((p) => `${cart[p._id]}x ${p.name}`)
+      .join(", ");
+    const remarks = `Order: ${orderItems}`;
 
     if (isSubmitting) return;
     setIsSubmitting(true);
@@ -162,9 +238,9 @@ const FoodStalls = ({ handlePayNow }) => {
           receiver_id: selectedRestaurant.user_id,
           amount: formattedAmount,
           transaction_type: "Transfer",
-          payment_method: "Gpay",
+          payment_method: "Balance Deduction",
           status: "Success",
-          remarks: `Payment from ${user.name} to ${selectedRestaurant.restaurant_name}`,
+          remarks: remarks,
         },
         { withCredentials: true }
       );
@@ -239,7 +315,7 @@ const FoodStalls = ({ handlePayNow }) => {
 </div>
               <CardContent className="p-4">
                 <Button
-                  className="w-full bg-[#00004d] hover:bg-[#000060] text-white"
+                  className="w-full bg-[#00004d] hover:bg-[#000060] text-white cursor-pointer"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleShowDetails(restaurant);
@@ -300,24 +376,71 @@ const FoodStalls = ({ handlePayNow }) => {
                 </p>
               </div>
 
-              {/* QR Code field with truncation */}
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              {/* QR Code field */}
+              <div className="flex flex-col sm:flex-row sm:items-start gap-2">
                 <span className="font-semibold text-gray-700 w-28">QR Code:</span>
-                <p
-                  className="text-gray-600 truncate max-w-[160px] sm:max-w-[220px]"
-                  title={selectedRestaurant?.qr_code}
-                >
-                  {selectedRestaurant?.qr_code || "N/A"}
-                </p>
+                {qrCodeImage ? (
+                  <img src={qrCodeImage} alt="Restaurant QR" className="border rounded shadow-sm w-24 h-24" />
+                ) : (
+                  <p className="text-gray-600">
+                    {selectedRestaurant?.qr_code || "N/A"}
+                  </p>
+                )}
               </div>
 
               {/* Status field */}
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-4">
                 <span className="font-semibold text-gray-700 w-28">Status:</span>
                 <p className="text-gray-600">
                   {selectedRestaurant?.status || "N/A"}
                 </p>
               </div>
+
+              {/* Menu / Products Section */}
+              <div className="border-t pt-4">
+                <h4 className="font-bold text-lg text-[#00004d] mb-3">Menu</h4>
+                {isLoadingProducts ? (
+                  <p className="text-gray-500 text-sm">Loading menu...</p>
+                ) : restaurantProducts.length === 0 ? (
+                  <p className="text-gray-500 text-sm">No items available currently.</p>
+                ) : (
+                  <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
+                    {restaurantProducts.map((product) => (
+                      <div key={product._id} className="flex justify-between items-center bg-[#f9fafb] p-3 rounded-lg border">
+                        <div>
+                          <p className="font-semibold text-gray-800">{product.name}</p>
+                          <p className="text-[#00004d] font-bold text-sm">₹{product.amount.toFixed(2)}</p>
+                        </div>
+                        <div className="flex items-center gap-3 bg-white border rounded-lg px-2 py-1">
+                          <button
+                            onClick={() => updateCart(product._id, -1)}
+                            className="text-gray-500 hover:text-red-500 px-2 cursor-pointer font-bold"
+                          >
+                            -
+                          </button>
+                          <span className="w-4 text-center font-semibold text-gray-800">
+                            {cart[product._id] || 0}
+                          </span>
+                          <button
+                            onClick={() => updateCart(product._id, 1)}
+                            className="text-gray-500 hover:text-green-500 px-2 cursor-pointer font-bold"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Total Amount Display */}
+              {calculateTotal() > 0 && (
+                <div className="mt-4 bg-[#e8eaf6] p-4 rounded-lg flex justify-between items-center border border-[#c5cae9]">
+                  <span className="font-bold text-[#00004d] text-lg">Total Amount:</span>
+                  <span className="font-bold text-[#00004d] text-xl">₹{calculateTotal().toFixed(2)}</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -331,7 +454,7 @@ const FoodStalls = ({ handlePayNow }) => {
             </Button>
             <Button
               onClick={handleProceedToPay}
-              className="w-full sm:w-auto bg-[#00004d] hover:bg-[#000060] text-white transition-colors"
+              className="w-full sm:w-auto bg-[#00004d] hover:bg-[#000060] text-white transition-colors cursor-pointer"
               disabled={!user || user.role?.role_id !== "role-5"}
             >
               Proceed to Pay
@@ -348,24 +471,8 @@ const FoodStalls = ({ handlePayNow }) => {
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-2">
-            <label htmlFor="paymentAmount" className="text-sm font-medium text-gray-700">
-              Amount to Pay
-            </label>
-            <div className="relative flex items-center gap-2">
-              <span className="text-lg text-gray-600">₹</span>
-              <Input
-                id="paymentAmount"
-                type="number"
-                min="0.01"
-                step="0.01"
-                className="h-10 px-3 text-sm rounded-lg border-gray-300 focus:ring-2 focus:ring-[#00004d]"
-                placeholder="Enter amount"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-              />
-            </div>
-            <div className="bg-[#f4f6ff] border text-sm text-gray-700 px-4 py-2 rounded mb-4 space-y-1">
+          <div className="space-y-4 pt-4">
+            <div className="bg-[#f4f6ff] border text-sm text-gray-700 px-4 py-2 rounded space-y-1">
               <p>
                 <span className="font-medium text-[#00004d]">Store:</span>{" "}
                 {selectedRestaurant?.restaurant_name || "N/A"}
@@ -374,25 +481,29 @@ const FoodStalls = ({ handlePayNow }) => {
                 <span className="font-medium text-[#00004d]">Owner:</span>{" "}
                 {selectedRestaurant?.owner_name || "N/A"}
               </p>
-              <p>
-                <span className="font-medium text-[#00004d]">QR Code:</span>{" "}
-                {selectedRestaurant?.qr_code?.length > 50
-                  ? selectedRestaurant.qr_code.slice(0, 50) + "..."
-                  : selectedRestaurant?.qr_code || "N/A"}
-              </p>
+            </div>
+            
+            <div className="p-4 border rounded-lg bg-gray-50">
+              <h4 className="font-semibold text-[#00004d] mb-2 border-b pb-1">Order Summary</h4>
+              <ul className="text-sm space-y-1 mb-3 max-h-[200px] overflow-y-auto pr-2">
+                {restaurantProducts.filter(p => cart[p._id]).map(p => (
+                  <li key={p._id} className="flex justify-between">
+                    <span>{cart[p._id]}x {p.name}</span>
+                    <span>₹{(p.amount * cart[p._id]).toFixed(2)}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="flex justify-between items-center pt-2 border-t font-bold text-lg text-[#00004d]">
+                <span>Total to Pay:</span>
+                <span>₹{calculateTotal().toFixed(2)}</span>
+              </div>
             </div>
           </div>
           <DialogFooter className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
-            {/* <Button
-              onClick={() => setShowPaymentDialog(false)}
-              className="w-full sm:w-auto bg-gray-500 hover:bg-gray-600 text-white transition-colors"
-            >
-              Cancel
-            </Button> */}
             <Button
               onClick={handlePayment}
-              className="w-full sm:w-auto bg-[#000066] hover:bg-[#000080] text-white transition-colors"
-              disabled={!amount || !user || user.role?.role_id !== "role-5" || isSubmitting}
+              className="w-full sm:w-auto bg-[#000066] hover:bg-[#000080] text-white transition-colors cursor-pointer"
+              disabled={calculateTotal() <= 0 || !user || user.role?.role_id !== "role-5" || isSubmitting}
             >
               {isSubmitting ? "Processing..." : "Pay Now"}
             </Button>

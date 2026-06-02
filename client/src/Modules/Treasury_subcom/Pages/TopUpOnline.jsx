@@ -1,3 +1,4 @@
+import BackButton from "@/components/BackButton";
 import { useState } from "react";
 import axios from "axios";
 import { useAuth } from "@/context/AuthContext";
@@ -33,15 +34,16 @@ function TopUpOnline({ customer }) {
   };
 
   const fetchBalance = async (userId) => {
-    console.log(userId,"fetch");
+    console.log(userId, "fetch");
     
+    const id = userId._id || userId; // handle both object and string
     const response = await axios.get(
-      `${import.meta.env.VITE_BASE_URL}/user-balance/fetch-balance-by-id/${userId._id}`,
+      `${import.meta.env.VITE_BASE_URL}/user-balance/fetch-balance-by-id/${id}`,
       { withCredentials: true }
     );
 
     const balance = response.data.data?.balance;
-    if (!balance) throw new Error("Failed to fetch balance");
+    if (balance === undefined || balance === null) throw new Error("Failed to fetch balance");
 
     return typeof balance === "string"
       ? balance
@@ -131,7 +133,8 @@ function TopUpOnline({ customer }) {
   }
 
   return (
-    <div className="min-h-screen flex justify-center items-center bg-white px-4 py-8">
+    <div className="min-h-screen relative flex justify-center items-center bg-white px-4 py-8">
+      <BackButton />
       <div className="max-w-lg w-full border p-6 rounded-lg shadow-lg bg-gray-50">
         <h2 className="text-2xl font-bold mb-4 text-[#070149] text-center">Online Top-Up</h2>
         

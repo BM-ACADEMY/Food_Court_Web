@@ -9,9 +9,11 @@ import AdminList from "@/Modules/Master-admin/pages/admin/AdminList";
 import PointExchange from "@/Modules/Master-admin/pages/points/PointExchange";
 import AddDeleteAccess from "@/Modules/Master-admin/pages/users/AddDeleteAccess";
 import SessionHistory from "@/Modules/Master-admin/pages/account/SessionHistory";
+import MergeBalance from "@/Modules/Master-admin/pages/account/MergeBalance";
 import { LocationManager } from "@/Modules/Master-admin/pages/locations/LocationPage";
 import { UpiManager } from "@/Modules/Master-admin/pages/upi/UpiPage";
 import FeesTable from "@/Modules/Master-admin/pages/Fees/FeesTable";
+import GenerateQr from "@/Modules/Master-admin/pages/offlineQrcode/OfflineQrcode";
 
 export default function MasterAdminRoutes() {
   return (
@@ -26,9 +28,11 @@ export default function MasterAdminRoutes() {
         <Route path="points/point-exchange" element={<PointExchange />} />
         <Route path="adddelete/add-new-user" element={<AddDeleteAccess />} />
         <Route path="history" element={<SessionHistory />} />
+        <Route path="merge-balance" element={<MergeBalance />} />
         <Route path="locations" element={<LocationManager />} />
         <Route path="fees" element={<FeesTable />} />
         <Route path="upi" element={<UpiManager />} />
+        <Route path="qrcode" element={<GenerateQr />} />
       </Route>
     </Routes>
   );

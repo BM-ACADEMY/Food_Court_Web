@@ -706,6 +706,22 @@ import { format, startOfDay, endOfDay } from "date-fns";
 import { debounce } from "lodash";
 import { useAuth } from "@/context/AuthContext";
 
+/**
+ * Formats a date string into a readable format like: "29 May 2026, 6:18 pm"
+ */
+const formatReadableDate = (dateStr) => {
+  if (!dateStr) return "N/A";
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return "N/A";
+    return format(date, "d MMM yyyy, h:mm a")
+      .replace(" AM", " am")
+      .replace(" PM", " pm");
+  } catch {
+    return "N/A";
+  }
+};
+
 const RestaurantHistory = () => {
   const { user, loading } = useAuth();
   const [restaurants, setRestaurants] = useState([]);
@@ -780,7 +796,7 @@ const RestaurantHistory = () => {
           customer: tx.customer || "Unknown",
           customer_id: tx.customer_id || "N/A",
           amount: tx.amount || 0,
-          dateTime: tx.datetime ? format(new Date(tx.datetime), "PPP HH:mm") : "N/A",
+          dateTime: formatReadableDate(tx.datetime),
           dateTimeRaw: tx.datetime ? new Date(tx.datetime) : new Date(),
           type: tx.type || "Unknown",
           status: tx.status || "Completed",
@@ -884,7 +900,7 @@ const RestaurantHistory = () => {
         customer: tx.customer || "Unknown",
         customer_id: tx.customer_id || "N/A",
         amount: tx.amount || 0,
-        dateTime: tx.datetime ? format(new Date(tx.datetime), "PPP HH:mm") : "N/A",
+        dateTime: formatReadableDate(tx.datetime),
         dateTimeRaw: tx.datetime ? new Date(tx.datetime) : new Date(),
         type: tx.type || "Unknown",
         status: tx.status || "Completed",
@@ -910,7 +926,7 @@ const RestaurantHistory = () => {
         "Transaction ID": txn.id,
         Customer: txn.customer,
         "Customer ID": txn.customer_id,
-        Amount: `₹${txn.amount.toFixed(2)}`,
+        Amount: `Rs.${txn.amount.toFixed(2)}`,
         "Date & Time": txn.dateTime,
         Type: txn.type,
         Status: txn.status,

@@ -35,8 +35,8 @@
 
 
 // // const allowedOrigins = [
-// //   "https://pegasus2025.com",
-// //   "https://www.pegasus2025.com"
+// //   "https://pegasus2026.com",
+// //   "https://www.pegasus2026.com"
 // // ];
 // const allowedOrigins = [
 //   "http://localhost:5173",
@@ -119,8 +119,8 @@ app.use(cookieParser());
 app.use(cors({
   origin: function (origin, callback) {
     const allowedOrigins = [
-      "https://pegasus2025.com",
-      "https://www.pegasus2025.com",
+      "https://pegasus2026.com",
+      "https://www.pegasus2026.com",
       "http://localhost:5173"
     ];
     if (!origin || allowedOrigins.includes(origin)) {
@@ -154,6 +154,7 @@ app.use('/api/user-balance', require('./route/userBalanceRoute'));
 app.use('/api/fees', require('./route/feeRoute'));
 app.use('/api/upis', require('./route/upiRoute'));
 app.use('/api/dashboards', require('./route/dashboardRoute'));
+app.use('/api/products', require('./route/productRoute'));
 
 // ✅ Health Check
 app.get('/', (req, res) => {

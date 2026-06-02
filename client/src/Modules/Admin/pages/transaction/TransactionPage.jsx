@@ -383,7 +383,7 @@ export default function TransactionHistory() {
       ];
       const ws = XLSX.utils.json_to_sheet(dataWithTotal);
       const csv = XLSX.utils.sheet_to_csv(ws);
-      const file = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const file = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
       saveAs(file, `transactions_${format(new Date(), "yyyy-MM-dd")}.csv`);
     } catch (error) {
       console.error("Error exporting to CSV:", error);
@@ -395,14 +395,14 @@ export default function TransactionHistory() {
     try {
       const allTransactions = await fetchAllTransactions();
       const data = prepareExportData(allTransactions);
-      const totalAmount = data.reduce((sum, item) => sum + item["Amount (₹)"], 0);
+      const totalAmount = data.reduce((sum, item) => sum + item["Amount (Rs. )"], 0);
       const doc = new jsPDF();
       doc.setFontSize(16);
       doc.text("Transaction History Report", 15, 15);
       doc.setFontSize(10);
       doc.text(`Generated on: ${format(new Date(), "yyyy-MM-dd HH:mm")}`, 15, 22);
       doc.text(`Total Transactions: ${data.length}`, 15, 28);
-      doc.text(`Total Amount: ₹${totalAmount.toFixed(2)}`, 15, 34);
+      doc.text(`Total Amount: Rs. ${totalAmount.toFixed(2)}`, 15, 34);
       const tableData = data.map((item) => [
         item["S.No"],
         item["Date & Time"],
@@ -418,7 +418,7 @@ export default function TransactionHistory() {
         item.Status,
       ]);
       const footerData = [
-        ["", "", "", "", "", "", "", "", "", "TOTAL", `₹${totalAmount.toFixed(2)}`, ""],
+        ["", "", "", "", "", "", "", "", "", "TOTAL", `Rs. ${totalAmount.toFixed(2)}`, ""],
       ];
       autoTable(doc, {
         startY: 40,
@@ -546,8 +546,10 @@ export default function TransactionHistory() {
                       {s.label}
                     </CardTitle>
                     <div className="text-2xl font-bold mt-2">
-                      {s.label.includes("Revenue") || s.label.includes("Value") || s.label === "Refunds"
-                        ? `₹${s.value.toLocaleString()}`
+                      {s.label.includes("Revenue") || s.label === "Refunds"
+                        ? `₹${s.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                        : s.label.includes("Avg. Transaction Value")
+                        ? `₹${Number(s.value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                         : s.value.toLocaleString()}
                     </div>
                   </div>
@@ -876,16 +878,20 @@ export default function TransactionHistory() {
                       <TableCell className="max-w-[150px] truncate">
                         <div className="flex items-center gap-2">
                           <Avatar name={txn.sender.name} />
-                          <div className="font-medium">{txn.sender.name}</div>
+                          <div className="flex flex-col truncate">
+                            <span className="font-medium truncate">{txn.sender.name}</span>
+                            <span className="text-xs text-muted-foreground truncate">({txn.sender.role})</span>
+                          </div>
                         </div>
-                        <div className="text-xs text-muted-foreground">({txn.sender.role})</div>
                       </TableCell>
                       <TableCell className="max-w-[150px] truncate">
                         <div className="flex items-center gap-2">
                           <Avatar name={txn.receiver.name} />
-                          <div className="font-medium">{txn.receiver.name}</div>
+                          <div className="flex flex-col truncate">
+                            <span className="font-medium truncate">{txn.receiver.name}</span>
+                            <span className="text-xs text-muted-foreground truncate">({txn.receiver.role})</span>
+                          </div>
                         </div>
-                        <div className="text-xs text-muted-foreground">({txn.receiver.role})</div>
                       </TableCell>
                       <TableCell className="whitespace-nowrap truncate">
                         {editingTransactionId === txn.id ? (

@@ -137,132 +137,96 @@ export default function RestaurantList() {
     fetchRestaurants();
   }, [search, status, lastActive, regDate, sortBy, page, pageSize]);
 
-  // Fetch all restaurants for export when export modal is opened
-  useEffect(() => {
-    if (isExportModalOpen) {
-      const fetchAllRestaurants = async () => {
-        try {
-          const response = await axios.get(
-            `${import.meta.env.VITE_BASE_URL}/restaurants/fetch-all-restaurant-details`,
-            {
-              params: {
-                search,
-                status,
-                lastActive,
-                regDate: regDate ? format(new Date(regDate), "yyyy-MM-dd") : "",
-                sortBy,
-                page: 1,
-                pageSize: 1000, // Set a high pageSize to fetch all records
-              },
-            }
-          );
-          setAllRestaurants(response.data.restaurants);
-        } catch (err) {
-          console.error("Error fetching all restaurants for export:", err);
-          toast.error("Failed to fetch all restaurants for export.");
-        }
-      };
-      fetchAllRestaurants();
-    }
-  }, [isExportModalOpen, search, status, lastActive, regDate, sortBy]);
+  const [exportLoading, setExportLoading] = useState(false);
 
   const { restaurants, totalRestaurants, totalSales, onlineCount, totalPages } = data;
 
   // Memoized paginated data
   const paginatedRestaurants = useMemo(() => restaurants, [restaurants]);
 
-  // Export to Excel
-  const exportToExcel = () => {
-    if (allRestaurants.length === 0) {
-      toast.error("No data available to export. Please try again.");
-      return;
-    }
-    const data = allRestaurants.map((restaurant) => ({
-      "Restaurant ID": restaurant.id || "N/A",
-      Name: restaurant.name || "Unknown",
-      Role: restaurant.receiver_role_name || "Restaurant", // Changed to receiver_role_name
-      Sales: `₹${restaurant.sales.toLocaleString()}` || "₹0", // Fixed INR formatting
-      Status: restaurant.status || "N/A",
-      "Last Active": restaurant.lastActive || "N/A",
-    }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Restaurants");
-    const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-    const file = new Blob([excelBuffer], { type: "application/octet-stream" });
-    saveAs(file, `restaurants_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
-  };
-
-  // Export to CSV
-  const exportToCSV = () => {
-    if (allRestaurants.length === 0) {
-      toast.error("No data available to export. Please try again.");
-      return;
-    }
-    const data = allRestaurants.map((restaurant) => ({
-      "Restaurant ID": restaurant.id || "N/A",
-      Name: restaurant.name || "Unknown",
-      Role: restaurant.receiver_role_name || "Restaurant", // Changed to receiver_role_name
-      Sales: `₹${restaurant.sales.toLocaleString()}` || "₹0", // Fixed INR formatting
-      Status: restaurant.status || "N/A",
-      "Last Active": restaurant.lastActive || "N/A",
-    }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    const csv = XLSX.utils.sheet_to_csv(ws);
-    const file = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    saveAs(file, `restaurants_${format(new Date(), "yyyy-MM-dd")}.csv`);
-  };
-
-  // Export to PDF
-  const exportToPDF = () => {
-    if (allRestaurants.length === 0) {
-      toast.error("No data available to export. Please try again.");
-      return;
-    }
+  const handleExport = async () => {
+    setExportLoading(true);
     try {
-      const doc = new jsPDF();
-      doc.text("Restaurant List", 14, 20);
-      autoTable(doc, {
-        startY: 30,
-        head: [
-          ["Restaurant ID", "Name", "Role", "Sales", "Status", "Last Active"], // Removed Category
-        ],
-        body: allRestaurants.map((restaurant) => [
-          restaurant.id || "N/A",
-          restaurant.name || "Unknown",
-          restaurant.receiver_role_name || "Restaurant", // Changed to receiver_role_name
-          `₹${restaurant.sales.toLocaleString()}` || "₹0", // Fixed INR formatting
-          restaurant.status || "N/A",
-          restaurant.lastActive || "N/A",
-        ]),
-        theme: "grid",
-        styles: { fontSize: 8 },
-        headStyles: { fillColor: [0, 0, 77], textColor: [255, 255, 255] },
-        margin: { top: 30 },
-      });
-      doc.save(`restaurants_${format(new Date(), "yyyy-MM-dd")}.pdf`);
-    } catch (error) {
-      console.error("Error exporting to PDF:", error);
-      setError("Failed to export PDF. Please try again.");
-      toast.error("Failed to export PDF. Please try again.");
-    }
-  };
+      const response = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/restaurants/fetch-all-restaurant-details`,
+        {
+          params: {
+            search,
+            status,
+            lastActive,
+            regDate: regDate ? format(new Date(regDate), "yyyy-MM-dd") : "",
+            sortBy,
+            page: 1,
+            pageSize: 10000, // Fetch all records
+          },
+        }
+      );
+      
+      const fetchedRestaurants = response.data.restaurants || [];
+      if (fetchedRestaurants.length === 0) {
+        toast.error("No data available to export.");
+        setIsExportModalOpen(false);
+        return;
+      }
 
-  const handleExport = () => {
-    switch (exportFormat) {
-      case "xlsx":
-        exportToExcel();
-        break;
-      case "csv":
-        exportToCSV();
-        break;
-      case "pdf":
-        exportToPDF();
-        break;
-      default:
-        console.error("Invalid export format");
+      if (exportFormat === "xlsx") {
+        const exportData = fetchedRestaurants.map((restaurant) => ({
+          "Restaurant ID": restaurant.id || "N/A",
+          Name: restaurant.name || "Unknown",
+          Category: restaurant.category || "N/A",
+          Sales: `₹${restaurant.sales.toLocaleString()}` || "₹0",
+          Status: restaurant.status || "N/A",
+          "Last Active": restaurant.lastActive || "N/A",
+        }));
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Restaurants");
+        const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+        const file = new Blob([excelBuffer], { type: "application/octet-stream" });
+        saveAs(file, `restaurants_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+      } else if (exportFormat === "csv") {
+        const exportData = fetchedRestaurants.map((restaurant) => ({
+          "Restaurant ID": restaurant.id || "N/A",
+          Name: restaurant.name || "Unknown",
+          Category: restaurant.category || "N/A",
+          Sales: `₹${restaurant.sales.toLocaleString()}` || "₹0",
+          Status: restaurant.status || "N/A",
+          "Last Active": restaurant.lastActive || "N/A",
+        }));
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const csv = XLSX.utils.sheet_to_csv(ws);
+        const file = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+        saveAs(file, `restaurants_${format(new Date(), "yyyy-MM-dd")}.csv`);
+      } else if (exportFormat === "pdf") {
+        const doc = new jsPDF();
+        doc.text("Restaurant List", 14, 20);
+        autoTable(doc, {
+          startY: 30,
+          head: [
+            ["Restaurant ID", "Name", "Category", "Sales", "Status", "Last Active"],
+          ],
+          body: fetchedRestaurants.map((restaurant) => [
+            restaurant.id || "N/A",
+            restaurant.name || "Unknown",
+            restaurant.category || "N/A",
+            `Rs. ${restaurant.sales.toLocaleString()}` || "Rs. 0",
+            restaurant.status || "N/A",
+            restaurant.lastActive || "N/A",
+          ]),
+          theme: "grid",
+          styles: { fontSize: 8 },
+          headStyles: { fillColor: [0, 0, 77], textColor: [255, 255, 255] },
+          margin: { top: 30 },
+        });
+        doc.save(`restaurants_${format(new Date(), "yyyy-MM-dd")}.pdf`);
+      }
+      setIsExportModalOpen(false);
+    } catch (err) {
+      console.error("Error exporting restaurants:", err);
+      toast.error("Failed to export data. Please try again.");
+    } finally {
+      setExportLoading(false);
     }
-    setIsExportModalOpen(false);
   };
 
   const handleToggleRestrict = async (restaurant) => {
@@ -461,8 +425,8 @@ export default function RestaurantList() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Restaurant ID</TableHead>
-                  <TableHead>Sender Name</TableHead>
-                  <TableHead>Role</TableHead>
+                  <TableHead>Restaurant Name</TableHead>
+                  <TableHead>Category</TableHead>
                   <TableHead>Sales</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Last Active</TableHead>
@@ -482,13 +446,13 @@ export default function RestaurantList() {
                       <TableCell className="font-medium">#{restaurant.id}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <Avatar name={restaurant.receiver_name} />
-                          <p>{restaurant.receiver_name}</p>
+                          <Avatar name={restaurant.name} />
+                          <p>{restaurant.name || "Unknown"}</p>
                         </div>
                       </TableCell>
                       <TableCell>
                         <span className="text-sm text-orange-500">
-                          {restaurant.receiver_role_name || "Restaurant"}
+                          {restaurant.category || "N/A"}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -591,10 +555,13 @@ export default function RestaurantList() {
             <Button
               variant="outline"
               onClick={() => setIsExportModalOpen(false)}
+              disabled={exportLoading}
             >
               Cancel
             </Button>
-            <Button onClick={handleExport}>OK</Button>
+            <Button onClick={handleExport} disabled={exportLoading}>
+              {exportLoading ? "Exporting..." : "OK"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

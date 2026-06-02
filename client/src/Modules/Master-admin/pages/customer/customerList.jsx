@@ -138,124 +138,98 @@ export default function CustomerList() {
     fetchCustomers();
   }, [search, status, registrationType, lastActive, sort, regDate, page, pageSize]);
 
-  // Fetch all customers for export when export modal is opened
-  useEffect(() => {
-    if (isExportModalOpen) {
-      const fetchAllCustomers = async () => {
-        try {
-          const response = await axios.get(
-            `${import.meta.env.VITE_BASE_URL}/customers/fetch-all-customer-details`,
-            {
-              params: {
-                search,
-                status,
-                lastActive,
-                regDate: regDate ? format(new Date(regDate), "yyyy-MM-dd") : "",
-                registration_type: registrationType,
-                sortBy: sort.split("-")[0] === "name" ? sort.split("-")[1] : sort,
-                page: 1,
-                pageSize: 1000, // Set a high pageSize to fetch all records
-              },
-            }
-          );
-          setAllCustomers(response.data.customers);
-        } catch (err) {
-          console.error("Error fetching all customers for export:", err);
-          toast.error("Failed to fetch all customers for export.");
-        }
-      };
-      fetchAllCustomers();
-    }
-  }, [isExportModalOpen, search, status, lastActive, regDate, registrationType, sort]);
+  const [exportLoading, setExportLoading] = useState(false);
 
   const { customers, totalCustomers, totalBalance, onlineCount, totalPages } = data;
 
   // Memoized paginated data
   const paginatedCustomers = useMemo(() => customers, [customers]);
 
-  // Export functions using allCustomers
-  const exportToExcel = () => {
-    const data = allCustomers.map((customer) => ({
-      "Customer ID": customer.id,
-      "Name (Role)": `${customer.name || "Unknown"} (${customer.role || "Unknown"})`,
-      Phone: customer.phone,
-      Balance: `₹${customer.balance.toLocaleString()}`,
-      Status: customer.status,
-      "Registration Type": customer.registration_type,
-      "Last Active": customer.lastActive,
-    }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Customers");
-    const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-    const file = new Blob([excelBuffer], { type: "application/octet-stream" });
-    saveAs(file, `customers_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
-  };
-
-  const exportToCSV = () => {
-    const data = allCustomers.map((customer) => ({
-      "Customer ID": customer.id,
-      "Name (Role)": `${customer.name || "Unknown"} (${customer.role || "Unknown"})`,
-      Phone: customer.phone,
-      Balance: `₹${customer.balance.toLocaleString()}`,
-      Status: customer.status,
-      "Registration Type": customer.registration_type,
-      "Last Active": customer.lastActive,
-    }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    const csv = XLSX.utils.sheet_to_csv(ws);
-    const file = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    saveAs(file, `customers_${format(new Date(), "yyyy-MM-dd")}.csv`);
-  };
-
-  const exportToPDF = () => {
+  const handleExport = async () => {
+    setExportLoading(true);
     try {
-      const doc = new jsPDF();
-      doc.text("Customer List", 14, 20);
-      autoTable(doc, {
-        startY: 30,
-        head: [["Customer ID", "Name (Role)", "Phone", "Balance", "Status", "Registration Type", "Last Active"]],
-        body: allCustomers.map((customer) => [
-          customer.id || "N/A",
-          `${customer.name || "Unknown"} (${customer.role || "Unknown"})`,
-          customer.phone || "N/A",
-          `₹${customer.balance.toLocaleString()}` || "₹0",
-          customer.status || "N/A",
-          customer.registration_type || "N/A",
-          customer.lastActive || "N/A",
-        ]),
-        theme: "grid",
-        styles: { fontSize: 8 },
-        headStyles: { fillColor: [0, 0, 77], textColor: [255, 255, 255] },
-        margin: { top: 30 },
-      });
-      doc.save(`customers_${format(new Date(), "yyyy-MM-dd")}.pdf`);
-    } catch (error) {
-      console.error("Error exporting to PDF:", error);
-      setError("Failed to export PDF. Please try again.");
-      toast.error("Failed to export PDF. Please try again.");
-    }
-  };
+      const response = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/customers/fetch-all-customer-details`,
+        {
+          params: {
+            search,
+            status,
+            lastActive,
+            regDate: regDate ? format(new Date(regDate), "yyyy-MM-dd") : "",
+            registration_type: registrationType,
+            sortBy: sort.split("-")[0] === "name" ? sort.split("-")[1] : sort,
+            page: 1,
+            pageSize: 10000, // Fetch all records
+          },
+        }
+      );
+      
+      const fetchedCustomers = response.data.customers || [];
+      if (fetchedCustomers.length === 0) {
+        toast.error("No data available to export.");
+        setIsExportModalOpen(false);
+        return;
+      }
 
-  const handleExport = () => {
-    if (allCustomers.length === 0) {
-      toast.error("No data available to export. Please try again.");
-      return;
+      if (exportFormat === "xlsx") {
+        const exportData = fetchedCustomers.map((customer) => ({
+          "Customer ID": customer.id,
+          "Name (Role)": `${customer.name || "Unknown"} (${customer.role || "Unknown"})`,
+          Phone: customer.phone,
+          Balance: `₹${customer.balance.toLocaleString()}`,
+          Status: customer.status,
+          "Registration Type": customer.registration_type,
+          "Last Active": customer.lastActive,
+        }));
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Customers");
+        const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+        const file = new Blob([excelBuffer], { type: "application/octet-stream" });
+        saveAs(file, `customers_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+      } else if (exportFormat === "csv") {
+        const exportData = fetchedCustomers.map((customer) => ({
+          "Customer ID": customer.id,
+          "Name (Role)": `${customer.name || "Unknown"} (${customer.role || "Unknown"})`,
+          Phone: customer.phone,
+          Balance: `₹${customer.balance.toLocaleString()}`,
+          Status: customer.status,
+          "Registration Type": customer.registration_type,
+          "Last Active": customer.lastActive,
+        }));
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const csv = XLSX.utils.sheet_to_csv(ws);
+        const file = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+        saveAs(file, `customers_${format(new Date(), "yyyy-MM-dd")}.csv`);
+      } else if (exportFormat === "pdf") {
+        const doc = new jsPDF();
+        doc.text("Customer List", 14, 20);
+        autoTable(doc, {
+          startY: 30,
+          head: [["Customer ID", "Name (Role)", "Phone", "Balance", "Status", "Registration Type", "Last Active"]],
+          body: fetchedCustomers.map((customer) => [
+            customer.id || "N/A",
+            `${customer.name || "Unknown"} (${customer.role || "Unknown"})`,
+            customer.phone || "N/A",
+            `Rs. ${customer.balance.toLocaleString()}` || "Rs. 0",
+            customer.status || "N/A",
+            customer.registration_type || "N/A",
+            customer.lastActive || "N/A",
+          ]),
+          theme: "grid",
+          styles: { fontSize: 8 },
+          headStyles: { fillColor: [0, 0, 77], textColor: [255, 255, 255] },
+          margin: { top: 30 },
+        });
+        doc.save(`customers_${format(new Date(), "yyyy-MM-dd")}.pdf`);
+      }
+      setIsExportModalOpen(false);
+    } catch (err) {
+      console.error("Error exporting customers:", err);
+      toast.error("Failed to export data. Please try again.");
+    } finally {
+      setExportLoading(false);
     }
-    switch (exportFormat) {
-      case "xlsx":
-        exportToExcel();
-        break;
-      case "csv":
-        exportToCSV();
-        break;
-      case "pdf":
-        exportToPDF();
-        break;
-      default:
-        console.error("Invalid export format");
-    }
-    setIsExportModalOpen(false);
   };
 
   const handleViewCustomer = (customer) => {
@@ -264,7 +238,7 @@ export default function CustomerList() {
   };
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       <h2 className="text-3xl font-bold text-[#00004D]">Customer Check</h2>
 
       {/* Filters */}
@@ -543,10 +517,12 @@ export default function CustomerList() {
             </RadioGroup>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsExportModalOpen(false)}>
+            <Button variant="outline" onClick={() => setIsExportModalOpen(false)} disabled={exportLoading}>
               Cancel
             </Button>
-            <Button onClick={handleExport}>OK</Button>
+            <Button onClick={handleExport} disabled={exportLoading}>
+              {exportLoading ? "Exporting..." : "OK"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

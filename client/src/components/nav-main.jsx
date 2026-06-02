@@ -32,11 +32,20 @@ export function NavMain({ items }) {
           const isParentActive = currentPath === item.url || item.items?.some(sub => sub.url === currentPath);
           return (
             <Collapsible key={item.title} asChild defaultOpen={isParentActive}>
-              <SidebarMenuItem className={isParentActive ? "bg-gray-600 rounded-md" : ""}>
-                <SidebarMenuButton asChild tooltip={item.title}>
-                  <Link to={item.url} className="flex items-center gap-2 w-full">
-                    <item.icon className={isParentActive ? "bg-gray-600 text-white rounded-md" : "text-[#00004D]"} />
-                    <span className={isParentActive ? "bg-gray-600 text-white rounded-md" : "text-[#00004D]"} >{item.title}</span>
+              <SidebarMenuItem>
+                <SidebarMenuButton 
+                  asChild 
+                  tooltip={item.title}
+                  isActive={isParentActive}
+                  className={
+                    isParentActive 
+                      ? "!bg-[#01004c] !text-white hover:!bg-[#01004c]/90 shadow-md transition-all duration-200" 
+                      : "text-[#01004c] hover:bg-[#01004c]/10 hover:text-[#01004c] transition-all duration-200"
+                  }
+                >
+                  <Link to={item.url} className="flex items-center gap-3 w-full px-1">
+                    <item.icon className="shrink-0 size-5" />
+                    <span className="font-medium tracking-wide">{item.title}</span>
                   </Link>
                 </SidebarMenuButton>
 

@@ -1,3 +1,4 @@
+import BackButton from "@/components/BackButton";
 import { useState, useRef, useEffect } from "react";
 import {
   Card,
@@ -218,7 +219,8 @@ function RegisterCustomer() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+    <div className="min-h-screen relative bg-gray-100 flex items-center justify-center p-4">
+      <BackButton />
       <Card className="w-full max-w-xl min-h-[600px] pt-0 rounded-b-lg rounded-t-none shadow-lg">
         <CardHeader className="bg-[#070149] pt-0 rounded-t-none">
           <CardTitle className="text-3xl font-bold text-center text-white py-4">

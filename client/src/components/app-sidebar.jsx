@@ -61,6 +61,11 @@ const masterAdminNavLinks = [
     icon: KeyRound,
   },
   {
+    title: "Merge Balance",
+    url: "/master-admin/merge-balance",
+    icon: Coins,
+  },
+  {
     title: "Point Exchange",
     url: "/master-admin/points/point-exchange",
     icon: Coins,
@@ -80,6 +85,11 @@ const masterAdminNavLinks = [
     url: "/master-admin/fees",
     icon: ArrowDownFromLine,
   },
+  {
+    title: "Offline Qrcode",
+    url: "/master-admin/qrcode",
+    icon: QrCode,
+  },
 ];
 
 const adminNavLinks = [
@@ -87,6 +97,11 @@ const adminNavLinks = [
     title: "Dashboard",
     url: "/admin",
     icon: SquareTerminal,
+  },
+  {
+    title: "Settlements",
+    url: "/admin/settlements",
+    icon: FileText,
   },
   {
     title: "Customer Users",
@@ -117,6 +132,11 @@ const adminNavLinks = [
     title: "Add / Delete Access",
     url: "/admin/adddelete/add-new-user",
     icon: KeyRound,
+  },
+  {
+    title: "Merge Balance",
+    url: "/admin/merge-balance",
+    icon: Coins,
   },
   {
     title: "Point Exchange",

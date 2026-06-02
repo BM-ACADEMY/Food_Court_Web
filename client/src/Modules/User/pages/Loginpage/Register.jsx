@@ -126,7 +126,7 @@ const RegisterForm = ({ onClose, onOtpSent }) => {
     confirmPassword: "",
   });
   const [error, setError] = useState("");
-  const [roles, setRoles] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [customerRoleId, setCustomerRoleId] = useState(null);
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.id]: e.target.value });
@@ -136,29 +136,29 @@ const RegisterForm = ({ onClose, onOtpSent }) => {
     const fetchRoles = async () => {
       try {
         const res = await axios.get(`${import.meta.env.VITE_BASE_URL}/roles/fetch-all-roles`);
-        console.log(res.data.data,"roel");
-        
         const customerRole = res.data.data.find((role) => role.role_id === "role-5");
         if (customerRole) setCustomerRoleId(customerRole._id);
       } catch (err) {
         console.error("Failed to fetch roles", err);
       }
     };
-
     fetchRoles();
   }, []);
 
 const handleSubmit = async (e) => {
   e.preventDefault();
   setError("");
+  setIsLoading(true);
 
   // Basic validation
   if (formData.password !== formData.confirmPassword) {
     setError("Passwords do not match");
+    setIsLoading(false);
     return;
   }
   if (formData.phone.length !== 10) {
     setError("Phone number must be 10 digits");
+    setIsLoading(false);
     return;
   }
 
@@ -174,24 +174,20 @@ const handleSubmit = async (e) => {
     });
 
     if (response.data.success) {
-      const userId = response.data.data._id;
+      // The backend createUser endpoint now automatically creates the Customer profile
+      // and sends the QR code email.
 
-      // Step 2: Create customer entry
-      await axios.post(`${import.meta.env.VITE_BASE_URL}/customers/create-customer`, {
-        user_id: userId,
-        registration_type: "online",
-      });
-
-      // Step 3: Go to OTP screen
+      // Step 2: Go to OTP screen
       onOtpSent(formData.phone);
     } else {
       setError(response.data.message || "Registration failed");
     }
   } catch (err) {
     setError(err.response?.data?.message || "An error occurred");
+  } finally {
+    setIsLoading(false);
   }
 };
-
 
   return (
     <div className="z-10 w-full max-w-md mt-6 shadow-xl rounded-2xl overflow-hidden border bg-white">
@@ -212,6 +208,7 @@ const handleSubmit = async (e) => {
               value={formData.fullName}
               onChange={handleChange}
               required
+              disabled={isLoading}
             />
           </div>
           <div>
@@ -226,6 +223,7 @@ const handleSubmit = async (e) => {
               value={formData.email}
               onChange={handleChange}
               required
+              disabled={isLoading}
             />
           </div>
           <div>
@@ -243,6 +241,7 @@ const handleSubmit = async (e) => {
                 value={formData.phone}
                 onChange={(e) => handleChange({ target: { id: "phone", value: e.target.value.replace(/\D/g, "") } })}
                 required
+                disabled={isLoading}
               />
             </div>
           </div>
@@ -258,6 +257,7 @@ const handleSubmit = async (e) => {
               value={formData.password}
               onChange={handleChange}
               required
+              disabled={isLoading}
             />
           </div>
           <div>
@@ -272,13 +272,25 @@ const handleSubmit = async (e) => {
               value={formData.confirmPassword}
               onChange={handleChange}
               required
+              disabled={isLoading}
             />
           </div>
           <Button
             type="submit"
-            className="w-full text-lg font-semibold py-4 h-14 bg-[#05025b] hover:bg-[#1a1a7b]"
+            className="w-full text-lg font-semibold py-4 h-14 bg-[#05025b] hover:bg-[#1a1a7b] disabled:opacity-70 flex items-center justify-center cursor-pointer"
+            disabled={isLoading}
           >
-            Send OTP
+            {isLoading ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Processing...
+              </>
+            ) : (
+              "Send OTP"
+            )}
           </Button>
         </form>
         <div className="mt-6 text-center">

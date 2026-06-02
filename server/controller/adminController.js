@@ -6,6 +6,9 @@ const User=require('../model/userModel')
 const moment=require('moment');
 const Role =require('../model/roleModel');
 const LoginLog=require('../model/loginLogModel')
+const Customer = require("../model/customerModel");
+const Restaurant = require("../model/restaurantModel");
+const TreasurySubcom = require("../model/treasurySubcomModel");
 
 
 // Create Admin
@@ -704,14 +707,57 @@ exports.getAdminTransactions = async (req, res) => {
       ],
       transaction_type: { $in: ["Transfer", "TopUp", "Refund", "Credit"] },
     })
-      .populate("sender_id", "name")
-      .populate("receiver_id", "name")
+      .populate({
+        path: "sender_id",
+        select: "name user_id",
+        populate: { path: "role_id", select: "name" },
+      })
+      .populate({
+        path: "receiver_id",
+        select: "name user_id",
+        populate: { path: "role_id", select: "name" },
+      })
+      .sort({ created_at: -1 })
       .lean();
+
+    const userIds = new Set();
+    transactions.forEach((tx) => {
+      if (tx.sender_id) userIds.add(tx.sender_id._id);
+      if (tx.receiver_id) userIds.add(tx.receiver_id._id);
+    });
+
+    const userIdsArray = Array.from(userIds);
+
+    const [customers, restaurantsList, admins, subcoms, masterAdmins] = await Promise.all([
+      Customer.find({ user_id: { $in: userIdsArray } }).select('user_id customer_id').lean(),
+      Restaurant.find({ user_id: { $in: userIdsArray } }).select('user_id restaurant_id').lean(),
+      Admin.find({ user_id: { $in: userIdsArray } }).select('user_id admin_id').lean(),
+      TreasurySubcom.find({ user_id: { $in: userIdsArray } }).select('user_id treasury_subcom_id').lean(),
+      MasterAdmin.find({ user_id: { $in: userIdsArray } }).select('user_id master_admin_id').lean()
+    ]);
+
+    const customIdMap = new Map();
+    customers.forEach(c => customIdMap.set(c.user_id.toString(), c.customer_id));
+    restaurantsList.forEach(r => customIdMap.set(r.user_id.toString(), r.restaurant_id));
+    admins.forEach(a => customIdMap.set(a.user_id.toString(), a.admin_id));
+    subcoms.forEach(s => customIdMap.set(s.user_id.toString(), s.treasury_subcom_id));
+    masterAdmins.forEach(m => customIdMap.set(m.user_id.toString(), m.master_admin_id));
+
     const formattedTransactions = transactions.map((tx) => ({
       id: tx.transaction_id,
       type: tx.transaction_type.toLowerCase(),
       amount: parseFloat(tx.amount),
       date: tx.created_at,
+      sender: {
+        name: tx.sender_id?.name || "Unknown",
+        user_id: tx.sender_id ? (customIdMap.get(tx.sender_id._id.toString()) || tx.sender_id.user_id || "Unknown") : "Unknown",
+        role: tx.sender_id?.role_id?.name || "Unknown",
+      },
+      receiver: {
+        name: tx.receiver_id?.name || "Unknown",
+        user_id: tx.receiver_id ? (customIdMap.get(tx.receiver_id._id.toString()) || tx.receiver_id.user_id || "Unknown") : "Unknown",
+        role: tx.receiver_id?.role_id?.name || "Unknown",
+      },
       description:
         tx.transaction_type === "Transfer"
           ? `To ${tx.receiver_id?.name || "Unknown"}`

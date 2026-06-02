@@ -28,45 +28,23 @@ const getPageNumbers = (current, total, delta = 2) => {
     return range;
 };
 
-const roleColumnMap = {
-    "role-1": [ // Master Admin
-        { label: "ID", key: "master_admin_id" },
-        { label: "Name", key: "name" },
-        { label: "Email", key: "email" },
-        { label: "Phone", key: "phone_number" },
-        { label: "Role", key: "role_name" },
-    ],
-    "role-2": [ // Admin
-        { label: "ID", key: "admin_id" },
-        { label: "Name", key: "name" },
-        { label: "Email", key: "email" },
-        { label: "Phone", key: "phone_number" },
-        { label: "Role", key: "role_name" },
-    ],
-    "role-3": [ // TreasurySubcom
-        { label: "ID", key: "treasury_subcom_id" },
-        { label: "Name", key: "name" },
-        { label: "Email", key: "email" },
-        { label: "Phone", key: "phone_number" },
-        { label: "Role", key: "role_name" },
-    ],
-    "role-4": [ // Restaurant
-        { label: "ID", key: "restaurant_id" },
-        { label: "Name", key: "name" },
-        { label: "Email", key: "email" },
-        { label: "Phone", key: "phone_number" },
-        { label: "Role", key: "role_name" },
-        { label: "Restaurant Name", key: "restaurant_name" },
-        { label: "Location", key: "location" },
-    ],
-    "role-5": [ // Customer
-        { label: "ID", key: "customer_id" },
-        { label: "Name", key: "name" },
-        { label: "Email", key: "email" },
-        { label: "Phone", key: "phone_number" },
-        { label: "Role", key: "role_name" },
-        { label: "Registration Type", key: "registration_type" },
-    ],
+const commonColumns = [
+    { label: "ID", key: "dynamic_id" },
+    { label: "Name", key: "name" },
+    { label: "Email", key: "email" },
+    { label: "Phone", key: "phone_number" },
+    { label: "Role", key: "role_name" },
+];
+
+const getUserId = (user) => {
+    switch (user.role_key) {
+        case "role-1": return user.master_admin_id;
+        case "role-2": return user.admin_id;
+        case "role-3": return user.treasury_subcom_id;
+        case "role-4": return user.restaurant_id;
+        case "role-5": return user.customer_id;
+        default: return "-";
+    }
 };
 const getRandomColor = () => {
   const colors = ["#FF6B6B", "#4ECDC4", "#556270", "#C7F464", "#FFA500"];
@@ -98,6 +76,9 @@ export default function UserList() {
     const [roleFilter, setRoleFilter] = useState("all");
     const [openModal, setOpenModal] = useState(false);
     const [editUser, setEditUser] = useState(null);
+    const [viewUser, setViewUser] = useState(null);
+    const [viewMenuItems, setViewMenuItems] = useState([]);
+    const [loadingViewMenu, setLoadingViewMenu] = useState(false);
     const [page, setPage] = useState(1);
     const perPage = 10;
     const [selectedUserForDelete, setSelectedUserForDelete] = useState(null);
@@ -134,7 +115,8 @@ export default function UserList() {
     }, [page, search, roleFilter]);
 
     const handleEdit = async (user) => {
-    
+        console.log(user, "updated");
+
         try {
             const roleKey = user.role_key;
             let roleDetails = {};
@@ -176,12 +158,57 @@ export default function UserList() {
     };
 
 
-    const handleView = (user) => {
-        alert(`Viewing details for:\n\nName: ${user.name}\nEmail: ${user.email}\nPhone: ${user.phone_number}\nRole: ${user.role_name}`);
+    const handleView = async (user) => {
+        try {
+            const roleKey = user.role_key;
+            let roleDetails = {};
+
+            const roleDetailsEndpoints = {
+                "role-1": `/master-admins/fetch-master-admin-by-id/${user.m_id}`,
+                "role-2": `/admins/fetch-admin-by-id/${user.a_id}`,
+                "role-3": `/treasurySubcom/fetch-treasurysubcom-by-id/${user.t_id}`,
+                "role-4": `/restaurants/fetch-restaurant-by-id/${user.r_id}`,
+                "role-5": `/customers/fetch-customer-by-id/${user.c_id}`,
+            };
+
+            if (roleDetailsEndpoints[roleKey]) {
+                const res = await axios.get(`${import.meta.env.VITE_BASE_URL}${roleDetailsEndpoints[roleKey]}`);
+                if (res.data.success) {
+                    roleDetails = res.data.data;
+                }
+            }
+
+            const normalizeDecimal = (val) => (typeof val === "object" && val?.$numberDecimal ? val.$numberDecimal : val);
+
+            const normalized = {
+                ...user,
+                ...roleDetails,
+                point_creation_limit: normalizeDecimal(roleDetails.point_creation_limit),
+                master_admin_to_admin: normalizeDecimal(roleDetails.master_admin_to_admin),
+                admin_to_admin_transfer_limit: normalizeDecimal(roleDetails.admin_to_admin_transfer_limit),
+                admin_to_subcom_transfer_limit: normalizeDecimal(roleDetails.admin_to_subcom_transfer_limit),
+                top_up_limit: normalizeDecimal(roleDetails.top_up_limit),
+            };
+
+            setViewUser(normalized);
+
+            if (roleKey === "role-4" && user.r_id) {
+                setLoadingViewMenu(true);
+                setViewMenuItems([]);
+                const menuRes = await axios.get(`${import.meta.env.VITE_BASE_URL}/products/customer/fetch-by-restaurant/${user.r_id}`, { withCredentials: true });
+                if (menuRes.data.data) {
+                    setViewMenuItems(menuRes.data.data);
+                }
+                setLoadingViewMenu(false);
+            }
+        } catch (error) {
+            console.error("Failed to load view details", error);
+            toast.error("Failed to load user details");
+        }
     };
 
     const handleDelete = async (user) => {
-
+        console.log(user, "delete");
 
         try {
             // Step 1: Delete from User model
@@ -284,10 +311,9 @@ export default function UserList() {
 
             if (isEdit) {
                 const userUpdateRes = await axios.put(`${import.meta.env.VITE_BASE_URL}/users/update-user/${formData.user_id._id}`, userPayload);
-                userId = userUpdateRes.data.data._id;
-
-
-                roleKey = userUpdateRes.data.data.role_id.role_id;
+                // The backend response structure might vary, so use known data from formData
+                userId = formData.user_id._id;
+                roleKey = formData.role_key;
             } else {
                 const userRes = await axios.post(`${import.meta.env.VITE_BASE_URL}/users/create-user`, userPayload);
                 const newUser = userRes.data.data;
@@ -303,25 +329,28 @@ export default function UserList() {
                 "role-5": isEdit ? `/customers/update-customer/${formData.c_id}` : "/customers/create-customer",
             };
 
+            const cleanVal = (val) => (val && String(val).trim() !== "" && val !== "-") ? val : undefined;
+
             const rolePayloadMap = {
                 "role-1": {
                     user_id: userId,
-                    point_creation_limit: formData.point_creation_limit,
-                    master_admin_to_admin: formData.master_admin_to_admin,
+                    point_creation_limit: cleanVal(formData.point_creation_limit),
+                    master_admin_to_admin: cleanVal(formData.master_admin_to_admin),
                 },
                 "role-2": {
                     user_id: userId,
-                    admin_to_admin_transfer_limit: formData.admin_to_admin_transfer_limit,
-                    admin_to_subcom_transfer_limit: formData.admin_to_subcom_transfer_limit,
+                    admin_to_admin_transfer_limit: cleanVal(formData.admin_to_admin_transfer_limit),
+                    admin_to_subcom_transfer_limit: cleanVal(formData.admin_to_subcom_transfer_limit),
                 },
                 "role-3": {
                     user_id: userId,
-                    top_up_limit: formData.top_up_limit,
+                    top_up_limit: cleanVal(formData.top_up_limit),
                 },
                 "role-4": {
                     user_id: userId,
                     restaurant_name: formData.restaurant_name,
-                    location: formData.location,
+                    location: cleanVal(formData.location),
+                    menuItems: formData.menuItems,
                 },
                 "role-5": {
                     user_id: userId,
@@ -347,13 +376,15 @@ export default function UserList() {
             fetchUsers();
         } catch (err) {
             console.error("Error during submission:", err);
-            toast.error(err.response?.data?.message || "Something went wrong");
+            const errMsg = err.response?.data?.message || err.response?.data?.error || JSON.stringify(err.response?.data) || err.message;
+            toast.error(`Update failed: ${errMsg}`);
         }
     };
 
     const handleToggleRestrict = async (user) => {
         try {
-            const updated = await axios.put(`${import.meta.env.VITE_BASE_URL}/users/update-user/${user._id}`, {
+            const id=user._id;
+            const updated = await axios.put(`${import.meta.env.VITE_BASE_URL}/users/update-user-flag/${id}`, {
                 is_flagged: !user.is_flagged,
             });
 
@@ -424,7 +455,7 @@ export default function UserList() {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            {(roleColumnMap[users[0]?.role_key] || roleColumnMap["role-1"]).map((col) => (
+                            {commonColumns.map((col) => (
                                 <TableHead key={col.key} className="text-[#00004D] font-bold">
                                     {col.label}
                                 </TableHead>
@@ -437,12 +468,11 @@ export default function UserList() {
 
                     <TableBody>
                         {users.map((user) => {
-                            const columns = roleColumnMap[user.role_key] || roleColumnMap["role-1"];
                             return (
                                 <TableRow key={user._id}>
-                                    {columns.map((col) => (
+                                    {commonColumns.map((col) => (
                                         <TableCell key={col.key}>
-                                            {user[col.key] || "-"}
+                                            {col.key === "dynamic_id" ? getUserId(user) : (user[col.key] || "-")}
                                         </TableCell>
                                     ))}
                                     <TableCell className="text-center">
@@ -462,9 +492,9 @@ export default function UserList() {
                                     </TableCell>
                                     <TableCell className="text-center">
                                         <div className="flex justify-center gap-2">
-                                            {/* <Button size="icon" variant="ghost" onClick={() => handleView(user)}>
+                                            <Button size="icon" variant="ghost" onClick={() => handleView(user)}>
                                                 <Eye className="w-4 h-4 text-[#00004D]" />
-                                            </Button> */}
+                                            </Button>
                                             <Button size="icon" variant="ghost" onClick={() => handleEdit(user)}>
                                                 <Pencil className="w-4 h-4 text-[#00004D]" />
                                             </Button>
@@ -556,6 +586,91 @@ export default function UserList() {
                             Delete
                         </Button>
                     </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* View Details Dialog */}
+            <Dialog open={!!viewUser} onOpenChange={(val) => { if (!val) setViewUser(null); }}>
+                <DialogContent className="sm:max-w-xl">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-bold text-[#00004D]">User Details</DialogTitle>
+                    </DialogHeader>
+                    {viewUser && (
+                        <div className="space-y-4 mt-2">
+                            <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-md">
+                                <div><span className="font-bold text-gray-700">Name:</span> {viewUser.name}</div>
+                                <div><span className="font-bold text-gray-700">Email:</span> {viewUser.email}</div>
+                                <div><span className="font-bold text-gray-700">Phone:</span> {viewUser.phone_number}</div>
+                                <div><span className="font-bold text-gray-700">Role:</span> {viewUser.role_name}</div>
+                            </div>
+
+                            {/* Role-specific details */}
+                            {viewUser.role_key === "role-1" && (
+                                <div className="space-y-2 border-t pt-4">
+                                    <h3 className="font-bold text-[#00004D]">Master Admin Settings</h3>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div><span className="font-bold text-gray-700">Point Creation Limit:</span> {viewUser.point_creation_limit}</div>
+                                        <div><span className="font-bold text-gray-700">Master to Admin:</span> {viewUser.master_admin_to_admin}</div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {viewUser.role_key === "role-2" && (
+                                <div className="space-y-2 border-t pt-4">
+                                    <h3 className="font-bold text-[#00004D]">Admin Settings</h3>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div><span className="font-bold text-gray-700">Admin to Admin Limit:</span> {viewUser.admin_to_admin_transfer_limit}</div>
+                                        <div><span className="font-bold text-gray-700">Admin to Subcom Limit:</span> {viewUser.admin_to_subcom_transfer_limit}</div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {viewUser.role_key === "role-3" && (
+                                <div className="space-y-2 border-t pt-4">
+                                    <h3 className="font-bold text-[#00004D]">Treasury Settings</h3>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div><span className="font-bold text-gray-700">Top Up Limit:</span> {viewUser.top_up_limit}</div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {viewUser.role_key === "role-4" && (
+                                <div className="space-y-2 border-t pt-4">
+                                    <h3 className="font-bold text-[#00004D]">Restaurant Information</h3>
+                                    <div className="grid grid-cols-2 gap-4 mb-4">
+                                        <div><span className="font-bold text-gray-700">Restaurant Name:</span> {viewUser.restaurant_name}</div>
+                                        {/* Location could be populated name, but typically it's just the ID initially if not populated deeply */}
+                                    </div>
+
+                                    <h4 className="font-bold text-[#00004D] mt-4">Menu Items</h4>
+                                    {loadingViewMenu ? (
+                                        <p className="text-sm text-gray-500">Loading menu...</p>
+                                    ) : viewMenuItems.length > 0 ? (
+                                        <div className="max-h-40 overflow-y-auto space-y-2 pr-2">
+                                            {viewMenuItems.map((item, idx) => (
+                                                <div key={idx} className="flex justify-between items-center bg-gray-100 p-2 rounded">
+                                                    <span className="font-medium text-sm">{item.name}</span>
+                                                    <span className="text-sm font-bold text-green-700">₹{item.amount}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="text-sm text-gray-500 italic">No menu items found.</p>
+                                    )}
+                                </div>
+                            )}
+
+                            {viewUser.role_key === "role-5" && (
+                                <div className="space-y-2 border-t pt-4">
+                                    <h3 className="font-bold text-[#00004D]">Customer Information</h3>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div><span className="font-bold text-gray-700">Registration Type:</span> {viewUser.registration_type}</div>
+                                        <div><span className="font-bold text-gray-700">Fee Paid:</span> {viewUser.registration_fee_paid ? "Yes" : "No"}</div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </DialogContent>
             </Dialog>
 

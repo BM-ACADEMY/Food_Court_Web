@@ -11,7 +11,12 @@ const connectDB = async () => {
   }
 
   try {
-    const conn = await mongoose.connect(mongoUri); // Clean and modern
+    // maxPoolSize increased to 200 to handle many concurrent operations
+    const conn = await mongoose.connect(mongoUri, {
+      maxPoolSize: 200,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+    });
     console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {
     console.error('❌ MongoDB connection failed:', error.message);

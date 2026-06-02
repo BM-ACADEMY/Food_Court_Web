@@ -100,6 +100,7 @@ export default function TransactionHistory() {
   const [fromDate, setFromDate] = useState(undefined);
   const [toDate, setToDate] = useState(undefined);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState(search); // New debounced search state
   const [quickFilter, setQuickFilter] = useState("last 7 days");
   const [chartView, setChartView] = useState("daily");
   const [openTo, setOpenTo] = useState(false);
@@ -135,6 +136,17 @@ export default function TransactionHistory() {
     location_id: "",
   });
 
+  // Debounce search input
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 500); // 500ms delay
+
+    return () => {
+      clearTimeout(handler); // Cleanup timer
+    };
+  }, [search]);
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -160,7 +172,7 @@ export default function TransactionHistory() {
           fromDate: fromDate ? format(fromDate, "yyyy-MM-dd") : undefined,
           toDate: toDate ? format(toDate, "yyyy-MM-dd") : undefined,
           quickFilter: fromDate || toDate ? undefined : quickFilter,
-          search,
+          search: debouncedSearch, // Use debouncedSearch
           page: pagination.page,
           limit: pagination.limit,
         };
@@ -207,7 +219,7 @@ export default function TransactionHistory() {
     fromDate,
     toDate,
     quickFilter,
-    search,
+    debouncedSearch, // Use debouncedSearch instead of search
     pagination.page,
     pagination.limit,
   ]);
@@ -388,7 +400,7 @@ export default function TransactionHistory() {
 
       const ws = XLSX.utils.json_to_sheet(dataWithTotal);
       const csv = XLSX.utils.sheet_to_csv(ws);
-      const file = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const file = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
       saveAs(file, `transactions_${format(new Date(), "yyyy-MM-dd")}.csv`);
     } catch (error) {
       console.error("Error exporting to CSV:", error);
@@ -403,7 +415,7 @@ export default function TransactionHistory() {
       const data = prepareExportData(allTransactions);
 
       // Calculate total amount
-      const totalAmount = data.reduce((sum, item) => sum + item["Amount (₹)"], 0);
+      const totalAmount = data.reduce((sum, item) => sum + item["Amount (Rs. )"], 0);
 
       const doc = new jsPDF();
 
@@ -413,7 +425,7 @@ export default function TransactionHistory() {
       doc.setFontSize(10);
       doc.text(`Generated on: ${format(new Date(), "yyyy-MM-dd HH:mm")}`, 15, 22);
       doc.text(`Total Transactions: ${data.length}`, 15, 28);
-      doc.text(`Total Amount: ₹${totalAmount.toFixed(2)}`, 15, 34);
+      doc.text(`Total Amount: Rs. ${totalAmount.toFixed(2)}`, 15, 34);
 
       // Prepare table data
       const tableData = data.map((item) => [
@@ -433,7 +445,7 @@ export default function TransactionHistory() {
 
       // Add total row
       const footerData = [
-        ["", "", "", "", "", "", "", "", "", "TOTAL", `₹${totalAmount.toFixed(2)}`, ""],
+        ["", "", "", "", "", "", "", "", "", "TOTAL", `Rs. ${totalAmount.toFixed(2)}`, ""],
       ];
 
       // Calculate total table width for debugging
@@ -760,7 +772,36 @@ export default function TransactionHistory() {
                 placeholder="Search by name, phone..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                  }
+                }}
               />
+              {loading && (
+                <div className="absolute right-2 top-9">
+                  <svg
+                    className="animate-spin h-5 w-5 text-gray-500"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v8z"
+                    ></path>
+                  </svg>
+                </div>
+              )}
             </div>
           </div>
 
@@ -862,34 +903,37 @@ export default function TransactionHistory() {
                     <TableHead className="whitespace-nowrap">Description</TableHead>
                     <TableHead className="whitespace-nowrap">Payment Method</TableHead>
                     <TableHead className="text-right whitespace-nowrap">Amount</TableHead>
-                    {/* <TableHead className="hidden md:table-cell text-right whitespace-nowrap">Actions</TableHead> */}
+                    <TableHead className="hidden md:table-cell text-right whitespace-nowrap">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {transactions.map((txn) => (
                     <TableRow key={txn.id}>
-                      {/* <TableCell className="whitespace-nowrap truncate">{txn.datetime}</TableCell> */}
                       <TableCell className="whitespace-nowrap truncate">
-                                            {new Date(txn.datetime).toLocaleString("en-IN", {
-                                              dateStyle: "medium",
-                                              timeStyle: "short",
-                                              timeZone: "Asia/Kolkata",
-                                            })}
-                                          </TableCell>
+                        {new Date(txn.datetime).toLocaleString("en-IN", {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                          timeZone: "Asia/Kolkata",
+                        })}
+                      </TableCell>
                       <TableCell className="font-semibold whitespace-nowrap truncate">{txn.id}</TableCell>
                       <TableCell className="max-w-[150px] truncate">
                         <div className="flex items-center gap-2">
                           <Avatar name={txn.sender.name} />
-                          <div className="font-medium">{txn.sender.name}</div>
+                          <div className="flex flex-col truncate">
+                            <span className="font-medium truncate">{txn.sender.name}</span>
+                            <span className="text-xs text-muted-foreground truncate">({txn.sender.role})</span>
+                          </div>
                         </div>
-                        <div className="text-xs text-muted-foreground">({txn.sender.role})</div>
                       </TableCell>
                       <TableCell className="max-w-[150px] truncate">
                         <div className="flex items-center gap-2">
                           <Avatar name={txn.receiver.name} />
-                          <div className="font-medium">{txn.receiver.name}</div>
+                          <div className="flex flex-col truncate">
+                            <span className="font-medium truncate">{txn.receiver.name}</span>
+                            <span className="text-xs text-muted-foreground truncate">({txn.receiver.role})</span>
+                          </div>
                         </div>
-                        <div className="text-xs text-muted-foreground">({txn.receiver.role})</div>
                       </TableCell>
                       <TableCell className="whitespace-nowrap truncate">
                         {editingTransactionId === txn.id ? (
@@ -1006,16 +1050,15 @@ export default function TransactionHistory() {
                             Save
                           </Button>
                         ) : (
-                          // <Button
-                          //   variant="outline"
-                          //   size="sm"
-                          //   onClick={() => handleEditClick(txn)}
-                          //   aria-label="Edit transaction"
-                          // >
-                          //   <Pencil className="size-4 mr-2" />
-                          //   Edit
-                          // </Button>
-                          <></>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditClick(txn)}
+                            aria-label="Edit transaction"
+                          >
+                            <Pencil className="size-4 mr-2" />
+                            Edit
+                          </Button>
                         )}
                       </TableCell>
                     </TableRow>

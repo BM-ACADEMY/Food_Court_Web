@@ -174,7 +174,7 @@ export default function AdminList() {
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const csv = XLSX.utils.sheet_to_csv(ws);
-    const file = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const file = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
     saveAs(file, `admins_${format(new Date(), "yyyy-MM-dd")}.csv`);
   };
 
@@ -189,7 +189,7 @@ export default function AdminList() {
           admin.id || "N/A",
           admin.name || "Unknown",
           admin.phone || "N/A",
-          `₹${admin.balance.toLocaleString()}` || "₹0",
+          `Rs. ${admin.balance.toLocaleString()}` || "Rs. 0",
           admin.status || "N/A",
           admin.lastActive || "N/A",
         ]),
@@ -386,21 +386,18 @@ export default function AdminList() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Admin ID</TableHead>
-                  <TableHead>Sender Name</TableHead>
-                  <TableHead>Receiver Name</TableHead>
+                  <TableHead>Name</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Balance</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Last Active</TableHead>
-                  {/* <TableHead>Permission</TableHead> */}
-
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {admins.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center">
+                    <TableCell colSpan={7} className="text-center">
                       No admins found
                     </TableCell>
                   </TableRow>
@@ -409,29 +406,18 @@ export default function AdminList() {
                     <TableRow key={admin.id}>
                       <TableCell className="font-medium">#{admin.id}</TableCell>
 
-                      {/* Sender Name */}
+                      {/* Name */}
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <Avatar name={admin.sender_name} />
+                          <Avatar name={admin.name || "Unknown"} />
                           <div className="flex flex-col">
-                            <span className="font-medium">{admin.sender_name}</span>
-                            <span className="text-xs text-gray-500">{admin.sender_role_name}</span>
+                            <span className="font-medium">{admin.name || "Unknown"}</span>
+                            <span className="text-xs text-gray-500">{admin.role || "Admin"}</span>
                           </div>
                         </div>
                       </TableCell>
 
-                      {/* Receiver Name */}
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Avatar name={admin.receiver_name} />
-                          <div className="flex flex-col">
-                            <span className="font-medium">{admin.receiver_name}</span>
-                            <span className="text-xs text-gray-500">{admin.receiver_role_name}</span>
-                          </div>
-                        </div>
-                      </TableCell>
-
-                      <TableCell>{admin.phone}</TableCell>
+                      <TableCell>{admin.phone || "N/A"}</TableCell>
                       <TableCell>
                         <span
                           className={`font-medium ${admin.balance > 10000

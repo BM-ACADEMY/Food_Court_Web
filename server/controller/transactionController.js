@@ -242,9 +242,6 @@ exports.createOrUpdateBalance = async (req, res) => {
 };
 
 exports.processPayment = async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
   try {
     const {
       sender_id,
@@ -260,7 +257,6 @@ exports.processPayment = async (req, res) => {
       !mongoose.Types.ObjectId.isValid(sender_id) ||
       !mongoose.Types.ObjectId.isValid(receiver_id)
     ) {
-      await session.abortTransaction();
       return res.status(400).json({
         success: false,
         message: "Invalid sender_id or receiver_id format",
@@ -269,19 +265,15 @@ exports.processPayment = async (req, res) => {
 
     // Validate users and roles
     const sender = await User.findById(sender_id)
-      .populate("role_id")
-      .session(session);
+      .populate("role_id");
     if (!sender) {
-      await session.abortTransaction();
       return res
         .status(400)
         .json({ success: false, message: "Sender not found" });
     }
     const receiver = await User.findById(receiver_id)
-      .populate("role_id")
-      .session(session);
+      .populate("role_id");
     if (!receiver) {
-      await session.abortTransaction();
       return res
         .status(400)
         .json({ success: false, message: "Receiver not found" });
@@ -289,14 +281,12 @@ exports.processPayment = async (req, res) => {
 
     if (transaction_type === "Transfer") {
       if (sender.role_id?.role_id !== "role-5") {
-        await session.abortTransaction();
         return res.status(400).json({
           success: false,
           message: "Sender must be a customer (role-5)",
         });
       }
       if (receiver.role_id?.role_id !== "role-4") {
-        await session.abortTransaction();
         return res.status(400).json({
           success: false,
           message: "Receiver must be a restaurant (role-4)",
@@ -307,7 +297,6 @@ exports.processPayment = async (req, res) => {
     // Validate amount format
     const deductAmount = parseFloat(amount);
     if (isNaN(deductAmount) || !/^\d+\.\d{2}$/.test(amount)) {
-      await session.abortTransaction();
       return res.status(400).json({
         success: false,
         message:
@@ -318,12 +307,11 @@ exports.processPayment = async (req, res) => {
     // Validate sender balance
     const senderBalance = await UserBalance.findOne({
       user_id: sender_id,
-    }).session(session);
+    });
     const senderBalanceAmount = senderBalance
       ? parseFloat(senderBalance.balance)
       : 0.0;
     if (deductAmount > senderBalanceAmount) {
-      await session.abortTransaction();
       return res.status(400).json({
         success: false,
         message: `Insufficient sender balance: ${senderBalanceAmount.toFixed(
@@ -342,23 +330,21 @@ exports.processPayment = async (req, res) => {
       status: "Success",
       remarks,
     });
-    await transaction.save({ session });
+    await transaction.save();
 
     // Update sender (customer) balance
     const updatedSenderBalance = await UserBalance.findOneAndUpdate(
       { user_id: sender_id },
       { $inc: { balance: -deductAmount } },
-      { new: true, upsert: true, session }
+      { new: true, upsert: true }
     );
 
     // Update receiver (restaurant) balance
     const updatedReceiverBalance = await UserBalance.findOneAndUpdate(
       { user_id: receiver_id },
       { $inc: { balance: deductAmount } },
-      { new: true, upsert: true, session }
+      { new: true, upsert: true }
     );
-
-    await session.commitTransaction();
 
     const io = getIO();
     // io.to(receiver_id.toString()).emit("newTransaction", {
@@ -388,14 +374,11 @@ exports.processPayment = async (req, res) => {
       receiverBalance: updatedReceiverBalance,
     });
   } catch (err) {
-    await session.abortTransaction();
     console.error("Payment processing error:", err);
     res.status(400).json({
       success: false,
       message: err.message || "Failed to process payment",
     });
-  } finally {
-    session.endSession();
   }
 };
 
@@ -529,6 +512,7 @@ exports.getAllTransactions = async (req, res) => {
             transaction_type: 1,
             payment_method: 1,
             status: 1,
+            order_status: 1,
             remarks: 1,
             created_at: 1,
             customer_id: { $ifNull: [{ $arrayElemAt: ["$customer.customer_id", 0] }, "N/A"] },
@@ -2803,5 +2787,248 @@ exports.getTodayBalance = async (req, res) => {
       message: "Internal server error",
       error: error.message,
     });
+  }
+};
+
+exports.updateOrderStatus = async (req, res) => {
+  try {
+    const { transactionId } = req.params;
+    const { order_status } = req.body;
+
+    if (!["Pending", "Preparing", "Ready", "Delivered", "Cancelled"].includes(order_status)) {
+      return res.status(400).json({ success: false, message: "Invalid order status" });
+    }
+
+    const Transaction = require("../model/transactionModel");
+    const transaction = await Transaction.findByIdAndUpdate(
+      transactionId,
+      { order_status },
+      { new: true }
+    );
+
+    if (!transaction) {
+      return res.status(404).json({ success: false, message: "Transaction not found" });
+    }
+
+    const { getIO } = require("../config/socket");
+    const io = getIO();
+    io.to(transaction.sender_id.toString()).emit("orderStatusUpdate", {
+      transaction_id: transaction._id,
+      order_status: transaction.order_status,
+    });
+
+    res.status(200).json({ success: true, message: "Order status updated", data: transaction });
+  } catch (err) {
+    console.error("Error updating order status:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+exports.getTransactionHistoryByCustomerId = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      search = '',
+      quickFilter,
+      fromDate,
+      toDate,
+      type,
+    } = req.query;
+    const { customerId } = req.params;
+
+    if (!customerId) {
+      return res.status(400).json({ success: false, message: 'Missing customerId' });
+    }
+
+    const customer = await Customer.findOne({ customer_id: customerId })
+      .select('user_id')
+      .lean();
+
+    if (!customer) {
+      return res.status(404).json({ success: false, message: 'Customer not found' });
+    }
+
+    const userObjectId = new mongoose.Types.ObjectId(customer.user_id);
+    const userId = customer.user_id.toString();
+
+    let filter = {
+      status: 'Success',
+      $or: [{ sender_id: userObjectId }, { receiver_id: userObjectId }],
+    };
+
+    if (type && type !== 'all') {
+      filter.transaction_type = type;
+    }
+
+    const dateFilter = buildDateFilter(quickFilter, fromDate, toDate);
+    if (dateFilter.created_at) {
+      filter = { ...filter, ...dateFilter };
+    }
+
+    if (search.trim()) {
+      const users = await User.find({
+        $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { phone_number: { $regex: search, $options: 'i' } },
+        ],
+      }).select('_id');
+
+      const userIds = users.map((u) => u._id);
+      if (userIds.length === 0) {
+        return res.status(200).json({
+          success: true,
+          transactions: [],
+          pagination: { page: parseInt(page), limit: parseInt(limit), totalPages: 0, totalTransactions: 0 },
+          todaysTransactions: 0,
+        });
+      }
+      filter.$or = [{ sender_id: { $in: userIds } }, { receiver_id: { $in: userIds } }];
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const transactionsPromise = Transaction.find(filter)
+      .populate({ path: 'sender_id', select: 'name phone_number role_id', populate: { path: 'role_id', select: 'name' } })
+      .populate({ path: 'receiver_id', select: 'name phone_number role_id', populate: { path: 'role_id', select: 'name' } })
+      .sort({ created_at: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+
+    const totalTransactionsPromise = Transaction.countDocuments(filter);
+
+    let todaysTransactions = 0;
+    if (quickFilter === 'today') {
+      const todayFilter = {
+        ...filter,
+        created_at: {
+          $gte: moment().startOf('day').utc().toDate(),
+          $lte: moment().endOf('day').utc().toDate(),
+        },
+      };
+      todaysTransactions = await Transaction.countDocuments(todayFilter);
+    }
+
+    const [transactions, totalTransactions] = await Promise.all([transactionsPromise, totalTransactionsPromise]);
+
+    const safeTransactions = transactions.filter((txn) => txn?.sender_id?._id && txn?.receiver_id?._id);
+
+    const formattedTransactions = safeTransactions.map((txn) => {
+      const senderId = txn.sender_id._id.toString();
+      let amount = parseFloat(txn.amount);
+      if (senderId === userId) amount = -amount;
+
+      return {
+        id: txn.transaction_id,
+        user: {
+          name: senderId === userId ? txn.receiver_id?.name || 'Unknown' : txn.sender_id?.name || 'Unknown',
+          type: senderId === userId ? txn.receiver_id?.role_id?.name || 'Unknown' : txn.sender_id?.role_id?.name || 'Unknown',
+        },
+        customer_id: customerId,
+        amount,
+        datetime: txn.created_at,
+        status: txn.status,
+        type: txn.transaction_type,
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      transactions: formattedTransactions,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(totalTransactions / parseInt(limit)),
+        totalTransactions,
+      },
+      todaysTransactions,
+    });
+  } catch (error) {
+    console.error('Error in getTransactionHistoryByCustomerId:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
+exports.exportTransactionHistoryByCustomerId = async (req, res) => {
+  try {
+    const { search = '', quickFilter, fromDate, toDate, type } = req.query;
+    const { customerId } = req.params;
+
+    if (!customerId) {
+      return res.status(400).json({ success: false, message: 'Missing customerId' });
+    }
+
+    const customer = await Customer.findOne({ customer_id: customerId })
+      .select('user_id')
+      .lean();
+
+    if (!customer) {
+      return res.status(404).json({ success: false, message: 'Customer not found' });
+    }
+
+    const userObjectId = new mongoose.Types.ObjectId(customer.user_id);
+    const userId = customer.user_id.toString();
+
+    let filter = {
+      status: 'Success',
+      $or: [{ sender_id: userObjectId }, { receiver_id: userObjectId }],
+    };
+
+    if (type && type !== 'all') {
+      filter.transaction_type = type;
+    }
+
+    const dateFilter = buildDateFilter(quickFilter, fromDate, toDate);
+    if (dateFilter.created_at) {
+      filter = { ...filter, ...dateFilter };
+    }
+
+    if (search.trim()) {
+      const users = await User.find({
+        $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { phone_number: { $regex: search, $options: 'i' } },
+        ],
+      }).select('_id');
+
+      const userIds = users.map((u) => u._id);
+      if (userIds.length === 0) {
+        return res.status(200).json({ success: true, transactions: [] });
+      }
+      filter.$or = [{ sender_id: { $in: userIds } }, { receiver_id: { $in: userIds } }];
+    }
+
+    const transactions = await Transaction.find(filter)
+      .populate({ path: 'sender_id', select: 'name phone_number role_id', populate: { path: 'role_id', select: 'name' } })
+      .populate({ path: 'receiver_id', select: 'name phone_number role_id', populate: { path: 'role_id', select: 'name' } })
+      .sort({ created_at: -1 })
+      .lean();
+
+    const safeTransactions = transactions.filter((txn) => txn?.sender_id?._id && txn?.receiver_id?._id);
+
+    const formattedTransactions = safeTransactions.map((txn) => {
+      const senderId = txn.sender_id._id.toString();
+      let amount = parseFloat(txn.amount);
+      if (senderId === userId) amount = -amount;
+
+      return {
+        id: txn.transaction_id,
+        user: {
+          name: senderId === userId ? txn.receiver_id?.name || 'Unknown' : txn.sender_id?.name || 'Unknown',
+          type: senderId === userId ? txn.receiver_id?.role_id?.name || 'Unknown' : txn.sender_id?.role_id?.name || 'Unknown',
+        },
+        customer_id: customerId,
+        amount,
+        datetime: txn.created_at,
+        status: txn.status,
+        type: txn.transaction_type,
+      };
+    });
+
+    res.status(200).json({ success: true, transactions: formattedTransactions });
+  } catch (error) {
+    console.error('Error in exportTransactionHistoryByCustomerId:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
 };

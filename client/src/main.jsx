@@ -1,5 +1,7 @@
 import React, { StrictMode } from "react";
 import ReactDOM from "react-dom/client";
+// Initialize global axios interceptors (NProgress & Error Handling)
+import "./lib/axios";
 import App from "./App";
 import "./index.css";
 import { AuthProvider } from "./context/AuthContext";
