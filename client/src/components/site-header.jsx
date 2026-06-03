@@ -23,7 +23,7 @@
 //           <div className="flex items-center gap-2">
 //             <img src={logo} alt="logo" className="h-8 w-8" />
 //             <div className="leading-tight text-white text-sm">
-//               <div className="font-semibold">Pegasus 2025</div>
+//               <div className="font-semibold">PEGASUS 2K26</div>
 //               <div className="text-xs">
 //                 {user?.name || "User"} ({user?.role?.name || "Role"})
 //                 <NavUser user={user} />
@@ -112,7 +112,7 @@ export function SiteHeader() {
                   className="font-semibold cursor-pointer text-base sm:text-sm leading-tight truncate"
                   onClick={handleHomePage}
                 >
-                  Pegasus 2025
+                  PEGASUS 2K26
                 </div>
 
                 {/* User Name + Role + Dropdown */}

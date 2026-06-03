@@ -31,6 +31,7 @@ const Products = () => {
     _id: "",
     name: "",
     amount: "",
+    isActive: true,
   });
 
   const fetchProducts = async () => {
@@ -62,9 +63,10 @@ const Products = () => {
         _id: product._id,
         name: product.name,
         amount: product.amount,
+        isActive: product.isActive !== undefined ? product.isActive : true,
       });
     } else {
-      setFormData({ _id: "", name: "", amount: "" });
+      setFormData({ _id: "", name: "", amount: "", isActive: true });
     }
     setIsModalOpen(true);
   };
@@ -80,14 +82,14 @@ const Products = () => {
       if (modalMode === "add") {
         await axios.post(
           `${import.meta.env.VITE_BASE_URL}/products/create`,
-          { name: formData.name, amount: Number(formData.amount) },
+          { name: formData.name, amount: Number(formData.amount), isActive: formData.isActive },
           { withCredentials: true }
         );
         toast.success("Product created successfully");
       } else if (modalMode === "edit") {
         await axios.put(
           `${import.meta.env.VITE_BASE_URL}/products/update/${formData._id}`,
-          { name: formData.name, amount: Number(formData.amount) },
+          { name: formData.name, amount: Number(formData.amount), isActive: formData.isActive },
           { withCredentials: true }
         );
         toast.success("Product updated successfully");
@@ -151,62 +153,45 @@ const Products = () => {
       </div>
 
       <Card className="shadow-md rounded-xl overflow-hidden bg-white">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-[#f0f2f5] border-b text-[#000052]">
-                <th className="p-4 font-semibold">Product Name</th>
-                <th className="p-4 font-semibold">Amount (₹)</th>
-                <th className="p-4 font-semibold">Status</th>
-                <th className="p-4 font-semibold text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr>
-                  <td colSpan="4" className="text-center p-6 text-gray-500">
-                    Loading products...
-                  </td>
-                </tr>
-              ) : products.length === 0 ? (
-                <tr>
-                  <td colSpan="4" className="text-center p-6 text-gray-500">
-                    No products found. Add some to get started!
-                  </td>
-                </tr>
-              ) : (
-                products.map((product) => (
-                  <tr key={product._id} className="border-b hover:bg-gray-50 transition-colors">
-                    <td className="p-4 font-medium text-gray-800">{product.name}</td>
-                    <td className="p-4 text-blue-700 font-bold">₹{product.amount.toFixed(2)}</td>
-                    <td className="p-4">
-                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${product.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                        {product.isActive ? "Active" : "Inactive"}
-                      </span>
-                    </td>
-                    <td className="p-4 text-right">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="mr-2 text-blue-600 border-blue-200 hover:bg-blue-50 cursor-pointer"
-                        onClick={() => handleOpenModal("edit", product)}
-                      >
-                        <Edit size={16} />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-red-600 border-red-200 hover:bg-red-50 cursor-pointer"
-                        onClick={() => handleDeleteProduct(product._id)}
-                      >
-                        <Trash2 size={16} />
-                      </Button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+        {/* Card View (for all screen sizes) */}
+        <div>
+          {isLoading ? (
+            <div className="p-6 text-center text-gray-500">Loading products...</div>
+          ) : products.length === 0 ? (
+            <div className="p-6 text-center text-gray-500">No products found. Add some to get started!</div>
+          ) : (
+            <div className="divide-y border-b">
+              {products.map((product) => (
+                <div key={product._id} className="p-4 hover:bg-gray-50 flex justify-between items-center transition-colors">
+                  <div className="flex flex-col gap-2">
+                    <span className="font-semibold text-gray-800 text-base">{product.name}</span>
+                    <span className="text-blue-700 font-bold text-sm">₹{product.amount.toFixed(2)}</span>
+                    <span className={`w-max px-2 py-0.5 rounded-full text-[11px] font-semibold tracking-wide ${product.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                      {product.isActive ? "Active" : "Inactive"}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="text-blue-600 border-blue-200 hover:bg-blue-50 cursor-pointer h-9 w-9"
+                      onClick={() => handleOpenModal("edit", product)}
+                    >
+                      <Edit size={16} />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="text-red-600 border-red-200 hover:bg-red-50 cursor-pointer h-9 w-9"
+                      onClick={() => handleDeleteProduct(product._id)}
+                    >
+                      <Trash2 size={16} />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </Card>
 
@@ -239,6 +224,18 @@ const Products = () => {
                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                 placeholder="e.g. 150.00"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="status" className="text-[#01004c]">Status</Label>
+              <select
+                id="status"
+                value={formData.isActive ? "true" : "false"}
+                onChange={(e) => setFormData({ ...formData, isActive: e.target.value === "true" })}
+                className="flex h-10 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="true">Active</option>
+                <option value="false">Inactive</option>
+              </select>
             </div>
           </div>
           <DialogFooter>

@@ -78,7 +78,7 @@ const TopUpSection = () => {
 
           <ul className="space-y-4 text-gray-700 text-sm">
             {[
-              "Show this QR code at any Pegasus 2025 Treasury Reception",
+              "Show this QR code at any PEGASUS 2K26 Treasury Reception",
               "Tell the cashier how much you want to add",
               "Pay the amount and your wallet will be updated instantly",
             ].map((text, index) => (
