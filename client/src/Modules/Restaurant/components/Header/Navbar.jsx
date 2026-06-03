@@ -106,7 +106,7 @@ const RestaurantNavbar = () => {
 
   return (
     <>
-      <header className="w-full bg-[#000052] text-white px-6 py-4 flex items-center justify-between shadow-md">
+      <header className="sticky top-0 z-50 w-full bg-[#000052] text-white px-6 py-4 flex items-center justify-between shadow-md">
         {/* Left section: Logo & Name */}
         <div className="flex items-center gap-3">
           <button onClick={() => navigate("/restaurant")} className="focus:outline-none">

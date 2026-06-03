@@ -1211,6 +1211,40 @@ exports.getUserByPhone = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+exports.searchUserExact = async (req, res) => {
+  try {
+    const { query } = req.query;
+    if (!query) {
+      return res.status(400).json({ success: false, message: "Query required" });
+    }
+
+    const q = query.replace(/\s+/g, "");
+    const conditions = [];
+
+    conditions.push({ phone_number: q });
+    conditions.push({ email: { $regex: new RegExp(`^${q}$`, "i") } });
+
+    if (mongoose.Types.ObjectId.isValid(q)) {
+      conditions.push({ _id: q });
+    }
+
+    const customer = await Customer.findOne({ customer_id: q }).lean();
+    if (customer) {
+      conditions.push({ _id: customer.user_id });
+    }
+
+    const users = await User.find({ $or: conditions })
+      .populate("role_id", "name role_id")
+      .select("-password_hash")
+      .lean();
+
+    return res.status(200).json({ success: true, data: users });
+  } catch (err) {
+    console.error("searchUserExact error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
 exports.getTransactionDetails = async (req, res) => {
   try {
     const { transactionId } = req.params;

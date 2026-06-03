@@ -34,20 +34,12 @@ export default function MergeBalance() {
     setLoader(true);
     setUser(null);
     try {
-      // First, find the user
-      // Assuming a generic search endpoint exists or fetching all and filtering
-      const res = await axios.get(`${import.meta.env.VITE_BASE_URL}/users/fetch-all-users`, {
+      const res = await axios.get(`${import.meta.env.VITE_BASE_URL}/users/search-exact?query=${query}`, {
         withCredentials: true,
       });
 
       const users = res.data.data || [];
-      const foundUser = users.find(
-        (u) =>
-          u.phone_number === query ||
-          u.email === query ||
-          u._id === query ||
-          u.customer_id === query // In case customer_id is what they mean by UserID
-      );
+      const foundUser = users.length > 0 ? users[0] : null;
 
       if (!foundUser) {
         toast.error(`No user found for query: ${query}`);

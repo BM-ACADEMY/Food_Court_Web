@@ -81,6 +81,7 @@ const initSocket = async (server) => {
         "https://pegasus2026.com",
         "https://www.pegasus2026.com",
         "https://pegasus2025sample.vercel.app",
+        "http://localhost:5173",
       ],
       credentials: true,
       methods: ["GET", "POST"],

@@ -51,6 +51,7 @@ router.delete("/delete-user/:id", userController.deleteUser);
 
 // Add to existing routes
 router.get("/fetch-by-phone", userController.getUserByPhone);
+router.get("/search-exact", userController.searchUserExact);
 
 // routes/authRoutes.js
 router.post("/forgot-password", userController.forgotPassword);
