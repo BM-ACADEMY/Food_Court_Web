@@ -335,7 +335,22 @@ exports.createUser = async (req, res) => {
         await sendEmail({
           to: email,
           subject: "Welcome! Here is your personal QR Code",
-          html: `<p>Hello ${name},</p><p>Welcome to Food Court! Please find your unique QR code attached.</p><p>You can use this QR code to identify yourself on the platform.</p>`,
+          text: `Hello ${name},\n\nWelcome to Pegasus2026! Please find your unique QR code attached.\n\nYou can use this QR code to identify yourself on the platform.`,
+          html: `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="utf-8">
+            </head>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+              <p>Hello ${name},</p>
+              <p>Welcome to Pegasus2026! Please find your unique QR code attached.</p>
+              <p>You can use this QR code to identify yourself on the platform.</p>
+              <br>
+              <p>Best Regards,<br>Pegasus2026 Team</p>
+            </body>
+            </html>
+          `,
           attachments: [
             {
               filename: 'qrcode.png',
