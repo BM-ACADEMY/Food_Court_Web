@@ -335,19 +335,35 @@ exports.createUser = async (req, res) => {
         await sendEmail({
           to: email,
           subject: "Welcome! Here is your personal QR Code",
-          text: `Hello ${name},\n\nWelcome to Pegasus2026! Please find your unique QR code attached.\n\nYou can use this QR code to identify yourself on the platform.`,
+          text: `Hello ${name},\n\nWelcome to Pegasus2026! Thank you for registering with us.\n\nTo help you get started, we have generated a unique QR code for your account. You will use this QR code to identify yourself and access various features on the platform seamlessly.\n\nPlease find your unique QR code attached.\n\nBest Regards,\nThe Pegasus2026 Team`,
           html: `
             <!DOCTYPE html>
-            <html>
+            <html lang="en">
             <head>
               <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Your Pegasus2026 QR Code</title>
             </head>
-            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-              <p>Hello ${name},</p>
-              <p>Welcome to Pegasus2026! Please find your unique QR code attached.</p>
-              <p>You can use this QR code to identify yourself on the platform.</p>
-              <br>
-              <p>Best Regards,<br>Pegasus2026 Team</p>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #e9ecef;">
+                <h2 style="color: #2c3e50; margin-top: 0;">Welcome to Pegasus2026!</h2>
+                <p>Hello <strong>${name}</strong>,</p>
+                <p>Thank you for registering with us. We are thrilled to have you on board.</p>
+                <p>To help you get started, we have generated a unique QR code for your account. You will use this QR code to identify yourself and access various features on the platform seamlessly.</p>
+                
+                <div style="text-align: center; margin: 30px 0; padding: 20px; background-color: white; border-radius: 8px;">
+                  <img src="cid:qrcode@pegasus2026.com" alt="Your Unique QR Code" style="max-width: 200px; height: auto; border: 1px solid #ddd; padding: 10px; border-radius: 4px;">
+                  <p style="font-size: 12px; color: #6c757d; margin-top: 10px;">Please do not share this QR code with others as it is unique to your account.</p>
+                </div>
+                
+                <p>If you have any questions or need assistance, feel free to reach out to our support team.</p>
+                <br>
+                <p style="margin-bottom: 0;">Best Regards,</p>
+                <p style="font-weight: bold; margin-top: 5px; color: #2c3e50;">The Pegasus2026 Team</p>
+              </div>
+              <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #999;">
+                <p>This is an automated message. Please do not reply directly to this email.</p>
+              </div>
             </body>
             </html>
           `,
@@ -355,6 +371,9 @@ exports.createUser = async (req, res) => {
             {
               filename: 'qrcode.png',
               content: qrImageBuffer,
+              contentType: 'image/png',
+              contentDisposition: 'inline',
+              cid: 'qrcode@pegasus2026.com', // Unique CID for inline embedding
             }
           ]
         });
