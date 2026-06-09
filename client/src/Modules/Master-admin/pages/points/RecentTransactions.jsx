@@ -38,7 +38,7 @@ const Avatar = ({ name = "" }) => {
   );
 };
 
-export default function RecentTransactions() {
+export default function RecentTransactions({ refreshTrigger }) {
   const [transactions, setTransactions] = useState([]);
   const [visibleCount, setVisibleCount] = useState(5);
 
@@ -55,7 +55,7 @@ export default function RecentTransactions() {
 
   useEffect(() => {
     loadTransactions();
-  }, []);
+  }, [refreshTrigger]);
 
   const loadMore = () => {
     setVisibleCount(transactions.length);

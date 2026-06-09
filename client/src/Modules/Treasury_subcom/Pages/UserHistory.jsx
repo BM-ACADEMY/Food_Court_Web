@@ -424,8 +424,8 @@ const UserHistory = () => {
                       <td className="px-2 sm:px-4 py-2" style={{ color: transaction.amount > 0 ? 'green' : 'red' }}>
                         {transaction.amount !== undefined
                           ? (transaction.amount > 0
-                              ? `₹${transaction.amount.toFixed(2)}`
-                              : `-₹${Math.abs(transaction.amount).toFixed(2)}`)
+                            ? `₹${transaction.amount.toFixed(2)}`
+                            : `-₹${Math.abs(transaction.amount).toFixed(2)}`)
                           : "N/A"}
                       </td>
                       <td className="px-2 sm:px-4 py-2">{transaction.type || "N/A"}</td>

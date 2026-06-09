@@ -2930,6 +2930,7 @@ exports.getTransactionHistoryByCustomerId = async (req, res) => {
         datetime: txn.created_at,
         status: txn.status,
         type: txn.transaction_type,
+        payment_method: txn.payment_method || "N/A",
       };
     });
 
@@ -3023,6 +3024,7 @@ exports.exportTransactionHistoryByCustomerId = async (req, res) => {
         datetime: txn.created_at,
         status: txn.status,
         type: txn.transaction_type,
+        payment_method: txn.payment_method || "N/A",
       };
     });
 
