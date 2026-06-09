@@ -3,7 +3,7 @@ import axios from "axios";
 import { DollarSign, Users, ArrowRightLeft } from "lucide-react";
 
 
-export default function DashboardCards() {
+export default function DashboardCards({ refreshTrigger }) {
   const [dashboardData, setDashboardData] = useState(null);
 
   useEffect(() => {
@@ -17,7 +17,7 @@ export default function DashboardCards() {
     };
 
     fetchSummary();
-  }, []);
+  }, [refreshTrigger]);
 
   if (!dashboardData) return <p className="text-center text-muted">Loading summary...</p>;
 

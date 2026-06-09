@@ -1,5 +1,5 @@
 import BackButton from "@/components/BackButton";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import { useAuth } from "@/context/AuthContext";
 import TopUpSuccess from "./TopUpSuccess";
@@ -14,6 +14,48 @@ function TopUpOnline({ customer }) {
   const [newBalance, setNewBalance] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  const fetchCustomerHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const response = await axios.get(
+        `${import.meta.env.VITE_BASE_URL}/transactions/history/customer/${customer.customer_id}`,
+        {
+          params: { page: 1, limit: 5 },
+          withCredentials: true,
+        }
+      );
+      if (response.data.success) {
+        setHistory(response.data.transactions || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch history", err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (customer?.customer_id) {
+      fetchCustomerHistory();
+    }
+  }, [customer]);
+
+  const formatReadableDate = (dateStr) => {
+    if (!dateStr) return "N/A";
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return "N/A";
+      return date.toLocaleString('en-IN', {
+        day: 'numeric', month: 'short', year: 'numeric', 
+        hour: 'numeric', minute: 'numeric', hour12: true
+      });
+    } catch {
+      return "N/A";
+    }
+  };
 
   const paymentMethods = [
     { label: "Cash", value: "Cash", icon: "💵" },
@@ -59,11 +101,6 @@ function TopUpOnline({ customer }) {
       return setError("User or customer ID is missing.");
     }
 
-    // const idFormat = /^[0-9a-fA-F]{24}$/;
-    // if ( !idFormat.test(customer.user_id)) {
-    //   return setError("Invalid ID format.");
-    // }
-
     setLoading(true);
     setError(null);
 
@@ -94,6 +131,7 @@ function TopUpOnline({ customer }) {
       setTransactionId(txnId);
       setNewBalance(updatedBalance);
       setTopUpComplete(true);
+      fetchCustomerHistory();
     } catch (err) {
       const msg =
         err.response?.data?.message ||
@@ -133,10 +171,11 @@ function TopUpOnline({ customer }) {
   }
 
   return (
-    <div className="min-h-screen relative flex justify-center items-center bg-white px-4 py-8">
+    <div className="min-h-screen relative flex justify-center items-start bg-white px-4 py-8 overflow-y-auto pt-20">
       <BackButton />
-      <div className="max-w-lg w-full border p-6 rounded-lg shadow-lg bg-gray-50">
-        <h2 className="text-2xl font-bold mb-4 text-[#070149] text-center">Online Top-Up</h2>
+      <div className="w-full max-w-lg flex flex-col gap-6">
+        <div className="w-full border p-6 rounded-lg shadow-lg bg-gray-50">
+          <h2 className="text-2xl font-bold mb-4 text-[#070149] text-center">Online Top-Up</h2>
         
         <div className="mb-4">
           <p className="text-sm text-gray-700"><strong>Customer:</strong> {customer.name}</p>
@@ -191,6 +230,49 @@ function TopUpOnline({ customer }) {
         >
           {loading ? "Processing..." : "Top Up Now"}
         </button>
+      </div>
+
+      {/* History Table */}
+      <div className="w-full border p-6 rounded-lg shadow-lg bg-gray-50">
+        <h3 className="text-xl font-bold mb-4 text-[#070149]">Recent Transactions</h3>
+        {historyLoading ? (
+          <p className="text-sm text-gray-500">Loading history...</p>
+        ) : history.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-gray-200 text-gray-700">
+                <tr>
+                  <th className="px-3 py-2">Date</th>
+                  <th className="px-3 py-2">Amount</th>
+                  <th className="px-3 py-2">Type</th>
+                  <th className="px-3 py-2">Mode</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((txn, idx) => (
+                  <tr key={idx} className="border-b">
+                    <td className="px-3 py-2 whitespace-nowrap">{formatReadableDate(txn.datetime)}</td>
+                    <td className="px-3 py-2 font-medium" style={{ color: txn.amount > 0 ? 'green' : 'red' }}>
+                      {txn.amount > 0 ? `+₹${txn.amount}` : `-₹${Math.abs(txn.amount)}`}
+                    </td>
+                    <td className="px-3 py-2">{txn.type}</td>
+                    <td className="px-3 py-2">
+                      {txn.payment_method ? (
+                        <span className="px-2 py-1 bg-gray-100 border rounded-md text-xs">{txn.payment_method}</span>
+                      ) : (
+                        "N/A"
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-500">No recent transactions found.</p>
+        )}
+      </div>
+
       </div>
     </div>
   );

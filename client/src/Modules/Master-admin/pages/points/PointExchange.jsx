@@ -97,7 +97,7 @@ const PointExchange = () => {
     const [status, setStatus] = useState("");
     const [sortBy, setSortBy] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
-    const { user } = useAuth();
+    const { user, fetchUser } = useAuth();
     const [roles, setRoles] = useState([]);
     const [users, setUsers] = useState([]);
     const [visibleTransactions, setVisibleTransactions] = useState(transactions.slice(0, 5));
@@ -106,6 +106,7 @@ const PointExchange = () => {
     const [page, setPage] = useState(1);
     const [selectedReceiver, setSelectedReceiver] = useState(null);
     const [openModal, setOpenModal] = useState(false);
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
     const transactionRef = useRef(null);
 
     const scrollToTransactions = () => {
@@ -202,7 +203,12 @@ const PointExchange = () => {
                                 </DialogTitle>
                             </DialogHeader>
 
-                            <AddPointForm onSuccess={() => setOpen(false)} />
+                            <AddPointForm onSuccess={async () => {
+                                setOpen(false);
+                                setRefreshTrigger(prev => prev + 1);
+                                fetchUsers(selectedRoleId, page);
+                                await fetchUser();
+                            }} />
                         </DialogContent>
                     </Dialog>
                 </div>
@@ -211,7 +217,7 @@ const PointExchange = () => {
 
             {/* Cards */}
             <div >
-                <DashboardCards />
+                <DashboardCards refreshTrigger={refreshTrigger} />
             </div>
 
             {/* Search and Filters */}
@@ -390,7 +396,12 @@ const PointExchange = () => {
                             <AddFundModalForm
                                 senderId={user._id}
                                 receiver={selectedReceiver}
-                                onClose={() => setOpenModal(false)}
+                                onClose={async () => {
+                                    setOpenModal(false);
+                                    setRefreshTrigger(prev => prev + 1);
+                                    fetchUsers(selectedRoleId, page);
+                                    await fetchUser();
+                                }}
                             />
                         )}
                     </DialogContent>
@@ -398,7 +409,7 @@ const PointExchange = () => {
             </div>
 
             <div className="mt-3" ref={transactionRef}>
-                <RecentTransactions />
+                <RecentTransactions refreshTrigger={refreshTrigger} />
             </div>
         </div>
     );
