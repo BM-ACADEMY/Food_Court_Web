@@ -1466,6 +1466,30 @@ exports.resetPassword = async (req, res) => {
   }
 };
 
+exports.adminResetPassword = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { password, confirm_password } = req.body;
 
+    if (!password || !confirm_password) {
+      return res.status(400).json({ success: false, message: "Password and confirm password are required" });
+    }
+    if (password !== confirm_password) {
+      return res.status(400).json({ success: false, message: "Passwords do not match" });
+    }
 
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
 
+    const password_hash = await bcrypt.hash(password, 10);
+    user.password_hash = password_hash;
+    await user.save();
+
+    res.status(200).json({ success: true, message: "Password reset successfully" });
+  } catch (error) {
+    console.error("adminResetPassword error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};

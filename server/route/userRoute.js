@@ -58,6 +58,6 @@ router.post("/forgot-password", userController.forgotPassword);
 
 router.post("/reset-password/:token", userController.resetPassword);
 
-
+router.put("/admin-reset-password/:id", userController.adminResetPassword);
 
 module.exports = router;
