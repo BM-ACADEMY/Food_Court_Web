@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Eye, Pencil, Trash2, UserPlus, Search, Lock, Unlock } from "lucide-react";
 import { useState, useEffect } from "react";
 import { UserForm } from "./UserForm";
+import { PasswordResetModal } from "./PasswordResetModal";
 import { toast, Bounce } from "react-toastify";
 import axios from "axios";
 import {
@@ -83,6 +84,7 @@ export default function UserList() {
     const perPage = 10;
     const [selectedUserForDelete, setSelectedUserForDelete] = useState(null);
     const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
+    const [openPasswordReset, setOpenPasswordReset] = useState(false);
     const [totalPages, setTotalPages] = useState(1);
 
     useEffect(() => {
@@ -445,9 +447,14 @@ export default function UserList() {
                     </div>
                 </div>
 
-                <Button onClick={() => { setEditUser(null); setOpenModal(true); }} className="bg-[#00004D]">
-                    <UserPlus className="mr-2 h-4 w-4" /> Add User
-                </Button>
+                <div className="flex gap-2">
+                    <Button onClick={() => setOpenPasswordReset(true)} variant="outline" className="border-[#00004D] text-[#00004D] hover:bg-[#00004D] hover:text-white">
+                        <Lock className="mr-2 h-4 w-4" /> Reset Password
+                    </Button>
+                    <Button onClick={() => { setEditUser(null); setOpenModal(true); }} className="bg-[#00004D]">
+                        <UserPlus className="mr-2 h-4 w-4" /> Add User
+                    </Button>
+                </div>
             </div>
 
             {/* Table */}
@@ -679,6 +686,11 @@ export default function UserList() {
                 onOpenChange={(val) => { setOpenModal(val); if (!val) setEditUser(null); }}
                 onSubmit={handleSubmit}
                 defaultValues={editUser}
+            />
+
+            <PasswordResetModal 
+                open={openPasswordReset} 
+                onOpenChange={setOpenPasswordReset} 
             />
         </div>
     );
